@@ -48,6 +48,7 @@ console.log('frontmatter ok')
 NODE
 
 grep -q 'superpowers@git+https://github.com/obra/superpowers.git' opencode/opencode.json
+grep -q '"default_agent": "developer"' opencode/opencode.json
 
 grep -q 'Open Design' README.md
 grep -q 'Superpowers' README.md
@@ -56,6 +57,9 @@ grep -q 'Impeccable' README.md
 grep -q '"open-design": allow' opencode/agents/designer.md
 grep -q '"impeccable": allow' opencode/agents/designer.md
 grep -q '"superpowers"' opencode/agents/designer.md && { echo 'designer should not allow superpowers' >&2; exit 1; } || true
+grep -q 'mode: all' opencode/agents/developer.md
+grep -q 'Direct mode without slash commands' opencode/agents/developer.md
+grep -q 'Default behavior without slash commands' opencode/agents/lead.md
 
 grep -q 'researcher: allow' opencode/agents/scoper.md
 grep -q 'specifier: allow' opencode/agents/scoper.md
@@ -64,6 +68,9 @@ grep -q 'specifier: allow' opencode/agents/scoper.md
 
 grep -q 'Never invoke `developer` before' opencode/agents/lead.md
 grep -q 'Never invoke `reviewer` before' opencode/agents/lead.md
+grep -q 'agent: lead' opencode/commands/feature.md
+grep -q 'agent: scoper' opencode/commands/scope.md
+grep -q 'agent: designer' opencode/commands/design.md
 grep -q 'evaluator' opencode/commands/evolve.md
 grep -q 'debugger' opencode/commands/evolve.md
 grep -q 'evolver' opencode/commands/evolve.md

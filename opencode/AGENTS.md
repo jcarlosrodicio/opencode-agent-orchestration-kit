@@ -10,6 +10,8 @@ Use a phased product-development flow:
 4. Implementation in small changes.
 5. Review before closing.
 
+For normal messages without a slash command, prefer direct mode: if the change is small, clear, and low risk, it can go straight to implementation with reasonable validation. Full flows activate when the user uses commands like `/feature`, `/scope`, `/design`, `/evolve`, or when the scope truly requires orchestration.
+
 ## Available agents
 
 - `lead`: main orchestrator for product work.
@@ -40,6 +42,8 @@ Use a phased product-development flow:
 - Feature: `lead -> designer if applicable -> researcher -> specifier -> developer -> reviewer`.
 - Scope: `scoper -> researcher -> scoper synthesis -> specifier`.
 - Design: `designer -> open-design`.
+
+These base flows are command contracts, not mandatory behavior for every free-form message.
 
 Rules:
 

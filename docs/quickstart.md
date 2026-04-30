@@ -23,7 +23,15 @@ Use the base URL only.
 
 Expected flow: researcher -> scoper synthesis -> specifier.
 
-## 4. Try design
+## 4. Try direct mode
+
+```text
+Change the Settings heading to Account settings and run the smallest relevant validation.
+```
+
+Expected flow: developer handles the small change directly. No full feature orchestration.
+
+## 5. Try design
 
 ```text
 /design Read PRODUCT.md and DESIGN.md, create an editable Open Design project for onboarding, and return the URL
@@ -31,7 +39,7 @@ Expected flow: researcher -> scoper synthesis -> specifier.
 
 Expected flow: designer checks docs, optionally uses Impeccable, then uses Open Design.
 
-## 5. Try feature
+## 6. Try feature
 
 ```text
 /feature Add a small settings page with a saved theme preference

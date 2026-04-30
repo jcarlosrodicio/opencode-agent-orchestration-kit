@@ -1,5 +1,11 @@
 # Workflows
 
+## Direct mode
+
+Free-form messages without a slash command use `developer` by default. This is intended for small, clear, low-risk changes where a full product-development pipeline would be unnecessary.
+
+If the request has ambiguity, visual/product impact, medium or large scope, or critical missing context, switch to `/feature`, `/scope`, `/design`, or `/spec`.
+
 ## Feature
 
 `lead -> designer if applicable -> researcher -> specifier -> developer -> reviewer`

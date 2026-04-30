@@ -8,6 +8,8 @@ This repository is not affiliated with OpenCode, Open Design, Impeccable, or Sup
 
 ## Architecture
 
+By default, free-form messages open with `developer` for small, clear, low-risk changes. Use slash commands when you want an explicit workflow.
+
 Core feature flow:
 
 ```text
@@ -144,6 +146,8 @@ Do not expose Open Design directly to the Internet without authentication, VPN, 
 /design Read PRODUCT.md and DESIGN.md, create an editable Open Design project, and generate a first version
 /review
 ```
+
+Without a slash command, simple implementation requests go directly through `developer`. Use `/feature` when you want the full orchestration flow.
 
 ## Docker Open Design
 

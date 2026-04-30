@@ -10,3 +10,5 @@ The kit is organized as an OpenCode config directory:
 - `tools/`: custom TypeScript tools.
 
 The default permissions are conservative: reads are allowed, edits and bash ask by default, and external directories are denied.
+
+The default agent is `developer`, with `mode: all`, so free-form small changes can be implemented directly. Slash commands still route to their explicit agents, for example `/feature` to `lead`, `/scope` to `scoper`, and `/design` to `designer`.
