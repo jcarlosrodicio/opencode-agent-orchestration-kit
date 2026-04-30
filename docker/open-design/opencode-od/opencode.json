@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "{env:OPENCODE_MODEL}",
+  "small_model": "{env:OPENCODE_SMALL_MODEL}",
+  "default_agent": "od-worker",
+  "share": "disabled",
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "edit": "allow",
+    "bash": "ask",
+    "webfetch": "ask",
+    "websearch": "ask",
+    "external_directory": "deny"
+  },
+  "agent": {
+    "od-worker": {
+      "model": "{env:OPENCODE_MODEL}",
+      "temperature": 0.4
+    }
+  }
+}

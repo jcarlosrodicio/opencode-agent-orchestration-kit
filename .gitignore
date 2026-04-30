@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+auth.json
+.local/
+opencode-auth/
+sessions/
+logs/
+docker/open-design/data/
+docker/open-design/opencode-auth/
+node_modules/
+dist/
+build/
+.DS_Store
+.backup.*
+*.backup
