@@ -21,6 +21,13 @@ docker/open-design/Dockerfile
 docker/open-design/docker-compose.yml
 docker/open-design/.env.example
 docker/open-design/opencode-od/opencode.json
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+.github/PULL_REQUEST_TEMPLATE.md
+.github/ISSUE_TEMPLATE/config.yml
+.github/ISSUE_TEMPLATE/bug_report.yml
+.github/ISSUE_TEMPLATE/feature_request.yml
+.github/ISSUE_TEMPLATE/documentation.yml
 "
 
 for file in $required_files; do

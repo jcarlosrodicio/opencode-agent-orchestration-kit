@@ -1,0 +1,65 @@
+name: Bug report
+description: Report something broken in the kit configuration, installer, docs, Docker setup, agents, commands, skills, or tools.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please do not include secrets, auth files, private logs, or private product data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: List the exact steps, commands, or OpenCode prompts needed to reproduce the issue.
+      placeholder: |
+        1. Run ...
+        2. Configure ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - agents
+        - commands
+        - open-design skill/tool
+        - Superpowers integration
+        - Impeccable documentation
+        - Docker Open Design
+        - install/uninstall scripts
+        - documentation
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, OpenCode version, Docker version if relevant, and any safe non-secret config details.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste only sanitized logs or screenshots.

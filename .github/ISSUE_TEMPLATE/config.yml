@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: OpenCode
+    url: https://github.com/anomalyco/opencode
+    about: Use OpenCode upstream for runtime bugs unrelated to this kit.
+  - name: Open Design
+    url: https://github.com/nexu-io/open-design
+    about: Use Open Design upstream for workbench bugs unrelated to this integration.
+  - name: Superpowers
+    url: https://github.com/obra/superpowers
+    about: Use Superpowers upstream for plugin or skill behavior unrelated to this kit.
