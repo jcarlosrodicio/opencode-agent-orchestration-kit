@@ -7,7 +7,10 @@
   "scripts": {
     "check": "bash scripts/check.sh",
     "lint": "bash scripts/check.sh",
-    "format": "echo 'No formatter configured. Markdown and shell are intentionally plain.'"
+    "format": "echo 'No formatter configured. Markdown and shell are intentionally plain.'",
+    "console:dev": "npm --prefix console run dev",
+    "console:check": "npm --prefix console run check",
+    "console:build": "npm --prefix console run build"
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.14.29"

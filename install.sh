@@ -2,7 +2,7 @@
 set -euo pipefail
 
 force=0
-target="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"
+target="$HOME/.config/opencode"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in

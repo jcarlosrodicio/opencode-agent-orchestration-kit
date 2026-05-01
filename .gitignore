@@ -11,6 +11,10 @@ docker/open-design/opencode-auth/
 node_modules/
 dist/
 build/
+.svelte-kit/
+console/.svelte-kit/
+console/build/
+console/.data/
 .DS_Store
 .backup.*
 *.backup
