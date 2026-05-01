@@ -29,3 +29,10 @@ Designer reads product/design docs, optionally uses Impeccable, then creates or 
 `evaluator -> debugger -> evolver -> lead approval -> developer -> evaluator -> debugger -> reviewer`
 
 Only for improving the harness itself.
+
+Harness-evolution evidence is classified in `opencode/docs/ai/harness/evidence.md`:
+
+- `static_contract`: file and contract inspection.
+- `transcript_replay`: `opencode run --format json --thinking` execution.
+- `live_smoke`: real repo, app, browser, or runtime check.
+- `manual_oracle`: documented human judgment.

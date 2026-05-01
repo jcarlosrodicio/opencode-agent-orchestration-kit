@@ -9,3 +9,5 @@
 - `/implement`: direct developer task for approved work.
 - `/review`: direct reviewer task for current diff.
 - `/evolve`: optional AHE harness evolution flow.
+
+Detailed command contracts live in `opencode/docs/ai/harness/commands.md`.

@@ -34,6 +34,13 @@ Optional harness-evolution flow:
 evaluator -> debugger -> evolver -> lead approval -> developer -> evaluator -> debugger -> reviewer
 ```
 
+Harness contracts are versioned inside the shipped OpenCode config:
+
+- `opencode/AGENTS.md`: short index for agents.
+- `opencode/docs/ai/harness/`: agent, command, evidence, and check contracts.
+- `opencode/docs/ai/evolution/`: AHE benchmark and evolution records.
+- `opencode/scripts/check-harness.mjs`: local mechanical validation for the harness.
+
 ## Skills and integrations
 
 Included locally:
@@ -148,6 +155,14 @@ Do not expose Open Design directly to the Internet without authentication, VPN, 
 ```
 
 Without a slash command, simple implementation requests go directly through `developer`. Use `/feature` when you want the full orchestration flow.
+
+## Validate the kit
+
+```bash
+npm run check
+```
+
+This runs the repository checks plus the harness validator in `opencode/scripts/check-harness.mjs`.
 
 ## Docker Open Design
 

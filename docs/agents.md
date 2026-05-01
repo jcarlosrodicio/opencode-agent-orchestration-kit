@@ -17,3 +17,5 @@
 - `evolver`: proposes harness changes only with evidence.
 
 Sidecars are not part of the normal feature flow.
+
+Detailed agent contracts live in `opencode/docs/ai/harness/agents.md`.

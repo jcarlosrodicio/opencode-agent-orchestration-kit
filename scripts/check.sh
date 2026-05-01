@@ -17,6 +17,15 @@ package.json
 opencode/AGENTS.md
 opencode/opencode.json
 opencode/tools/open_design.ts
+opencode/scripts/check-harness.mjs
+opencode/docs/ai/harness/README.md
+opencode/docs/ai/harness/agents.md
+opencode/docs/ai/harness/commands.md
+opencode/docs/ai/harness/evidence.md
+opencode/docs/ai/harness/checks.md
+opencode/docs/ai/evolution/README.md
+opencode/docs/ai/evolution/evolution_history.md
+opencode/docs/ai/evolution/benchmarks/manual-scenarios.md
 docker/open-design/Dockerfile
 docker/open-design/docker-compose.yml
 docker/open-design/.env.example
@@ -39,6 +48,7 @@ for file in install.sh uninstall.sh scripts/check.sh; do
 done
 
 node -e "JSON.parse(require('fs').readFileSync('opencode/opencode.json','utf8')); JSON.parse(require('fs').readFileSync('docker/open-design/opencode-od/opencode.json','utf8')); console.log('json ok')"
+(cd opencode && node scripts/check-harness.mjs)
 
 node <<'NODE'
 const fs = require('fs')
@@ -88,7 +98,7 @@ grep -q 'OPEN_DESIGN_URL' opencode/tools/open_design.ts
 ! grep -q 'from "node:crypto"' opencode/tools/open_design.ts
 
 private_re="$(printf '%s|%s|%s|%s' '/''Users/' 'synology''\\.me' 'auth''\\.json' 'OPENAI''_API_KEY')"
-if grep -R -nE "$private_re" . --exclude-dir=.git --exclude='check.sh' --exclude='.gitignore'; then
+if grep -R -nE "$private_re" . --exclude-dir=.git --exclude='.git' --exclude='check.sh' --exclude='.gitignore'; then
   echo 'Potential private data found' >&2
   exit 1
 fi

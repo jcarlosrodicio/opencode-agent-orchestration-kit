@@ -46,3 +46,11 @@ Expected flow: designer checks docs, optionally uses Impeccable, then uses Open 
 ```
 
 Expected flow: lead decides research/design needs, then specifier -> developer -> reviewer.
+
+## 7. Validate harness contracts
+
+```bash
+npm run check
+```
+
+The check validates config JSON, agent/command frontmatter, the default `developer` direct mode, `/feature` sidecar boundaries, and the agent-readable docs under `opencode/docs/ai/harness/`.

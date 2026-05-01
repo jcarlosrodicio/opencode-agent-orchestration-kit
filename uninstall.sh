@@ -51,6 +51,15 @@ commands/review.md
 commands/evolve.md
 skills/open-design/SKILL.md
 tools/open_design.ts
+scripts/check-harness.mjs
+docs/ai/harness/README.md
+docs/ai/harness/agents.md
+docs/ai/harness/commands.md
+docs/ai/harness/evidence.md
+docs/ai/harness/checks.md
+docs/ai/evolution/README.md
+docs/ai/evolution/evolution_history.md
+docs/ai/evolution/benchmarks/manual-scenarios.md
 "
 
 if [ "$yes" -ne 1 ]; then
@@ -68,6 +77,12 @@ for file in $known_files; do
 done
 
 find "$target/skills/open-design" -type d -empty -delete 2>/dev/null || true
+find "$target/docs/ai/evolution/benchmarks" -type d -empty -delete 2>/dev/null || true
+find "$target/docs/ai/evolution" -type d -empty -delete 2>/dev/null || true
+find "$target/docs/ai/harness" -type d -empty -delete 2>/dev/null || true
+find "$target/docs/ai" -type d -empty -delete 2>/dev/null || true
+find "$target/docs" -type d -empty -delete 2>/dev/null || true
+find "$target/scripts" -type d -empty -delete 2>/dev/null || true
 for dir in agents commands skills tools; do
   find "$target/$dir" -type d -empty -delete 2>/dev/null || true
 done

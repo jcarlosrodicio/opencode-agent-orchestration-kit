@@ -1,29 +1,41 @@
 # Global Rules for OpenCode
 
+This file is the short map for the harness. Detailed contracts live in
+`docs/ai/harness/`; harness evolution records live in `docs/ai/evolution/`.
+
 ## Work model
 
-Use a phased product-development flow:
+- For normal messages without a slash command, use the simplest path.
+- If a change is small, clear, and low risk, direct mode goes to `developer`.
+- Full flows activate through slash commands such as `/feature`, `/scope`,
+  `/design`, `/review`, or `/evolve`.
+- Before implementing, understand the stack, scope, and minimum validation.
+- At closure, summarize changes, validation, and risks.
 
-1. Research when there is uncertainty.
-2. Design when there is visual, UX, brand, layout, or interaction impact.
-3. Specification before medium or large implementation.
-4. Implementation in small changes.
-5. Review before closing.
+## Agents
 
-For normal messages without a slash command, prefer direct mode: if the change is small, clear, and low risk, it can go straight to implementation with reasonable validation. Full flows activate when the user uses commands like `/feature`, `/scope`, `/design`, `/evolve`, or when the scope truly requires orchestration.
+- `developer`: direct implementation and reasonable validation.
+- `lead`: orchestration with phase barriers.
+- `designer`: UX/UI, brand, layout, interaction, and Open Design.
+- `researcher`: technical/product uncertainty, APIs, libraries, and risks.
+- `specifier`: specs, atomic tasks, acceptance criteria, and validation.
+- `reviewer`: diff review, security, bugs, risks, and compliance.
+- `scoper`: research -> spec without implementation.
+- `evaluator`: optional benchmark/smoke evidence sidecar.
+- `debugger`: optional traces, root causes, and attribution sidecar.
+- `evolver`: sidecar only for OpenCode harness evolution.
 
-## Available agents
+See `docs/ai/harness/agents.md` for full contracts.
 
-- `lead`: main orchestrator for product work.
-- `scoper`: lightweight research -> spec orchestrator.
-- `designer`: visual design, UX/UI, Open Design handoff.
-- `researcher`: technical and product research.
-- `specifier`: specifications, tasks, acceptance criteria, validation plan.
-- `developer`: implementation.
-- `reviewer`: code review.
-- `evaluator`: optional AHE evidence sidecar.
-- `debugger`: optional AHE/debugging sidecar.
-- `evolver`: optional harness-evolution sidecar.
+## Base flows
+
+- Small free-form request: `developer`.
+- Full feature: `lead -> designer if applicable -> researcher -> specifier -> developer -> reviewer`.
+- Scope/spec without implementation: `scoper -> researcher -> scoper synthesis -> specifier`.
+- Design: `designer -> open design`.
+- AHE evolution: `evaluator -> debugger -> evolver -> lead approval -> developer -> evaluator -> debugger -> reviewer`.
+
+See `docs/ai/harness/commands.md` for command contracts.
 
 ## General rules
 
@@ -32,31 +44,13 @@ For normal messages without a slash command, prefer direct mode: if the change i
 - Do not touch secrets or credentials.
 - Do not run destructive commands without explicit approval.
 - Do not introduce dependencies without justification.
-- Understand the stack and conventions before implementing.
-- Do not implement without a minimal spec and acceptance criteria.
-- Do not close without validation evidence or a clear reason validation was not run.
-- Summarize changes, validation, and risks at closure.
-
-## Base flows
-
-- Feature: `lead -> designer if applicable -> researcher -> specifier -> developer -> reviewer`.
-- Scope: `scoper -> researcher -> scoper synthesis -> specifier`.
-- Design: `designer -> open-design`.
-
-These base flows are command contracts, not mandatory behavior for every free-form message.
-
-Rules:
-
-- If research is pending, `specifier` waits.
-- If design affects requirements or acceptance criteria, `specifier` waits.
-- `developer` waits for `specifier`.
-- `reviewer` waits for `developer` and a reviewable diff.
-- Only parallelize independent work.
-- `lead` acts as the barrier between phases.
+- Do not expand scope silently.
+- Do not close if required validation failed or was not run without saying why.
 
 ## Superpowers discipline
 
-This kit enables the upstream Superpowers OpenCode plugin. Use it as operational discipline when applicable:
+This kit enables the upstream Superpowers OpenCode plugin. Use it as operational
+discipline when applicable:
 
 - brainstorming for ambiguous feature intent;
 - writing-plans before complex implementation;
@@ -67,19 +61,29 @@ This kit enables the upstream Superpowers OpenCode plugin. Use it as operational
 
 User instructions and the local repo `AGENTS.md` take precedence.
 
-## AHE sidecars
+## Observability
 
-AHE sidecars do not redefine the normal feature flow. Use them only when there is concrete value:
+Observability does not redefine the normal flow. `evaluator`, `debugger`, and
+`evolver` are sidecars, not mandatory phases for normal features.
 
-- `evaluator`: additional smoke/benchmark evidence or `/evolve`.
-- `debugger`: failures, traces, root cause, or `/evolve`.
-- `evolver`: changes to this harness only; never normal app features.
+Evidence types:
 
-Harness evolution flow:
+- `static_contract`: file and contract inspection.
+- `transcript_replay`: `opencode run --format json --thinking` execution.
+- `live_smoke`: real repo, app, browser, or runtime check.
+- `manual_oracle`: documented human judgment.
 
-1. `evaluator` captures scenarios and results.
-2. `debugger` turns results into patterns and root causes.
-3. `evolver` proposes changes only with evidence, predicted fixes, and risk tasks.
-4. `developer` applies approved harness changes.
-5. `evaluator` and `debugger` attribute fixes/regressions.
-6. `reviewer` reviews manifest, diff, and evaluation.
+See `docs/ai/harness/evidence.md` for evidence thresholds.
+
+## AHE evolution
+
+To change agents, commands, skills, tools, or global rules:
+
+1. Run evaluable scenarios with `evaluator`.
+2. Turn results into root causes with `debugger`.
+3. Use `evolver` only with evidence, root cause, predicted fixes, and risk tasks.
+4. Record changes in `docs/ai/evolution/runs/iteration-XXX/change_manifest.json`.
+5. Evaluate the next iteration with `change_evaluation.json`.
+
+Real rollback requires git. If the harness is not versioned, do not promise
+automatic rollback.

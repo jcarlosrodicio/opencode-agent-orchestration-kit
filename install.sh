@@ -39,7 +39,7 @@ backup_dir=""
 if [ -d "$target" ] && find "$target" -mindepth 1 -maxdepth 1 | read -r _; then
   backup_dir="$target.backup.$ts"
   mkdir -p "$backup_dir"
-  for name in agents commands skills tools AGENTS.md opencode.json; do
+  for name in agents commands skills tools docs scripts AGENTS.md opencode.json; do
     if [ -e "$target/$name" ]; then
       cp -R "$target/$name" "$backup_dir/"
     fi
@@ -47,7 +47,7 @@ if [ -d "$target" ] && find "$target" -mindepth 1 -maxdepth 1 | read -r _; then
   echo "Backup created: $backup_dir"
 fi
 
-for dir in agents commands skills tools; do
+for dir in agents commands skills tools docs scripts; do
   mkdir -p "$target/$dir"
   cp -R "$src/$dir/." "$target/$dir/"
 done
