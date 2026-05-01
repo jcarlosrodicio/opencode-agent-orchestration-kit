@@ -88,7 +88,14 @@ grep -q 'OPEN_DESIGN_URL' opencode/tools/open_design.ts
 ! grep -q 'from "node:crypto"' opencode/tools/open_design.ts
 
 private_re="$(printf '%s|%s|%s|%s' '/''Users/' 'synology''\\.me' 'auth''\\.json' 'OPENAI''_API_KEY')"
-if grep -R -nE "$private_re" . --exclude-dir=.git --exclude='check.sh' --exclude='.gitignore'; then
+if grep -R -nE "$private_re" . \
+  --exclude-dir=.git \
+  --exclude-dir=node_modules \
+  --exclude-dir=.svelte-kit \
+  --exclude-dir=build \
+  --exclude-dir=.data \
+  --exclude='check.sh' \
+  --exclude='.gitignore'; then
   echo 'Potential private data found' >&2
   exit 1
 fi

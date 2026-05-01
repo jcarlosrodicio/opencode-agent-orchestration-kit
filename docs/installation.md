@@ -5,9 +5,8 @@
 ```bash
 git clone https://github.com/<owner>/opencode-agent-orchestration-kit.git
 cd opencode-agent-orchestration-kit
-export OPENCODE_CONFIG_DIR="$PWD/opencode"
-source env.example
-opencode
+./install.sh --target "$HOME/.config/opencode"
+opencode auth login
 ```
 
 ## Global install
@@ -19,7 +18,7 @@ opencode
 Default target:
 
 ```bash
-${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}
+$HOME/.config/opencode
 ```
 
 Use a custom target:

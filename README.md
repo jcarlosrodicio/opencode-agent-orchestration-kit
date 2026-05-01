@@ -65,23 +65,13 @@ opencode auth login
 opencode
 ```
 
-## Use without installing globally
-
-```bash
-export OPENCODE_CONFIG_DIR="$PWD/opencode"
-export OPEN_DESIGN_URL="https://open-design.example.com"
-opencode
-```
-
-This is the safest way to test the kit before touching your global config.
-
 ## Global install
 
 ```bash
 ./install.sh
 ```
 
-The installer copies agents, commands, skills, and tools to `${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}`. It creates a backup when existing files are present. It does not overwrite `opencode.json` or `AGENTS.md` unless you pass `--force`.
+The installer copies agents, commands, skills, and tools to `$HOME/.config/opencode`, which is OpenCode's native config directory. It creates a backup when existing files are present. It does not overwrite `opencode.json` or `AGENTS.md` unless you pass `--force`.
 
 ```bash
 ./install.sh --target "$HOME/.config/opencode"
@@ -148,6 +138,25 @@ Do not expose Open Design directly to the Internet without authentication, VPN, 
 ```
 
 Without a slash command, simple implementation requests go directly through `developer`. Use `/feature` when you want the full orchestration flow.
+
+## Console MVP
+
+This repository includes a frontend-first orchestration console under `console/`.
+
+```bash
+npm install --prefix console
+npm run console:dev
+```
+
+The console is built with SvelteKit, TypeScript, Tailwind CSS, local lightweight components, and typed read-models. It launches OpenCode through the local CLI using native OpenCode configuration from `$HOME/.config/opencode`, and reads sessions, messages, and logs from OpenCode's native data directory under `$HOME/.local/share/opencode`. The console does not keep a parallel run store under `console/.data`.
+
+Useful validation commands:
+
+```bash
+npm run console:check
+npm run console:build
+npm --prefix console test
+```
 
 ## Docker Open Design
 
