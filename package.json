@@ -8,8 +8,5 @@
     "check": "bash scripts/check.sh",
     "lint": "bash scripts/check.sh",
     "format": "echo 'No formatter configured. Markdown and shell are intentionally plain.'"
-  },
-  "dependencies": {
-    "@opencode-ai/plugin": "^1.14.29"
   }
 }

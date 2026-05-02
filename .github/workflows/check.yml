@@ -1,0 +1,37 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Repository check
+        run: npm run check
+
+      - name: Install OpenCode tool dependencies
+        working-directory: opencode
+        run: npm ci
+
+      - name: Audit OpenCode tool dependencies
+        working-directory: opencode
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Smoke import OpenCode plugin
+        working-directory: opencode
+        run: node --input-type=module -e "import('@opencode-ai/plugin').then(() => console.log('plugin import ok'))"

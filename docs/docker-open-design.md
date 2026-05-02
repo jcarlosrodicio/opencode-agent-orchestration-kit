@@ -6,6 +6,20 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+The Docker image pins upstream build inputs by default:
+
+- `OPEN_DESIGN_REF=1592beb96134f9d49b8a90dc6a359b94a69af57e`
+- `OPENCODE_AI_VERSION=1.14.31`
+
+Update them intentionally when you want a newer Open Design or OpenCode CLI build:
+
+```bash
+docker compose build \
+  --build-arg OPEN_DESIGN_REF=<commit-sha> \
+  --build-arg OPENCODE_AI_VERSION=<version>
+docker compose up -d
+```
+
 Authenticate OpenCode inside the container:
 
 ```bash
