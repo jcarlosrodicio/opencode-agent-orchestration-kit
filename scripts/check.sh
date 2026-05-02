@@ -16,6 +16,9 @@ uninstall.sh
 package.json
 opencode/AGENTS.md
 opencode/opencode.json
+opencode/.gitignore
+opencode/package.json
+opencode/package-lock.json
 opencode/tools/open_design.ts
 opencode/scripts/check-harness.mjs
 opencode/commands/plan.md
@@ -34,6 +37,8 @@ docker/open-design/opencode-od/opencode.json
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 .github/PULL_REQUEST_TEMPLATE.md
+.github/CODEOWNERS
+.github/workflows/check.yml
 .github/ISSUE_TEMPLATE/config.yml
 .github/ISSUE_TEMPLATE/bug_report.yml
 .github/ISSUE_TEMPLATE/feature_request.yml
@@ -98,6 +103,22 @@ grep -q 'OPEN_DESIGN_URL' opencode/tools/open_design.ts
 ! grep -q 'baseUrl:' opencode/tools/open_design.ts
 ! grep -q 'randomUUID' opencode/tools/open_design.ts
 ! grep -q 'from "node:crypto"' opencode/tools/open_design.ts
+
+node <<'NODE'
+const fs = require('fs')
+const rootPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+if (rootPackage.dependencies?.['@opencode-ai/plugin']) {
+  throw new Error('package.json should not carry @opencode-ai/plugin; keep it scoped to opencode/package.json')
+}
+
+const opencodePackage = JSON.parse(fs.readFileSync('opencode/package.json', 'utf8'))
+if (opencodePackage.dependencies?.['@opencode-ai/plugin'] !== '1.14.31') {
+  throw new Error('opencode/package.json must pin @opencode-ai/plugin to 1.14.31')
+}
+if (opencodePackage.overrides?.uuid !== '^14.0.0') {
+  throw new Error('opencode/package.json must override uuid to ^14.0.0')
+}
+NODE
 
 private_re="$(printf '%s|%s|%s|%s' '/''Users/' 'synology''\\.me' 'auth''\\.json' 'OPENAI''_API_KEY')"
 if grep -R -nE "$private_re" . \
