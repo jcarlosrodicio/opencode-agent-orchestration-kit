@@ -25,7 +25,7 @@ Invalid examples:
 - `https://open-design.example.com/projects/my-project`
 - `https://open-design.example.com/projects/my-project/files/index.html`
 
-Tools read `OPEN_DESIGN_URL` from the environment. Do not pass a URL argument, compose URLs manually, or guess localhost ports.
+Resolve the tool `baseUrl` from approved configuration or explicit user/lead-provided context before calling Open Design tools. Do not invent, guess, or hardcode a URL. If no approved `baseUrl` is available, stop and ask for the missing configuration/context instead of trying a fallback.
 
 ## PRODUCT.md and DESIGN.md
 
@@ -43,6 +43,9 @@ Use only the Open Design tools:
 - `open_design_list_design_systems`
 - `open_design_create_project`
 - `open_design_run_design`
+
+Pass the resolved `baseUrl` to every Open Design tool call, including health,
+list, create, and run calls.
 
 ## Modes
 

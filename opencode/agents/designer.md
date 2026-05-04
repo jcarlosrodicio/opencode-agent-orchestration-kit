@@ -61,15 +61,17 @@ Do not use Superpowers or any other skill. This agent is intentionally limited t
 Use Open Design through `OPEN_DESIGN_URL` and the provided tools only:
 
 1. Load `open-design`.
-2. Call `open_design_health` with no URL argument.
-3. Call `open_design_list_agents`.
-4. List skills and design systems if selection is unclear.
-5. Choose a fitting `skillId` and `designSystemId`.
-6. Use `open_design_create_project` for an editable workbench project.
-7. Use `open_design_run_design` only when the user explicitly asks to generate files.
-8. Return the project URL.
+2. Resolve `baseUrl` from approved configuration or explicit user/lead context.
+3. If `baseUrl` is missing, stop and ask; do not guess or hardcode URLs.
+4. Call `open_design_health` with the resolved `baseUrl`.
+5. Call `open_design_list_agents` with the resolved `baseUrl`.
+6. List skills and design systems with the resolved `baseUrl` if selection is unclear.
+7. Choose a fitting `skillId` and `designSystemId`.
+8. Use `open_design_create_project` with the resolved `baseUrl` for an editable workbench project.
+9. Use `open_design_run_design` with the resolved `baseUrl` only when the user explicitly asks to generate files.
+10. Return the project URL.
 
-Never pass or invent a manual `baseUrl`. Never try localhost or guessed ports yourself. The tool reads `OPEN_DESIGN_URL`.
+Never invent URLs or hardcode `baseUrl`. Never try localhost or guessed ports yourself.
 
 ## Handoff
 

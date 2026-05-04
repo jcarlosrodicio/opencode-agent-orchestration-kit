@@ -102,7 +102,7 @@ grep -q 'debugger' opencode/commands/evolve.md
 grep -q 'evolver' opencode/commands/evolve.md
 
 grep -q 'OPEN_DESIGN_URL' opencode/tools/open_design.ts
-! grep -q 'baseUrl:' opencode/tools/open_design.ts
+grep -q 'baseUrl: tool.schema.string().optional()' opencode/tools/open_design.ts
 ! grep -q 'randomUUID' opencode/tools/open_design.ts
 ! grep -q 'from "node:crypto"' opencode/tools/open_design.ts
 

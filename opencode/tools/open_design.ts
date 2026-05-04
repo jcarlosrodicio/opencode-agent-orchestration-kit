@@ -32,8 +32,8 @@ function randomId(length = 8): string {
     .slice(0, length)
 }
 
-function baseUrl() {
-  const raw = getEnv("OPEN_DESIGN_URL")
+function baseUrl(input?: string) {
+  const raw = input || getEnv("OPEN_DESIGN_URL")
   if (!raw) {
     throw new Error("OPEN_DESIGN_URL is not set. Example: export OPEN_DESIGN_URL='https://open-design.example.com'")
   }
@@ -205,9 +205,11 @@ async function streamOpenDesignChat(base: string, body: unknown) {
 
 export const health = tool({
   description: "Check whether the Open Design workbench is reachable.",
-  args: {},
-  async execute() {
-    const base = baseUrl()
+  args: {
+    baseUrl: tool.schema.string().optional(),
+  },
+  async execute(args) {
+    const base = baseUrl(args.baseUrl)
     const data = await requestJson(base, "/api/health")
     return JSON.stringify({ baseUrl: base, health: data }, null, 2)
   },
@@ -215,9 +217,11 @@ export const health = tool({
 
 export const list_agents = tool({
   description: "List local agent CLIs detected by Open Design.",
-  args: {},
-  async execute() {
-    const base = baseUrl()
+  args: {
+    baseUrl: tool.schema.string().optional(),
+  },
+  async execute(args) {
+    const base = baseUrl(args.baseUrl)
     const data = await requestJson(base, "/api/agents")
     return JSON.stringify(data, null, 2)
   },
@@ -225,9 +229,11 @@ export const list_agents = tool({
 
 export const list_skills = tool({
   description: "List Open Design skills available in the workbench.",
-  args: {},
-  async execute() {
-    const base = baseUrl()
+  args: {
+    baseUrl: tool.schema.string().optional(),
+  },
+  async execute(args) {
+    const base = baseUrl(args.baseUrl)
     const data = await requestJson(base, "/api/skills")
     return JSON.stringify(data, null, 2)
   },
@@ -235,9 +241,11 @@ export const list_skills = tool({
 
 export const list_design_systems = tool({
   description: "List Open Design design systems available in the workbench.",
-  args: {},
-  async execute() {
-    const base = baseUrl()
+  args: {
+    baseUrl: tool.schema.string().optional(),
+  },
+  async execute(args) {
+    const base = baseUrl(args.baseUrl)
     const data = await requestJson(base, "/api/design-systems")
     return JSON.stringify(data, null, 2)
   },
@@ -246,6 +254,7 @@ export const list_design_systems = tool({
 export const create_project = tool({
   description: "Create an Open Design project and return its workbench URL without running generation.",
   args: {
+    baseUrl: tool.schema.string().optional(),
     name: tool.schema.string(),
     prompt: tool.schema.string(),
     skillId: tool.schema.string().optional(),
@@ -254,7 +263,7 @@ export const create_project = tool({
     fidelity: tool.schema.string().optional(),
   },
   async execute(args) {
-    const base = baseUrl()
+    const base = baseUrl(args.baseUrl)
     const projectId = `${safeSlug(args.name)}-${randomId(8)}`
     const body = {
       id: projectId,
@@ -276,6 +285,7 @@ export const create_project = tool({
 export const run_design = tool({
   description: "Create an Open Design project and run a design generation.",
   args: {
+    baseUrl: tool.schema.string().optional(),
     name: tool.schema.string(),
     prompt: tool.schema.string(),
     skillId: tool.schema.string(),
@@ -286,7 +296,7 @@ export const run_design = tool({
     fidelity: tool.schema.string().optional(),
   },
   async execute(args) {
-    const base = baseUrl()
+    const base = baseUrl(args.baseUrl)
     const projectId = `${safeSlug(args.name)}-${randomId(8)}`
 
     await requestJson(base, "/api/projects", {

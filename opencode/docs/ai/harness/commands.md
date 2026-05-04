@@ -55,6 +55,34 @@ Criteria:
 - `debugger` enters only for traces, results, or concrete previous evidence.
 - Output is scoped specs, atomic tasks, and validation.
 
+## Visible Auxiliary/Subtask Commands
+
+These commands are visible slash commands, but they do not add mandatory phases
+or promote sidecars by themselves. They inherit the barriers of the parent flow,
+or the `lead` barriers when used directly.
+
+### `/research`
+
+Contract: auxiliary/subtask `researcher`.
+
+Criteria:
+
+- Clarify technical/product uncertainty, APIs, libraries, risks, or architecture.
+- Do not implement and do not invoke `developer` by itself.
+- Return context, alternatives, risks, recommendation, and remaining unknowns.
+
+### `/implement`
+
+Contract: auxiliary/subtask `developer`.
+
+Criteria:
+
+- Execute approved changes or clear acceptance criteria.
+- Do not replace `/feature`, `/plan`, or `/scope` when research, design, spec,
+  or scope decisions are still missing.
+- Keep reasonable minimum validation and do not add mandatory review/evaluation
+  unless the parent flow requires it.
+
 ## `/design`
 
 Contract: `designer -> open design`.
