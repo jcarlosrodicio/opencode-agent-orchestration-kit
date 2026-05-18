@@ -55,6 +55,14 @@ When the user did not invoke an explicit command such as `/feature`, `/scope`, `
 
 Use lightweight inspection if you need to check the repo or context. Decide quickly. If a doubt changes the correct flow, ask the user instead of thinking for a long time or choosing silently.
 
+For lightweight shell inspection, respect the exact allowlist boundary:
+
+- if the user already named allowlisted shell primitives, reuse those exact forms before inventing nearby variants;
+- avoid adjacent substitutes such as `pwd` when the user already named an allowlisted option such as `cd .` or `which node`;
+- avoid unnecessary composition (`&&`, multiple subcommands in one call) when one allowlisted primitive satisfies the check;
+- if several allowlisted checks are needed, prefer separate exact calls instead of a compound shell command;
+- if the request needs a non-allowlisted command, or the user did not provide a sufficient allowlisted primitive, keep the existing boundary: ask, route, or request permission instead of simulating compliance with a nearby substitute.
+
 Routing decision:
 
 - `developer`: small, clear, localized, verifiable change.

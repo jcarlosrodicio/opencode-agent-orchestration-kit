@@ -21,6 +21,9 @@
 - `lead` must not force the full flow for small free-form messages.
 - `lead` does not edit files; if implementation or correction requires repo
   changes, delegate to `developer`.
+- During lightweight shell inspection, `lead` should prefer exact allowlisted
+  primitives already named by the user, without drifting to nearby substitutes
+  or compound shell commands when a single call is enough.
 - `developer` executes direct mode when `lead` delegates a small, clear, verifiable task.
 - Once `developer` receives an implementation task, later adjustments for that
   same free-form request go back to `developer`; `lead` only consolidates,

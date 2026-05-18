@@ -1,0 +1,31 @@
+{
+  "iteration": 12,
+  "changes": [
+    {
+      "id": "chg-1-lead-allowlisted-shell-preference",
+      "type": "improvement",
+      "description": "Tighten the lead agent contract so natural lightweight inspection prefers exact allowlisted shell primitives already named by the user and avoids adjacent substitutes or compound shell composition when one allowlisted command is sufficient.",
+      "files": [
+        "agents/lead.md",
+        "docs/ai/harness/agents.md"
+      ],
+      "failure_pattern": "Natural inspection prompts that fit the narrow shell allowlist can still drift to adjacent or compound shell forms, causing avoidable permission requests.",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-012-lead-shell-allowlist-boundaries/evaluation.md",
+        "docs/ai/evolution/runs/iteration-012-lead-shell-allowlist-boundaries/analysis/overview.md"
+      ],
+      "predicted_fixes": [
+        "lead-reuses-user-named-allowlisted-shell-primitives",
+        "lead-avoids-unneeded-compound-shell-inspection",
+        "unknown-bash-commands-still-ask"
+      ],
+      "risk_tasks": [
+        "do-not-broaden-bash-allowlist",
+        "preserve-lead-edit-deny",
+        "avoid-benchmark-specific-wording"
+      ],
+      "constraint_level": "agent",
+      "why_this_component": "The tool layer already allows exact cd and which commands and still blocks unknown bash commands. The observed failure happens earlier, in lead command selection."
+    }
+  ]
+}
