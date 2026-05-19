@@ -7,10 +7,14 @@ Contract: `lead` router -> appropriate agent.
 Criteria:
 
 - `lead` decides quickly between `developer`, `researcher`, `designer`, or `specifier`.
+- `lead` may inspect only the minimum needed for routing; if it needs to
+  understand code behavior or diagnose flow, it delegates to `researcher`.
 - If the change is small, clear, and low risk, delegate to `developer` with minimum validation.
 - If there is technical/product uncertainty, delegate to `researcher`.
 - If there is UX/UI, brand, layout, interaction, or visual criteria impact, delegate to `designer`.
 - If enough context exists but tasks, criteria, or a plan are missing, delegate to `specifier`.
+- If there is a diff, implementation, or reviewable plan, delegate review to
+  `reviewer` instead of reviewing it as `lead`.
 - If ambiguity changes the correct flow, ask the user before delegating.
 
 ## `/feature`
@@ -40,6 +44,8 @@ Criteria:
   independent.
 - `developer` does not act without acceptance criteria.
 - `reviewer` does not act without a reviewable diff.
+- `lead` does not replace `reviewer`; it only consolidates the verdict and sends
+  bounded fixes back to `developer` when changes are required.
 
 ## `/plan`
 

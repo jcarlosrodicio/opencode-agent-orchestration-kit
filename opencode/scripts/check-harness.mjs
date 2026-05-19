@@ -152,6 +152,16 @@ function checkLeadRouterContract() {
     "whole loop of the same free-form request",
     "bounded task back to `developer`",
     "implementation correction goes back to `developer`",
+    "does not develop",
+    "does not deeply",
+    "minimum",
+    "context needed to",
+    "delegate to `researcher`",
+    "`reviewer`",
+    "Do not mentally implement the solution before delegating",
+    "handoff to another",
+    "must be self-contained",
+    "Do not review a diff yourself",
   ]) {
     if (!text.includes(token)) fail(`agents/lead.md: missing ${token}`);
   }
@@ -161,8 +171,22 @@ function checkLeadRouterContract() {
     "`lead` does not edit files",
     "later adjustments for that",
     "same free-form request go back to `developer`",
+    "`lead` does not develop",
+    "delegates substantive discovery to `researcher`",
+    "belongs to `reviewer`",
+    "Every `lead` handoff to another agent must be self-contained",
   ]) {
     if (!docs.includes(token)) fail(`docs/ai/harness/agents.md: missing ${token}`);
+  }
+
+  const commandDocs = read("docs/ai/harness/commands.md");
+  for (const token of [
+    "understand code behavior",
+    "delegates to `researcher`",
+    "delegate review to",
+    "`lead` does not replace `reviewer`",
+  ]) {
+    if (!commandDocs.includes(token)) fail(`docs/ai/harness/commands.md: missing ${token}`);
   }
 }
 

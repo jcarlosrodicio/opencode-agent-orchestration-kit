@@ -21,6 +21,16 @@
 - `lead` must not force the full flow for small free-form messages.
 - `lead` does not edit files; if implementation or correction requires repo
   changes, delegate to `developer`.
+- `lead` does not develop, deeply investigate code, or review diffs as a
+  substitute for `researcher` or `reviewer`; it only gathers minimum routing
+  context.
+- If `lead` needs to understand how the code works before deciding what to do,
+  it delegates substantive discovery to `researcher`.
+- If there is a diff, implementation, or reviewable plan, bug, security,
+  regression, and compliance review belongs to `reviewer`.
+- Every `lead` handoff to another agent must be self-contained: objective,
+  minimum context, constraints, assumptions, expected output, and expected
+  validation or evidence.
 - During lightweight shell inspection, `lead` should prefer exact allowlisted
   primitives already named by the user, without drifting to nearby substitutes
   or compound shell commands when a single call is enough.
