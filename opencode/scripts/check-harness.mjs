@@ -121,6 +121,28 @@ function checkConfig() {
   }
 }
 
+/**
+ * Verify that all given regex patterns match the text.
+ * Each pattern is either a RegExp, a string treated as literal, or an object
+ * with a regex and optional literal fallbacks.
+ */
+function checkSemantic(text, patterns, label) {
+  for (let i = 0; i < patterns.length; i++) {
+    const p = patterns[i];
+    const re =
+      p instanceof RegExp
+        ? p
+        : p.regex instanceof RegExp
+          ? p.regex
+          : new RegExp("\\b" + p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
+    const fallbackLiterals = p.fallbackLiterals ?? [];
+    if (!re.test(text) && !fallbackLiterals.some((token) => text.includes(token))) {
+      const desc = p instanceof RegExp ? p.source : p.description ?? p.regex?.source ?? p;
+      fail(`${label}[${i}]: no match for /${desc}/`);
+    }
+  }
+}
+
 function checkLeadRouterContract() {
   const text = read("agents/lead.md");
   const frontmatter = frontmatterBlock("agents/lead.md");
@@ -141,53 +163,63 @@ function checkLeadRouterContract() {
   }
 
   for (const token of [
-    "fast router",
     "developer",
     "researcher",
     "designer",
     "specifier",
-    "Ask the user",
-    "real ambiguity",
-    "Do not edit code",
-    "whole loop of the same free-form request",
-    "bounded task back to `developer`",
-    "implementation correction goes back to `developer`",
-    "does not develop",
-    "does not deeply",
-    "minimum",
-    "context needed to",
-    "delegate to `researcher`",
+    "`researcher`",
     "`reviewer`",
-    "Do not mentally implement the solution before delegating",
-    "handoff to another",
-    "must be self-contained",
-    "Do not review a diff yourself",
   ]) {
     if (!text.includes(token)) fail(`agents/lead.md: missing ${token}`);
   }
 
+  checkSemantic(text, [
+    /\b(fast|quick|rapid|agile|lightweight)\s+router\b/i,
+    /\b(ask|consult)\s+the\s+user\b/i,
+    /\b(real|genuine|material|meaningful)\s+ambiguity\b/i,
+    {
+      regex: /\bdo\s+not\s+(edit|modify|change|alter)\s+code\b/i,
+      fallbackLiterals: ["Do not edit code"],
+    },
+    /\b(whole|entire)\s+(loop|cycle)\s+of\s+the\s+same\s+free-form\s+request\b/i,
+    /\b(send|return|route|pass)\s+a\s+bounded\s+(task|correction)\s+back\s+to\s+\`developer\`/i,
+    /\b(implementation\s+)?(correction|fix|adjustment|change)\s+goes\s+back\s+to\s+\`developer\`/i,
+    {
+      regex: /\bdoes\s+not\s+(develop|code|implement|program)\b/i,
+      fallbackLiterals: ["does not develop"],
+    },
+    {
+      regex: /\bdoes\s+not\s+(deeply\s+)?(investigate|inspect|analyze|analyse)\s+code\b/i,
+      fallbackLiterals: ["does not deeply"],
+    },
+    /\bminimum\s+context\s+needed\s+to\b/i,
+    /\bdelegate\s+to\s+\`researcher\`/i,
+    /\bdo\s+not\s+(mentally\s+)?(implement|design|solve|build)\s+the\s+(solution|problem)\s+before\s+delegating\b/i,
+    /\bhandoff\s+to\s+another\b/i,
+    /\bmust\s+be\s+self-contained\b/i,
+    /\bdo\s+not\s+(review|inspect)\s+a\s+diff\s+yourself\b/i,
+  ], "agents/lead.md semantic invariant");
+
   const docs = read("docs/ai/harness/agents.md");
-  for (const token of [
-    "`lead` does not edit files",
-    "later adjustments for that",
-    "same free-form request go back to `developer`",
-    "`lead` does not develop",
-    "delegates substantive discovery to `researcher`",
-    "belongs to `reviewer`",
-    "Every `lead` handoff to another agent must be self-contained",
-  ]) {
-    if (!docs.includes(token)) fail(`docs/ai/harness/agents.md: missing ${token}`);
+  if (!docs.includes("belongs to `reviewer`")) {
+    fail("docs/ai/harness/agents.md: missing belongs to `reviewer`");
   }
 
+  checkSemantic(docs, [
+    /\`lead\`\s+does\s+not\s+(edit|modify|change|alter)\s+files\b/i,
+    /\b(later|subsequent)\s+(adjustments|corrections|fixes|changes)\s+for\s+that\s+same\s+free-form\s+request\s+go\s+back\s+to\s+\`developer\`/i,
+    /\`lead\`\s+does\s+not\s+(develop|code|implement|program)\b/i,
+    /\bdelegates\s+(substantive|meaningful|deep)\s+discovery\s+to\s+\`researcher\`/i,
+    /\bevery\s+\`lead\`\s+handoff\s+to\s+another\s+agent\s+must\s+be\s+self-contained\b/i,
+  ], "docs/ai/harness/agents.md semantic invariant");
+
   const commandDocs = read("docs/ai/harness/commands.md");
-  for (const token of [
-    "understand code behavior",
-    "delegates to `researcher`",
-    "delegate review to",
-    "`lead` does not replace `reviewer`",
-  ]) {
-    if (!commandDocs.includes(token)) fail(`docs/ai/harness/commands.md: missing ${token}`);
-  }
+  checkSemantic(commandDocs, [
+    /\bunderstand\s+(code\s+behavior|how\s+the\s+code\s+works|the\s+code)\b/i,
+    /\bdelegates\s+to\s+\`researcher\`/i,
+    /\bdelegate\s+review\s+to\s+\`reviewer\`/i,
+    /\`lead\`\s+does\s+not\s+replace\s+\`reviewer\`/i,
+  ], "docs/ai/harness/commands.md semantic invariant");
 }
 
 function checkFrontmatter() {

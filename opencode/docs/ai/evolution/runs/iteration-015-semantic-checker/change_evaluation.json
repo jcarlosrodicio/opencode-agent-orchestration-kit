@@ -1,0 +1,31 @@
+{
+  "iteration": 15,
+  "evaluates_iteration": 15,
+  "results": [
+    {
+      "change_id": "chg-1-semantic-checker",
+      "predicted_fixes_confirmed": [
+        "Equivalent wording rewrites pass the checker.",
+        "Real rule omissions still fail the checker.",
+        "Structural permission and agent identifier checks remain exact.",
+        "No routing, provider, model, MCP, credential, or agent behavior is changed."
+      ],
+      "predicted_fixes_not_confirmed": [],
+      "risk_tasks_regressed": [],
+      "risk_tasks_not_regressed": [
+        "Do not make regex patterns broad enough to pass unrelated text.",
+        "Keep literal fallbacks for the most critical lead prohibition checks.",
+        "Keep permissions and agent identifiers as exact literals.",
+        "Do not include private providers, MCPs, credentials, local paths, or raw transcripts."
+      ],
+      "unpredicted_regressions": [],
+      "decision": "keep",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-015-semantic-checker/evaluation.md",
+        "docs/ai/evolution/runs/iteration-015-semantic-checker/change_manifest.json",
+        "scripts/check-harness.mjs"
+      ],
+      "notes": "The public sync ports the local semantic-checker improvement to the English packaged harness and includes only sanitized summary evidence."
+    }
+  ]
+}

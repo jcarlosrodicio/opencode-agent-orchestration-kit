@@ -1,0 +1,47 @@
+{
+  "iteration": 15,
+  "changes": [
+    {
+      "id": "chg-1-semantic-checker",
+      "type": "improvement",
+      "description": "Replace brittle literal prompt-text checks in check-harness.mjs with bounded semantic regex checks while preserving exact matching for structural permissions and agent identifiers.",
+      "files": [
+        "scripts/check-harness.mjs"
+      ],
+      "failure_pattern": "The checker failed when lead-router contract text was rewritten with equivalent wording, even though the rule meaning was preserved.",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-014-harness-baseline/evaluation.md",
+        "docs/ai/evolution/runs/iteration-014-harness-baseline/analysis/overview.md",
+        "docs/ai/evolution/runs/iteration-014-harness-baseline/analysis/detail/token-vs-semantic.md"
+      ],
+      "root_cause": "The verification mechanism treated prompt prose as exact tokens instead of semantic contract rules.",
+      "component_touched": "tool",
+      "predicted_fixes": [
+        "Equivalent wording rewrites pass the checker.",
+        "Real rule omissions still fail the checker.",
+        "Structural permission and agent identifier checks remain exact.",
+        "No routing, provider, model, MCP, credential, or agent behavior is changed."
+      ],
+      "risk_tasks": [
+        "Do not make regex patterns broad enough to pass unrelated text.",
+        "Keep literal fallbacks for the most critical lead prohibition checks.",
+        "Keep permissions and agent identifiers as exact literals.",
+        "Do not include private providers, MCPs, credentials, local paths, or raw transcripts."
+      ],
+      "constraint_level": "tool",
+      "why_this_component": "The defect is in the mechanical checker, not in agent routing or model configuration.",
+      "post_change_validation": [
+        "Run `node --check scripts/check-harness.mjs`.",
+        "Run `node scripts/check-harness.mjs` from the packaged opencode directory.",
+        "Run semantic rewrite smoke tests on temporary copies.",
+        "Run omission smoke tests on temporary copies.",
+        "Run `git diff --check`."
+      ],
+      "decision_criteria": {
+        "keep": "Checker passes current docs, passes equivalent rewrites, fails real omissions, and keeps structural checks exact.",
+        "improve": "Some equivalent rewrites still fail or some real omissions pass.",
+        "rollback+pivot": "Regex checks become less reliable than literal checks."
+      }
+    }
+  ]
+}
