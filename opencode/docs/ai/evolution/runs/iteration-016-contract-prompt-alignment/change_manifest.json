@@ -1,0 +1,35 @@
+{
+  "iteration": 16,
+  "changes": [
+    {
+      "id": "chg-16-1",
+      "type": "new",
+      "description": "Add mechanical checker coverage for /evolve ordering, cross-agent prompt invariants, and /scope and /design command contracts.",
+      "files": [
+        "scripts/check-harness.mjs",
+        "scripts/check-harness.test.mjs",
+        "agents/developer.md",
+        "docs/ai/harness/checks.md"
+      ],
+      "failure_pattern": "Harness prompts and command contracts could drift without detection, and prior path validation treated prose evidence containing markdown filenames as a missing local path.",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-016-contract-prompt-alignment/evaluation.md",
+        "docs/ai/evolution/runs/iteration-016-contract-prompt-alignment/analysis/overview.md"
+      ],
+      "root_cause": "The checker validated coverage and a few critical flows, but did not enforce several command contracts or each configured agent invariant.",
+      "predicted_fixes": [
+        "evolve-order-drift",
+        "scope-order-drift",
+        "agent-invariant-drift",
+        "prose-evidence-path-false-positive"
+      ],
+      "risk_tasks": [
+        "public-checker-patterns-match-english-prompts",
+        "no-private-config-or-paths-in-public-artifacts",
+        "existing-feature-plan-checks-unchanged"
+      ],
+      "constraint_level": "tool",
+      "why_this_component": "The failure is mechanical checker coverage, so scripts/check-harness.mjs is the narrowest component. The developer prompt receives one explicit continuity rule to keep the documented contract reflected in the prompt."
+    }
+  ]
+}

@@ -27,6 +27,9 @@ The harness check validates:
   `docs/ai/harness/commands.md`;
 - local `/feature` contract;
 - local `/plan` contract;
+- local `/evolve` contract;
+- minimum consistency between agent contracts and prompts in `agents/*.md`;
+- local `/scope` and `/design` contracts;
 - main docs in `docs/ai/harness/`;
 - benchmark references to replay and evidence taxonomy;
 - AHE run lifecycle under `docs/ai/evolution/runs/`;

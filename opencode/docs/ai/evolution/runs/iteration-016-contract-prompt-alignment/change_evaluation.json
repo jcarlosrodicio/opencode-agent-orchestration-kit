@@ -1,0 +1,31 @@
+{
+  "iteration": 16,
+  "evaluates_iteration": 16,
+  "results": [
+    {
+      "change_id": "chg-16-1",
+      "predicted_fixes_confirmed": [
+        "evolve-order-drift",
+        "scope-order-drift",
+        "agent-invariant-drift",
+        "prose-evidence-path-false-positive"
+      ],
+      "predicted_fixes_not_confirmed": [],
+      "risk_tasks_regressed": [],
+      "risk_tasks_not_regressed": [
+        "public-checker-patterns-match-english-prompts",
+        "no-private-config-or-paths-in-public-artifacts",
+        "existing-feature-plan-checks-unchanged"
+      ],
+      "unpredicted_regressions": [],
+      "decision": "keep",
+      "evidence": [
+        "node --test scripts/check-harness.test.mjs passed 4/4 tests.",
+        "node scripts/check-harness.mjs passed.",
+        "Repository-level scripts/check.sh passed.",
+        "Public artifact leak check found no private paths, local MCP config, providers, credentials, or local search wiring."
+      ],
+      "notes": "The public port keeps only harness checker, prompt-contract, docs, and summary AHE evidence. Private opencode.json, MCP servers, provider config, local memory data, and raw transcripts are intentionally excluded."
+    }
+  ]
+}
