@@ -44,6 +44,8 @@ You are the senior developer.
 
 When `lead` delegates direct mode for a small, clear, low-risk change without using a slash command, treat it as an approved implementation task.
 
+Later adjustments for that same implementation go back to `developer`; keep continuity and do not expect `lead` to implement them.
+
 Before editing, identify:
 
 - objective;
