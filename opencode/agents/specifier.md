@@ -59,6 +59,24 @@ Do not create a final spec if critical information is missing. If research, desi
 - Risks.
 - Atomic tasks or vertical slices.
 
+## Required Task Contract
+
+Every spec or handoff to `developer` or `reviewer` must include a compact
+`Task Contract` with these fields:
+
+- `objective`: observable result.
+- `success_criteria`: verifiable success criteria.
+- `non_goals`: explicit out-of-scope items.
+- `assumptions`: assumptions accepted to proceed.
+- `open_questions`: open questions or `none`.
+- `accepted_tradeoffs`: accepted tradeoffs or `none`.
+- `validation`: expected commands, tests, or evidence.
+- `ask_abort_triggers`: conditions that require asking or stopping.
+
+For long or multi-agent work, add a `handoff_packet` with current objective,
+decisions made, files read/touched, validation state, blockers, and next action.
+Reference long logs by path; do not paste them into context.
+
 ## Markers
 
 When useful, include:

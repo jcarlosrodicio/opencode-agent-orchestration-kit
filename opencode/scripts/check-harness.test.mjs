@@ -132,3 +132,107 @@ bounded router developer researcher designer specifier reviewer \`researcher\`
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("harness rejects developer prompt missing Task Contract", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "agents/developer.md",
+      `---
+description: Senior developer.
+mode: all
+permission:
+  edit: allow
+---
+
+You are the senior developer.
+
+Validate changed behavior and report results.
+`,
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted developer without Task Contract");
+    assert.match(result.stderr, /agents\/developer\.md: missing Task Contract/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects plan command without clarifications and acceptance checklist", () => {
+  const cwd = makeFixture();
+  try {
+    const plan = fs.readFileSync(path.join(cwd, "commands/plan.md"), "utf8");
+    write(
+      "commands/plan.md",
+      plan
+        .replace(/Clarifications/g, "Notes")
+        .replace(/Acceptance Checklist/g, "Checklist"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted plan without clarification/checklist contract");
+    assert.match(result.stderr, /commands\/plan\.md: missing Clarifications/);
+    assert.match(result.stderr, /commands\/plan\.md: missing Acceptance Checklist/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects invalid mechanism ids", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/evolution/mechanisms.jsonl",
+      `{"mechanism_id":"bad id","status":"accepted","owning_surface":"workflow","activation":"x","behavior_change":"y","evidence":["docs/ai/evolution/runs/iteration-003/evaluation.md"],"failure_modes":["z"]}\n`,
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted invalid mechanism id");
+    assert.match(result.stderr, /mechanisms\.jsonl: line 1 invalid mechanism_id/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects duplicate mechanisms without pruning notes", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/evolution/mechanisms.jsonl",
+      [
+        `{"mechanism_id":"mech-task-contract","status":"accepted","owning_surface":"workflow","activation":"handoff","behavior_key":"task-contract","behavior_change":"Adds task contract","evidence":["docs/ai/evolution/runs/iteration-003/evaluation.md"],"failure_modes":["drift"]}`,
+        `{"mechanism_id":"mech-task-contract-v2","status":"accepted","owning_surface":"workflow","activation":"handoff","behavior_key":"task-contract","behavior_change":"Adds task contract again","evidence":["docs/ai/evolution/runs/iteration-003/evaluation.md"],"failure_modes":["drift"]}`,
+        "",
+      ].join("\n"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted duplicate mechanisms without pruning notes");
+    assert.match(result.stderr, /mechanisms\.jsonl: duplicate behavior_key task-contract requires pruning_decision/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects invalid router scenarios", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/evolution/benchmarks/router-scenarios.jsonl",
+      `{"id":"bad-router","prompt":"x","expected_agent":"wizard","command_path":"feature","allowed_skills":"none","forbidden_sidecars":[],"required_evidence":["static_contract"]}\n`,
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted invalid router scenario");
+    assert.match(result.stderr, /router-scenarios\.jsonl: line 1 invalid expected_agent/);
+    assert.match(result.stderr, /router-scenarios\.jsonl: line 1 allowed_skills must be an array/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});

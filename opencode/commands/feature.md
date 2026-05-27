@@ -10,6 +10,20 @@ $ARGUMENTS
 
 Run the feature flow with explicit barriers.
 
+## Init/context policy
+
+Before the first handoff, confirm only what is needed for correct routing:
+
+- `cwd`: current repository or user-provided target directory.
+- `AGENTS.md`: applicable local rules when present.
+- `git state`: clean/dirty state if the change will touch files.
+- `validation commands`: likely repo checks, without running them yet unless
+  needed to classify.
+- `repo docs`: local docs that are named or obvious.
+
+Keep this policy lightweight. Small free-form work keeps the fast path; do not
+turn init into technical discovery.
+
 ## Mandatory flow
 
 1. Analyze the objective only enough to classify scope, uncertainty, and
@@ -40,3 +54,10 @@ Run the feature flow with explicit barriers.
 13. Close with changes, validation, and risks.
 
 AHE sidecars are optional and must not be inserted unless evidence is needed or this request changes the harness itself.
+
+## Expected output
+
+Deliver phase, agents used, decisions made, spec or tasks generated with
+`Task Contract` when implementation is involved, changes if any, validation,
+sidecar evidence if used, risks, and `handoff_packet` for long or multi-agent
+work.

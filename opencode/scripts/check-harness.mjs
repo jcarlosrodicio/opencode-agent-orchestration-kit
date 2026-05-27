@@ -401,6 +401,197 @@ function checkEvolutionRuns() {
   }
 }
 
+function parseJsonl(rel) {
+  if (!exists(rel)) {
+    fail(`${rel}: missing`);
+    return [];
+  }
+
+  const records = [];
+  const lines = read(rel).split("\n");
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    try {
+      records.push({ line: index + 1, value: JSON.parse(line) });
+    } catch (error) {
+      fail(`${rel}: line ${index + 1} invalid JSON (${error.message})`);
+    }
+  }
+  return records;
+}
+
+function requireJsonlFields(rel, line, object, fields) {
+  for (const field of fields) {
+    if (object[field] === undefined) fail(`${rel}: line ${line} missing ${field}`);
+  }
+}
+
+function checkStringArray(rel, line, object, field) {
+  if (!Array.isArray(object[field])) {
+    fail(`${rel}: line ${line} ${field} must be an array`);
+    return;
+  }
+  for (const [index, value] of object[field].entries()) {
+    if (typeof value !== "string" || value.length === 0) {
+      fail(`${rel}: line ${line} ${field}[${index}] must be a non-empty string`);
+    }
+  }
+}
+
+function checkTaskContractSurface() {
+  const taskContractFiles = [
+    "agents/specifier.md",
+    "agents/developer.md",
+    "agents/reviewer.md",
+  ];
+  const requiredFields = [
+    "objective",
+    "success_criteria",
+    "non_goals",
+    "assumptions",
+    "open_questions",
+    "accepted_tradeoffs",
+    "validation",
+    "ask_abort_triggers",
+  ];
+
+  for (const rel of taskContractFiles) {
+    const text = read(rel);
+    if (!text.includes("Task Contract")) {
+      fail(`${rel}: missing Task Contract`);
+      continue;
+    }
+    for (const field of requiredFields) {
+      if (!text.includes(field)) fail(`${rel}: Task Contract missing ${field}`);
+    }
+  }
+
+  const docs = read("docs/ai/harness/agents.md");
+  for (const token of ["Task Contract", "handoff_packet", "ask_abort_triggers"]) {
+    if (!docs.includes(token)) fail(`docs/ai/harness/agents.md: missing ${token}`);
+  }
+
+  const planText = read("commands/plan.md");
+  for (const token of ["Clarifications", "Acceptance Checklist"]) {
+    if (!planText.includes(token)) fail(`commands/plan.md: missing ${token}`);
+  }
+}
+
+function checkInitContextPolicy() {
+  for (const rel of ["commands/feature.md", "commands/plan.md", "commands/scope.md", "commands/evolve.md"]) {
+    const text = read(rel);
+    for (const token of ["Init/context policy", "cwd", "AGENTS.md", "git state", "validation commands", "repo docs"]) {
+      if (!text.includes(token)) fail(`${rel}: missing init/context token ${token}`);
+    }
+  }
+}
+
+function checkMechanismRegistries() {
+  const acceptedRel = "docs/ai/evolution/mechanisms.jsonl";
+  const rejectedRel = "docs/ai/evolution/rejected_mechanisms.jsonl";
+  const mechanismIdPattern = /^mech-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const allowedSurfaces = new Set(["agent", "command", "skill", "tool", "workflow", "memory", "evaluation"]);
+  const behaviorKeys = new Map();
+
+  for (const { line, value } of parseJsonl(acceptedRel)) {
+    requireJsonlFields(acceptedRel, line, value, [
+      "mechanism_id",
+      "status",
+      "owning_surface",
+      "activation",
+      "behavior_key",
+      "behavior_change",
+      "evidence",
+      "failure_modes",
+    ]);
+    if (typeof value.mechanism_id !== "string" || !mechanismIdPattern.test(value.mechanism_id)) {
+      fail(`${acceptedRel}: line ${line} invalid mechanism_id`);
+    }
+    if (value.status !== "accepted") fail(`${acceptedRel}: line ${line} status must be accepted`);
+    if (!allowedSurfaces.has(value.owning_surface)) {
+      fail(`${acceptedRel}: line ${line} invalid owning_surface`);
+    }
+    checkStringArray(acceptedRel, line, value, "evidence");
+    checkStringArray(acceptedRel, line, value, "failure_modes");
+
+    if (typeof value.behavior_key === "string") {
+      const records = behaviorKeys.get(value.behavior_key) ?? [];
+      records.push({ line, value });
+      behaviorKeys.set(value.behavior_key, records);
+    }
+  }
+
+  for (const [behaviorKey, records] of behaviorKeys.entries()) {
+    if (records.length <= 1) continue;
+    if (!records.some((record) => typeof record.value.pruning_decision === "string" && record.value.pruning_decision.length > 0)) {
+      fail(`${acceptedRel}: duplicate behavior_key ${behaviorKey} requires pruning_decision`);
+    }
+  }
+
+  for (const { line, value } of parseJsonl(rejectedRel)) {
+    requireJsonlFields(rejectedRel, line, value, [
+      "mechanism_id",
+      "status",
+      "reason",
+      "evidence",
+      "failure_modes",
+    ]);
+    if (typeof value.mechanism_id !== "string" || !mechanismIdPattern.test(value.mechanism_id)) {
+      fail(`${rejectedRel}: line ${line} invalid mechanism_id`);
+    }
+    if (value.status !== "rejected") fail(`${rejectedRel}: line ${line} status must be rejected`);
+    checkStringArray(rejectedRel, line, value, "evidence");
+    checkStringArray(rejectedRel, line, value, "failure_modes");
+  }
+}
+
+function checkRouterScenarios() {
+  const rel = "docs/ai/evolution/benchmarks/router-scenarios.jsonl";
+  const allowedAgents = new Set([
+    "lead",
+    "developer",
+    "researcher",
+    "designer",
+    "specifier",
+    "reviewer",
+    "scoper",
+    "evaluator",
+    "debugger",
+    "evolver",
+  ]);
+  const allowedEvidence = new Set(["static_contract", "transcript_replay", "live_smoke", "manual_oracle"]);
+
+  for (const { line, value } of parseJsonl(rel)) {
+    requireJsonlFields(rel, line, value, [
+      "id",
+      "prompt",
+      "expected_agent",
+      "command_path",
+      "allowed_skills",
+      "forbidden_sidecars",
+      "required_evidence",
+    ]);
+    if (typeof value.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.id)) {
+      fail(`${rel}: line ${line} invalid id`);
+    }
+    if (!allowedAgents.has(value.expected_agent)) {
+      fail(`${rel}: line ${line} invalid expected_agent`);
+    }
+    if (value.command_path !== "freeform" && !/^\/[a-z-]+$/.test(value.command_path ?? "")) {
+      fail(`${rel}: line ${line} invalid command_path`);
+    }
+    for (const field of ["allowed_skills", "forbidden_sidecars", "required_evidence"]) {
+      checkStringArray(rel, line, value, field);
+    }
+    if (Array.isArray(value.required_evidence)) {
+      for (const evidence of value.required_evidence) {
+        if (!allowedEvidence.has(evidence)) fail(`${rel}: line ${line} invalid required_evidence ${evidence}`);
+      }
+    }
+  }
+}
+
 /**
  * Validate that commands/evolve.md contains the AHE flow
  * evaluator -> debugger -> evolver with flexible regex matching.
@@ -748,6 +939,10 @@ checkFeatureContract();
 checkPlanContract();
 checkHarnessDocs();
 checkEvolutionRuns();
+checkTaskContractSurface();
+checkInitContextPolicy();
+checkMechanismRegistries();
+checkRouterScenarios();
 checkEvolveContract();
 checkCrossAgentContract();
 checkCommandContracts();

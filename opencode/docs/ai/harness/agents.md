@@ -44,3 +44,22 @@
 - `reviewer` waits for a diff, reviewable implementation, or `/plan` artifact.
 - `evaluator`, `debugger`, and `evolver` are optional sidecars.
 - `evolver` works only on the OpenCode harness.
+
+## Task Contract and handoff_packet
+
+`specifier`, `developer`, and `reviewer` must work against a `Task Contract`
+when the change is not trivial. The minimum block is:
+
+- `objective`: observable result.
+- `success_criteria`: verifiable criteria.
+- `non_goals`: out-of-scope items.
+- `assumptions`: accepted assumptions.
+- `open_questions`: open questions or `none`.
+- `accepted_tradeoffs`: accepted tradeoffs or `none`.
+- `validation`: commands, tests, or evidence.
+- `ask_abort_triggers`: conditions for asking, blocking, or returning work.
+
+For long, multi-agent, or resumable work, the responsible agent adds a compact
+`handoff_packet` with current objective, decisions made, files read/touched,
+validation state, blockers, and next action. Long logs are referenced by path
+and are not pasted into context.

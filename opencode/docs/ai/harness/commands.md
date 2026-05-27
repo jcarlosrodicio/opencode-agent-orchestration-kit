@@ -21,6 +21,12 @@ Criteria:
 
 Contract: `lead -> designer if applicable -> researcher -> specifier -> developer -> reviewer`.
 
+Init/context policy:
+
+- Read or locate `cwd`, `AGENTS.md`, `git state`, `validation commands`, and
+  `repo docs` only as needed for routing.
+- The small-task fast path must not become broad discovery.
+
 Criteria:
 
 - `designer` acts before `specifier` if UX, brand, layout, interaction, or visual
@@ -51,6 +57,12 @@ Criteria:
 
 Contract: `lead -> researcher -> specifier -> reviewer`.
 
+Init/context policy:
+
+- Record `cwd`, `AGENTS.md`, `git state`, `validation commands`, and
+  `repo docs` as planning context.
+- Deliver `Clarifications`, `Task Contract`, and `Acceptance Checklist`.
+
 Criteria:
 
 - No implementation and no `developer`.
@@ -67,6 +79,11 @@ Criteria:
 ## `/scope`
 
 Contract: `scoper -> researcher -> scoper synthesis -> specifier`.
+
+Init/context policy:
+
+- Fix `cwd`, `AGENTS.md`, `git state`, `validation commands`, and `repo docs`
+  before research.
 
 Criteria:
 
@@ -149,6 +166,13 @@ Criteria:
 ## `/evolve`
 
 Full contract for real harness changes: `evaluator -> debugger -> evolver -> lead approval -> developer -> evaluator -> debugger -> reviewer`.
+
+Init/context policy:
+
+- Confirm harness `cwd`, `AGENTS.md`, `git state`, `validation commands`, and
+  `repo docs` before proposing or applying changes.
+- Consult `mechanisms.jsonl`, `rejected_mechanisms.jsonl`, and benchmarks for
+  novelty/pruning before the manifest.
 
 Allowed no-apply branches:
 

@@ -19,6 +19,18 @@ memory, not app features.
 2. If git is unavailable, do not promise automatic rollback.
 3. Identify or create the target iteration path under `docs/ai/evolution/runs/iteration-XXX/`.
 
+## Init/context policy
+
+Before evaluating or proposing harness changes, record:
+
+- `cwd`: must be the OpenCode harness repo.
+- `AGENTS.md`: local rules and evolution boundaries.
+- `git state`: branch, pending changes, and real rollback ability.
+- `validation commands`: `node scripts/check-harness.mjs`,
+  `node --test scripts/check-harness.test.mjs`, and needed replays.
+- `repo docs`: `docs/ai/harness/`, `docs/ai/evolution/`,
+  `mechanisms.jsonl`, `rejected_mechanisms.jsonl`, and benchmarks.
+
 ## Flow
 
 1. Invoke `evaluator` for benchmark/smoke evidence.
@@ -61,3 +73,5 @@ memory, not app features.
 - Changes applied, if approved.
 - Validations run.
 - Final decision and risks.
+- `Task Contract` if implementation is delegated to `developer`.
+- `handoff_packet` if the iteration is left mid-flow or needs another session.

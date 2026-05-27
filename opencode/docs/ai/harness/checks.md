@@ -36,6 +36,10 @@ The harness check validates:
 - AHE manifests when present.
 - local paths referenced by `change_manifest.json` and
   `change_evaluation.json`.
+- `Task Contract`, `Clarifications`, `Acceptance Checklist`,
+  `handoff_packet`, and init/context policy in the surfaces that require them;
+- accepted/rejected mechanism JSONL registries;
+- router/skill scenarios in `docs/ai/evolution/benchmarks/router-scenarios.jsonl`.
 
 ## AHE Run Lifecycle
 
@@ -63,5 +67,6 @@ The local check turns the cheapest maintenance rules into mechanical checks:
 - `AGENTS.md` must stay a short map, not a long manual;
 - new agents and commands must appear in the harness docs;
 - manifests and evaluations must not point to missing local artifacts.
+- mechanisms and router scenarios must be parseable JSONL with minimum fields.
 
 Do not make doc gardening mandatory for normal features.

@@ -12,6 +12,18 @@ Run a deterministic plan-only flow.
 
 Contract: `lead -> researcher -> specifier -> reviewer`.
 
+## Init/context policy
+
+Before invoking `researcher`, record only the minimum context:
+
+- `cwd`: target repository or area.
+- `AGENTS.md`: applicable local rules when present.
+- `git state`: clean/dirty state when the plan depends on current changes.
+- `validation commands`: likely checks the plan should use.
+- `repo docs`: local docs relevant to research/spec.
+
+Do not implement or do deep discovery in this phase.
+
 ## Mandatory flow
 
 1. Ground the user objective with assumptions, questions, scope, non-scope, and verifiable success criteria.
@@ -50,10 +62,13 @@ If `reviewer` returns `requires changes`:
 Deliver:
 
 1. Research summary.
-2. Decisions made.
-3. Assumptions and open questions.
+2. Clarifications: decisions made, assumptions, open questions, and answers.
+3. Task Contract: `objective`, `success_criteria`, `non_goals`,
+   `assumptions`, `open_questions`, `accepted_tradeoffs`, `validation`, and
+   `ask_abort_triggers`.
 4. Implementation-ready plan.
-5. Acceptance criteria.
+5. Acceptance Checklist with items marked pass/fail/not_run.
 6. Validation plan.
 7. Reviewer result.
 8. Risks and pending items.
+9. `handoff_packet` if the plan requires multiple sessions or agents.

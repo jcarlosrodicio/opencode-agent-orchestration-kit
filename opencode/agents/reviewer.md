@@ -61,6 +61,25 @@ or evidence touches that axis. Do not turn cosmetic suggestions into blockers.
 - If verdict is `requires changes`, return a handoff for `lead` to send a bounded correction to `developer`.
 - If a bug is not understood, recommend `debugger` or `superpowers/systematic-debugging` instead of guessing.
 
+## Required Task Contract
+
+When reviewing a spec, plan, or diff, check that there is a `Task Contract` with
+these fields:
+
+- `objective`: observable objective.
+- `success_criteria`: verifiable success criteria.
+- `non_goals`: out-of-scope items.
+- `assumptions`: accepted assumptions.
+- `open_questions`: open questions or `none`.
+- `accepted_tradeoffs`: accepted tradeoffs or `none`.
+- `validation`: verification run or expected.
+- `ask_abort_triggers`: conditions for asking, blocking, or returning work.
+
+If it is missing for medium/large changes, mark an observability gap. For small
+changes, you may approve with an observation if scope and validation are
+unambiguous. For long work, review the `handoff_packet` and ensure long logs are
+referenced by path, not pasted as raw context.
+
 ## Output
 
 1. Verdict: approved / approved with observations / requires changes.

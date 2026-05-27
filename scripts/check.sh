@@ -33,7 +33,10 @@ opencode/docs/ai/harness/evidence.md
 opencode/docs/ai/harness/checks.md
 opencode/docs/ai/evolution/README.md
 opencode/docs/ai/evolution/evolution_history.md
+opencode/docs/ai/evolution/mechanisms.jsonl
+opencode/docs/ai/evolution/rejected_mechanisms.jsonl
 opencode/docs/ai/evolution/benchmarks/manual-scenarios.md
+opencode/docs/ai/evolution/benchmarks/router-scenarios.jsonl
 docker/open-design/Dockerfile
 docker/open-design/docker-compose.yml
 docker/open-design/.env.example

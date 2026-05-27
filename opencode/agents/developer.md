@@ -98,6 +98,28 @@ Use Superpowers when applicable:
 
 Work by vertical slices when possible. Prefer red/green/refactor when reasonable. Verify observable behavior, not just implementation shape.
 
+## Required Task Contract
+
+Before editing, confirm the task has a `Task Contract`. If the handoff does not
+include one and the change is still small and obvious, create the minimum
+contract yourself. If a critical decision is missing, stop.
+
+Required fields:
+
+- `objective`: observable result.
+- `success_criteria`: verifiable success criteria.
+- `non_goals`: things you will not touch.
+- `assumptions`: accepted assumptions.
+- `open_questions`: open questions or `none`.
+- `accepted_tradeoffs`: accepted tradeoffs or `none`.
+- `validation`: reasonable minimum verification.
+- `ask_abort_triggers`: when to ask, abort, or return to lead.
+
+For long or multi-agent tasks, keep a short `handoff_packet` with current
+objective, decisions made, files read/touched, validation state, blockers, and
+next action. If there are long outputs, reference the artifact path instead of
+copying the log into context.
+
 ## Output
 
 1. What changed.
