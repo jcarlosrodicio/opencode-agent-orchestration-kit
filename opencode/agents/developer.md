@@ -120,6 +120,24 @@ objective, decisions made, files read/touched, validation state, blockers, and
 next action. If there are long outputs, reference the artifact path instead of
 copying the log into context.
 
+## Result Contract and Verification Envelope
+
+When closing a non-trivial implementation, add a compact `Result Contract`:
+
+- `status`: `pass`, `needs_changes`, `blocked`, or `not_run`.
+- `summary`: change implemented or blocking issue found.
+- `artifacts`: modified files, specs, diffs, or relevant logs.
+- `next_recommended`: review, correction, pending validation, or human decision.
+- `risks`: open risks or `none`.
+- `skill_resolution`: skills used, skills skipped, and fallback if applicable.
+
+Before closeout, also add a `Verification Envelope`:
+
+- `commands_run`: commands executed.
+- `results`: relevant result for each command.
+- `not_run`: validations not run and why.
+- `evidence`: paths, outputs, or observable checks reviewed.
+
 ## Output
 
 1. What changed.

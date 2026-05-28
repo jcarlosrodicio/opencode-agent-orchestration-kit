@@ -160,6 +160,42 @@ Validate changed behavior and report results.
   }
 });
 
+test("harness rejects phase prompts missing Result Contract", () => {
+  const cwd = makeFixture();
+  try {
+    const specifier = fs.readFileSync(path.join(cwd, "agents/specifier.md"), "utf8");
+    write(
+      "agents/specifier.md",
+      specifier.replace(/## Required Result Contract[\s\S]*?## Markers/, "## Markers"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted specifier without Result Contract");
+    assert.match(result.stderr, /agents\/specifier\.md: missing Result Contract/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects developer prompt missing Verification Envelope", () => {
+  const cwd = makeFixture();
+  try {
+    const developer = fs.readFileSync(path.join(cwd, "agents/developer.md"), "utf8");
+    write(
+      "agents/developer.md",
+      developer.replace(/Verification Envelope/g, "Verification Block"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted developer without Verification Envelope");
+    assert.match(result.stderr, /agents\/developer\.md: missing Verification Envelope/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("harness rejects plan command without clarifications and acceptance checklist", () => {
   const cwd = makeFixture();
   try {

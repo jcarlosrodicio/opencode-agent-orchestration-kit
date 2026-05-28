@@ -478,6 +478,50 @@ function checkTaskContractSurface() {
   }
 }
 
+function checkResultContractSurface() {
+  const resultContractFiles = [
+    "agents/specifier.md",
+    "agents/developer.md",
+    "agents/reviewer.md",
+  ];
+  const resultFields = [
+    "status",
+    "summary",
+    "artifacts",
+    "next_recommended",
+    "risks",
+    "skill_resolution",
+  ];
+
+  const docs = read("docs/ai/harness/agents.md");
+  for (const token of ["Result Contract", "Verification Envelope", ...resultFields]) {
+    if (!docs.includes(token)) fail(`docs/ai/harness/agents.md: missing ${token}`);
+  }
+  for (const token of ["commands_run", "results", "not_run", "evidence"]) {
+    if (!docs.includes(token)) fail(`docs/ai/harness/agents.md: missing ${token}`);
+  }
+
+  for (const rel of resultContractFiles) {
+    const text = read(rel);
+    if (!text.includes("Result Contract")) {
+      fail(`${rel}: missing Result Contract`);
+      continue;
+    }
+    for (const field of resultFields) {
+      if (!text.includes(field)) fail(`${rel}: Result Contract missing ${field}`);
+    }
+  }
+
+  const developer = read("agents/developer.md");
+  if (!developer.includes("Verification Envelope")) {
+    fail("agents/developer.md: missing Verification Envelope");
+    return;
+  }
+  for (const field of ["commands_run", "results", "not_run", "evidence"]) {
+    if (!developer.includes(field)) fail(`agents/developer.md: Verification Envelope missing ${field}`);
+  }
+}
+
 function checkInitContextPolicy() {
   for (const rel of ["commands/feature.md", "commands/plan.md", "commands/scope.md", "commands/evolve.md"]) {
     const text = read(rel);
@@ -940,6 +984,7 @@ checkPlanContract();
 checkHarnessDocs();
 checkEvolutionRuns();
 checkTaskContractSurface();
+checkResultContractSurface();
 checkInitContextPolicy();
 checkMechanismRegistries();
 checkRouterScenarios();

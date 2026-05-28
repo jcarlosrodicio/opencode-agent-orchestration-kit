@@ -63,3 +63,23 @@ For long, multi-agent, or resumable work, the responsible agent adds a compact
 `handoff_packet` with current objective, decisions made, files read/touched,
 validation state, blockers, and next action. Long logs are referenced by path
 and are not pasted into context.
+
+## Result Contract
+
+When `specifier`, `developer`, or `reviewer` closes a non-trivial phase, it must
+return a compact `Result Contract` so the next agent does not need to interpret
+free-form prose. The minimum block is:
+
+- `status`: `pass`, `needs_changes`, `blocked`, or `not_run`.
+- `summary`: short actionable result.
+- `artifacts`: relevant files, specs, diffs, or logs.
+- `next_recommended`: recommended next step.
+- `risks`: open risks or `none`.
+- `skill_resolution`: skills used, skills skipped, and fallback if applicable.
+
+`developer` also adds a `Verification Envelope` before closeout:
+
+- `commands_run`: commands executed.
+- `results`: relevant result for each command.
+- `not_run`: validations not run and why.
+- `evidence`: paths, outputs, or observable checks reviewed.

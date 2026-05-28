@@ -80,6 +80,17 @@ changes, you may approve with an observation if scope and validation are
 unambiguous. For long work, review the `handoff_packet` and ensure long logs are
 referenced by path, not pasted as raw context.
 
+## Required Result Contract
+
+When closing a non-trivial review, add a compact `Result Contract`:
+
+- `status`: `pass`, `needs_changes`, `blocked`, or `not_run`.
+- `summary`: verdict and primary reason.
+- `artifacts`: diff, spec, manifest, evaluation, or logs reviewed.
+- `next_recommended`: merge, correction by `developer`, diagnosis, or human decision.
+- `risks`: open risks or `none`.
+- `skill_resolution`: skills used, skills skipped, and fallback if applicable.
+
 ## Output
 
 1. Verdict: approved / approved with observations / requires changes.

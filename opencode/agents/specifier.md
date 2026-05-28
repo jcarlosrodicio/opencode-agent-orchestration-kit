@@ -77,6 +77,17 @@ For long or multi-agent work, add a `handoff_packet` with current objective,
 decisions made, files read/touched, validation state, blockers, and next action.
 Reference long logs by path; do not paste them into context.
 
+## Required Result Contract
+
+When closing a non-trivial spec, add a compact `Result Contract`:
+
+- `status`: `pass`, `needs_changes`, `blocked`, or `not_run`.
+- `summary`: spec/tasks created or blocking issue found.
+- `artifacts`: relevant specs, tasks, files, or notes.
+- `next_recommended`: next agent or human decision.
+- `risks`: open risks or `none`.
+- `skill_resolution`: skills used, skills skipped, and fallback if applicable.
+
 ## Markers
 
 When useful, include:
