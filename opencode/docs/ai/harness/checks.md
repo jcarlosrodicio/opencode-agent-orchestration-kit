@@ -8,6 +8,16 @@ From the OpenCode config root, run:
 node scripts/check-harness.mjs
 ```
 
+This is the cheap local smoke check for the harness. It should remain the
+default low-cost validation before closing small documentation or structural
+changes.
+
+For the full checker suite, also run:
+
+```bash
+(cd opencode && node --test scripts/check-harness.test.mjs)
+```
+
 From this public repository, run:
 
 ```bash
@@ -68,5 +78,11 @@ The local check turns the cheapest maintenance rules into mechanical checks:
 - new agents and commands must appear in the harness docs;
 - manifests and evaluations must not point to missing local artifacts.
 - mechanisms and router scenarios must be parseable JSONL with minimum fields.
+
+Budget rule:
+
+- If `node --test scripts/check-harness.test.mjs` is used in an AHE iteration,
+  the run should record the time budget and observed runtime so operational
+  timeout is not confused with a functional checker regression.
 
 Do not make doc gardening mandatory for normal features.

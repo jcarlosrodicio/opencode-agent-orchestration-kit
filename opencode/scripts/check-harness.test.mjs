@@ -71,6 +71,37 @@ AHE.
   }
 });
 
+test("harness rejects evolve contract without OpenCode session-source policy", () => {
+  const cwd = makeFixture();
+  try {
+    const evolve = fs.readFileSync(path.join(cwd, "commands/evolve.md"), "utf8");
+    write(
+      "commands/evolve.md",
+      evolve
+        .replace(/session_sources/g, "source_list")
+        .replace(/opencode\.db/g, "local.db")
+        .replace(/collect-session-evidence\.mjs/g, "collect-evidence.mjs")
+        .replace(/execution-trees\.jsonl/g, "trees.jsonl")
+        .replace(/cursor\.json/g, "state.json")
+        .replace(/parent_id/g, "parent")
+        .replace(/full-rescan/g, "force-rescan"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted evolve without OpenCode session-source policy");
+    assert.match(result.stderr, /commands\/evolve\.md: missing evolve session-source token session_sources/);
+    assert.match(result.stderr, /commands\/evolve\.md: missing evolve session-source token opencode\.db/);
+    assert.match(result.stderr, /commands\/evolve\.md: missing evolve session-source token collect-session-evidence\.mjs/);
+    assert.match(result.stderr, /commands\/evolve\.md: missing evolve session-source token execution-trees\.jsonl/);
+    assert.match(result.stderr, /commands\/evolve\.md: missing evolve session-source token cursor\.json/);
+    assert.match(result.stderr, /commands\/evolve\.md: missing evolve session-source token parent_id/);
+    assert.match(result.stderr, /commands\/evolve\.md: missing evolve session-source token full-rescan/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("harness rejects scope flow when specifier appears before researcher", () => {
   const cwd = makeFixture();
   try {

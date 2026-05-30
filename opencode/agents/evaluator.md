@@ -13,6 +13,7 @@ permission:
     "*": ask
     "git status*": allow
     "git diff*": allow
+    "opencode run --format json --thinking *": allow
     "npm test*": allow
     "pnpm test*": allow
     "npm run test*": allow

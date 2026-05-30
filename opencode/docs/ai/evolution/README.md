@@ -28,6 +28,7 @@ docs/ai/harness/
   checks.md
 docs/ai/evolution/
   README.md
+  session-sources.md
   evolution_history.md
   mechanisms.jsonl
   rejected_mechanisms.jsonl
@@ -44,13 +45,52 @@ docs/ai/evolution/
 ## AHE Flow
 
 1. `evaluator` runs or defines benchmark/smoke scenarios.
-2. `debugger` analyzes results and produces root causes.
-3. `evolver` proposes changes only with evidence and manifest.
-4. `developer` applies bounded approved changes.
-5. `evaluator` measures again.
-6. `debugger` attributes fixes and regressions.
-7. `reviewer` reviews diff, spec, manifest, and evaluation.
-8. `lead` decides keep, improve, or rollback+pivot.
+2. OpenCode session sources are staged before evaluation with `collect-session-evidence.mjs`.
+3. `debugger` analyzes results and produces root causes.
+4. `evolver` proposes changes only with evidence and manifest.
+5. `developer` applies bounded approved changes.
+6. `evaluator` measures again.
+7. `debugger` attributes fixes and regressions.
+8. `reviewer` reviews diff, spec, manifest, and evaluation.
+9. `lead` decides keep, improve, or rollback+pivot.
+
+Minimum evidence hygiene in this flow:
+
+- Always distinguish natural feature evidence from synthetic/coercive routing
+  tests.
+- A prompt that explicitly requires talking to every agent, every phase, or
+  every sidecar counts as a synthetic routing test, not the baseline normal
+  `/feature` flow.
+- One coercive tree is not enough to support a sidecar-overreach claim; require
+  a second independent proof source such as a natural request or a stable replay
+  on the current harness.
+- Explicit user requests for sidecars remain valid; the classification only
+  corrects evidence attribution.
+
+## Session Sources
+
+`/evolve` uses OpenCode sessions, not `~/.codex/sessions`, as its base corpus.
+
+- Primary source: `~/.local/share/opencode/opencode.db`
+- Optional raw sources: `RAW_SESSIONS_DIR`, `/raw-sessions`
+
+The collector `scripts/collect-session-evidence.mjs` stages normalized
+artifacts before `evaluator`. AHE sidecars consume those staged artifacts rather
+than reading external directories directly.
+
+Primary evidence is execution-tree based:
+
+- one root session with `parent_id = null`
+- all child sessions and descendants linked by `parent_id`
+- primary artifact: `execution-trees.jsonl`
+- cursor artifact: `cursor.json`
+
+The canonical incremental cursor is tree-based:
+
+- `tree_time_updated_max`
+- `root_session_id`
+
+Raw exports are supplemental and do not advance the canonical cursor.
 
 ## Mechanism Registry
 
@@ -78,3 +118,12 @@ Every applied harness change should declare:
 - risk tasks;
 - constraint level;
 - why this component is the smallest sufficient place to change.
+
+When an iteration includes local harness checks, report separately:
+
+- quick smoke: `node scripts/check-harness.mjs`
+- long suite: `node --test scripts/check-harness.test.mjs`
+
+The long suite should record observed runtime and run with an explicit time
+budget above the default timeout. A timeout or cancellation near the ceiling is
+not enough, by itself, to classify the checker as functionally broken.

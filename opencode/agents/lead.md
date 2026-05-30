@@ -19,6 +19,7 @@ permission:
     "find *": allow
     "grep *": allow
     "rg *": allow
+    "node scripts/collect-session-evidence.mjs --iteration *": allow
     "tail *": allow
     "which": allow
     "which *": allow

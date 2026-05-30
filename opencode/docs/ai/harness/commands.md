@@ -173,6 +173,28 @@ Init/context policy:
   `repo docs` before proposing or applying changes.
 - Consult `mechanisms.jsonl`, `rejected_mechanisms.jsonl`, and benchmarks for
   novelty/pruning before the manifest.
+- Consult `docs/ai/evolution/session-sources.md` before evaluation.
+
+Session sources:
+
+- Primary source: `~/.local/share/opencode/opencode.db`
+- Optional raw sources: `session_sources` from `RAW_SESSIONS_DIR` or `/raw-sessions`
+- Required staging step: `node scripts/collect-session-evidence.mjs --iteration iteration-XXX`
+- Without external raw exports, `/evolve` still runs from `opencode.db`
+- Primary evidence is tree-based, not flat-session based
+- `parent_id` links the root session and subagent children
+- Canonical incremental cursor: `tree_time_updated_max` + `root_session_id`
+- Raw exports are supplemental and do not advance the canonical cursor
+- A full-rescan mode remains available for audit/debug recovery
+
+Local validation expectations in AHE:
+
+- `node scripts/check-harness.mjs` is the quick harness smoke and does not
+  replace the full suite.
+- `node --test scripts/check-harness.test.mjs` is long validation; run it with
+  an explicit budget above the default timeout, record observed runtime, and do
+  not mark it as a functional failure only because the shell or harness canceled
+  it near the time ceiling.
 
 Allowed no-apply branches:
 
@@ -190,9 +212,19 @@ Criteria:
 - Manifest, developer, and implementation are conditional on sufficient
   evidence, user scope, and approval; they are not mandatory outputs of
   evaluation-only or debugger-only branches.
+- Historical trees used as benchmarks must be classified by prompt type:
+  natural feature requests vs synthetic/coercive routing tests.
+- A prompt that explicitly asks to talk to every agent, every phase, or every
+  sidecar is not enough, by itself, to claim a `/feature` sidecar-overreach
+  regression; require a second independent proof source such as natural
+  evidence or a stable replay on the current harness.
+- This rule does not invalidate real requests where the user intentionally asks
+  for sidecars; it only prevents confusing them with the normal-flow baseline.
 - The next measurement needs `change_evaluation.json` when a manifest/change was
   applied or previous changes are being evaluated.
 - Do not promise automatic rollback without git.
+- `~/.codex/sessions` is not the base corpus for `/evolve`.
+- Sidecars should reason at execution-tree level first and only descend to individual child sessions for diagnosis.
 
 ## `/review`
 

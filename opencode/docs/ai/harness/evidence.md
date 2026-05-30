@@ -39,3 +39,47 @@ Record:
 - observed result;
 - limitations;
 - evaluation artifact path.
+
+## Session Evidence
+
+When `/evolve` uses OpenCode session evidence, it should first collect and
+normalize sources with:
+
+```bash
+node scripts/collect-session-evidence.mjs --iteration iteration-XXX
+```
+
+Local default source:
+
+- `~/.local/share/opencode/opencode.db`
+
+Optional raw sources:
+
+- `RAW_SESSIONS_DIR`
+- `/raw-sessions`
+
+The collector should write staged artifacts under `runs/iteration-XXX/raw/` and
+record, per source:
+
+- `discovered`
+- `accepted`
+- `skipped`
+- `skip_reasons`
+
+The primary `/evolve` evidence should be written as execution trees:
+
+- `execution-trees.jsonl`
+- `cursor.json`
+
+Rules:
+
+- each execution tree groups one root session and all descendants linked by `parent_id`
+- `normalized-sessions.jsonl` remains a secondary diagnostic view
+- the canonical cursor uses `tree_time_updated_max` and `root_session_id`
+- raw exports are supplemental only and do not advance the cursor
+- a full-rescan mode should remain available for audits and recovery
+- `debugger` and `evolver` should consume these staged artifacts first rather
+  than recalculating mechanical metrics with ad hoc scripting, unless a
+  limitation is made explicit
+- if a metric or summary is useful repeatedly, move it into the collector or an
+  auditable repo script instead of leaving it as an improvised session command

@@ -649,6 +649,9 @@ function checkEvolveContract() {
       fail(`commands/evolve.md: missing agent token ${token}`);
     }
   }
+  for (const token of ["session_sources", "opencode.db", "collect-session-evidence.mjs", "session-sources.md", "execution-trees.jsonl", "cursor.json", "parent_id", "full-rescan"]) {
+    if (!text.includes(token)) fail(`commands/evolve.md: missing evolve session-source token ${token}`);
+  }
 
   // Semantic: the AHE flow sequence evaluator -> debugger -> evolver
   // Must appear in this order with any intervening text.
@@ -683,6 +686,40 @@ function checkEvolveContract() {
       fallbackLiterals: ["/evolve", "Evolve the OpenCode harness"],
     },
   ], "commands/evolve.md AHE flow");
+}
+
+function checkSessionSourceDocs() {
+  const docs = read("docs/ai/evolution/session-sources.md");
+  for (const token of [
+    "opencode.db",
+    "RAW_SESSIONS_DIR",
+    "/raw-sessions",
+    "collect-session-evidence.mjs",
+    "normalized-sessions.jsonl",
+    "session-sources.summary.json",
+    "execution-trees.jsonl",
+    "cursor.json",
+    "parent_id",
+    "tree_time_updated_max",
+    "root_session_id",
+    "full-rescan",
+    "discovered",
+    "accepted",
+    "skipped",
+    "skip_reasons",
+  ]) {
+    if (!docs.includes(token)) fail(`docs/ai/evolution/session-sources.md: missing ${token}`);
+  }
+
+  const evidence = read("docs/ai/harness/evidence.md");
+  for (const token of ["opencode.db", "collect-session-evidence.mjs", "execution-trees.jsonl", "cursor.json", "tree_time_updated_max", "root_session_id", "discovered", "accepted", "skipped", "skip_reasons"]) {
+    if (!evidence.includes(token)) fail(`docs/ai/harness/evidence.md: missing session evidence token ${token}`);
+  }
+
+  const readme = read("docs/ai/evolution/README.md");
+  for (const token of ["session-sources.md", "opencode.db", "collect-session-evidence.mjs", "execution-trees.jsonl", "cursor.json", "parent_id"]) {
+    if (!readme.includes(token)) fail(`docs/ai/evolution/README.md: missing session-source token ${token}`);
+  }
 }
 
 /**
@@ -989,6 +1026,7 @@ checkInitContextPolicy();
 checkMechanismRegistries();
 checkRouterScenarios();
 checkEvolveContract();
+checkSessionSourceDocs();
 checkCrossAgentContract();
 checkCommandContracts();
 
