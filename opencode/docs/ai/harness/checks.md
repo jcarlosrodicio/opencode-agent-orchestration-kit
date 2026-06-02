@@ -50,6 +50,19 @@ The harness check validates:
   `handoff_packet`, and init/context policy in the surfaces that require them;
 - accepted/rejected mechanism JSONL registries;
 - router/skill scenarios in `docs/ai/evolution/benchmarks/router-scenarios.jsonl`.
+- presence of `docs/ai/harness/skill_registry.md` (soft check; warns when missing);
+- `agents/lead.md` contains `Skill Resolution` or a registry reference;
+- `developer`, `researcher`, `specifier`, `reviewer`, `designer`, and `scoper`
+  mention selected-skill behavior;
+- if `scripts/update-skill-registry.mjs` exists, its `--check` mode passes;
+- `commands/init.md` exists (soft check);
+- `docs/ai/harness/commands.md` documents `/init`;
+- `docs/ai/harness/init-detection-rules.md` exists (soft check);
+- `specifier` contains the Auto-Forecast contract (`estimated_scope`,
+  `affected_files`, `suggested_phases`);
+- `lead` contains the Auto-Forecast gate for `large`, the advisory `Strict TDD`
+  block, and context quarantine wording (`minimum handoff` + `compact output`);
+- `developer` honors the `Strict TDD` block when it appears in a handoff.
 
 ## AHE Run Lifecycle
 

@@ -34,6 +34,13 @@ Your only goal is to turn an intent, question, or product problem into scoped re
 
 You do not design, implement, or review code.
 
+## Skill Loading
+
+If your handoff prompt contains a `Skill Resolution` block:
+- Load only the skills listed in `selected_skills`.
+- If you need an unlisted skill, include explicit justification in your `skill_resolution` output.
+- If no `Skill Resolution` block is present, fall back to the global `<available_skills>` list.
+
 ## Allowed agents
 
 You may invoke only:

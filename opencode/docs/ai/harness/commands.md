@@ -23,9 +23,14 @@ Contract: `lead -> designer if applicable -> researcher -> specifier -> develope
 
 Init/context policy:
 
+- Read `PROJECT_CONTEXT.md` at the repo root, or `docs/ai/project-context.md`,
+  when present. Use it as a context accelerator for validation commands, testing
+  posture, and stack. Treat it as advisory, not as truth.
 - Read or locate `cwd`, `AGENTS.md`, `git state`, `validation commands`, and
   `repo docs` only as needed for routing.
 - The small-task fast path must not become broad discovery.
+- `lead` consults `docs/ai/harness/skill_registry.md` to select relevant skills
+  per handoff.
 
 Criteria:
 
@@ -59,6 +64,8 @@ Contract: `lead -> researcher -> specifier -> reviewer`.
 
 Init/context policy:
 
+- Read `PROJECT_CONTEXT.md` at the repo root, or `docs/ai/project-context.md`,
+  when present. Use it as a context accelerator.
 - Record `cwd`, `AGENTS.md`, `git state`, `validation commands`, and
   `repo docs` as planning context.
 - Deliver `Clarifications`, `Task Contract`, and `Acceptance Checklist`.
@@ -234,3 +241,25 @@ Criteria:
 
 - Review `git diff`, active spec, and available evidence.
 - If the diff changes the harness, also review AHE manifests and evaluations.
+
+## `/init`
+
+Contract: `lead` runs lightweight repository calibration and persists a
+`PROJECT_CONTEXT.md`.
+
+Init/context policy:
+
+- Confirm `cwd` and target repository.
+- Detect stack, test runner, conventions, and tooling from real config-file
+  signals.
+- Write `PROJECT_CONTEXT.md` at the repo root.
+- Return detection summary, confidence, and next action.
+
+Criteria:
+
+- Idempotent: rewrite without duplicating sections.
+- Detection is based on real files, not guesses.
+- Ambiguous items are marked `unknown`.
+- Does not mutate project files except the context file.
+- `lead` reads `PROJECT_CONTEXT.md` at the start of `/feature` and `/plan` when
+  it exists.

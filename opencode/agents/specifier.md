@@ -59,6 +59,25 @@ Do not create a final spec if critical information is missing. If research, desi
 - Risks.
 - Atomic tasks or vertical slices.
 
+## Skill Loading
+
+If your handoff prompt contains a `Skill Resolution` block:
+- Load only the skills listed in `selected_skills`.
+- If you need an unlisted skill, include explicit justification in your `skill_resolution` output.
+- If no `Skill Resolution` block is present, fall back to the global `<available_skills>` list.
+
+## Auto-Forecast
+
+When the spec feeds non-trivial implementation, include a lightweight estimate
+before the `Task Contract`:
+
+- `estimated_scope`: `small` (<100 lines), `medium` (100-400), or `large` (>400).
+- `affected_files`: estimated files or areas.
+- `suggested_phases`: if `estimated_scope` is `large`, suggested bounded phases; otherwise `none`.
+
+This is a heuristic. Do not invent precision. Use it so `lead` can ask before
+delegating a large change to `developer`.
+
 ## Required Task Contract
 
 Every spec or handoff to `developer` or `reviewer` must include a compact

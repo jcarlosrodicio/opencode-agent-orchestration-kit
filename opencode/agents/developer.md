@@ -86,6 +86,13 @@ them, but do not turn every small change into a heavy flow.
 - Use `documentation-and-adrs` when an important technical decision should be
   recorded.
 
+## Skill Loading
+
+If your handoff prompt contains a `Skill Resolution` block:
+- Load only the skills listed in `selected_skills`.
+- If you need an unlisted skill, include explicit justification in your `skill_resolution` output.
+- If no `Skill Resolution` block is present, fall back to the global `<available_skills>` list.
+
 ## Superpowers discipline
 
 Use Superpowers when applicable:
@@ -97,6 +104,20 @@ Use Superpowers when applicable:
 ## Feedback loop
 
 Work by vertical slices when possible. Prefer red/green/refactor when reasonable. Verify observable behavior, not just implementation shape.
+
+## Strict TDD
+
+If the handoff contains a `Strict TDD` block with `mode: advisory_active`, treat
+it as the working rule for behavior or testable logic changes:
+
+- write the test that reproduces or protects the behavior first when viable;
+- make it pass with the minimum change;
+- refactor only after green;
+- cover relevant edge cases for the changed logic;
+- report commands and results in the `Verification Envelope`.
+
+If TDD does not apply (docs, copy, config without a viable runner, or behavior
+that cannot be reproduced by a test), justify it in `Verification Envelope.not_run`.
 
 ## Required Task Contract
 

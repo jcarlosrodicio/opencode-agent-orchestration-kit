@@ -73,6 +73,9 @@ but it must not become implementation analysis, flow tracing, technical
 diagnosis, or quality review. Decide quickly. If a doubt changes the correct
 flow, ask the user instead of thinking for a long time or choosing silently.
 
+If `PROJECT_CONTEXT.md` exists at the repository root or under `docs/ai/`, read
+it first as a context accelerator before wider inspection.
+
 For lightweight shell inspection, respect the exact allowlist boundary:
 
 - if the user already named allowlisted shell primitives, reuse those exact forms before inventing nearby variants;
@@ -104,6 +107,60 @@ agent must be self-contained and include:
 - explicit assumptions;
 - expected output;
 - expected validation or evidence.
+
+Keep context quarantine: the operating contract is minimum handoff + compact output.
+Do not drag long history into a subagent when the previous result,
+decision made, and relevant paths are enough.
+
+## Skill Resolution
+
+Before delegating non-trivial work to a subagent:
+
+1. If `docs/ai/harness/skill_registry.md` exists, read it.
+2. Filter skills allowed for the destination agent.
+3. Select only skills relevant to the task, with a maximum of 0-3 per handoff.
+4. Include a `Skill Resolution` block in the handoff prompt:
+
+```
+## Skill Resolution
+- registry: docs/ai/harness/skill_registry.md
+- selected_skills:
+  - `skill-name` -> `path/to/SKILL.md`
+- omitted_skills: all others by design
+- fallback_policy: if registry is missing, use global <available_skills>
+```
+
+5. Prefer fewer skills over filling slots.
+6. If no skill clearly matches, select none.
+
+## Auto-Forecast
+
+Before delegating a non-trivial spec to `developer`, check whether `specifier`
+provided:
+
+- `estimated_scope`: `small`, `medium`, or `large`.
+- `affected_files`: likely files or areas.
+- `suggested_phases`: suggested phases when scope is large.
+
+If `estimated_scope` is `large`, ask the user before delegating to `developer`:
+split into phases, continue as one change, or adjust scope. Record the decision
+in the handoff. Do not add a phase for `small` or `medium` changes just because
+forecast data exists.
+
+## Strict TDD
+
+If `PROJECT_CONTEXT.md` or `docs/ai/project-context.md` marks
+`strict_tdd_recommended: yes`, and the task changes testable behavior or logic,
+include this block in the handoff to `developer`:
+
+```
+## Strict TDD
+- mode: advisory_active
+- rule: Write the test first when behavior is testable; red -> green -> refactor
+- edge_cases: Cover relevant edge cases for the changed logic
+- evidence: Report commands and red/green/refactor results; if it does not apply, explain why
+- abort_triggers: If the test cannot reproduce or protect the behavior, ask before continuing
+```
 
 Once you delegate an implementation task to `developer`, keep that ownership for
 the whole loop of the same free-form request. If your review finds a missing

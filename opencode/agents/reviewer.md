@@ -45,6 +45,13 @@ diff. Load `security-and-hardening`, `performance-optimization`,
 `test-driven-development`, or `debugging-and-error-recovery` only when the diff
 or evidence touches that axis. Do not turn cosmetic suggestions into blockers.
 
+## Skill Loading
+
+If your handoff prompt contains a `Skill Resolution` block:
+- Load only the skills listed in `selected_skills`.
+- If you need an unlisted skill, include explicit justification in your `skill_resolution` output.
+- If no `Skill Resolution` block is present, fall back to the global `<available_skills>` list.
+
 ## Rules
 
 - Do not edit files.

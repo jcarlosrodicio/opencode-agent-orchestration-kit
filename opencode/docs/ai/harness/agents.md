@@ -40,7 +40,18 @@
   decides, or reroutes.
 - Local skills in `skills/` are process checklists for agents, not a new
   mandatory orchestration layer.
+- `lead` must consult `docs/ai/harness/skill_registry.md` before delegating
+  non-trivial work, selecting 0-3 relevant skills per handoff.
+- `lead` preserves context quarantine: minimum handoff + compact output,
+  without carrying long history when decisions, paths, and evidence are enough.
+- If `specifier` marks `estimated_scope: large`, `lead` asks the user whether
+  to split, continue as one change, or adjust scope before delegating to
+  `developer`.
+- If project context marks `strict_tdd_recommended: yes`, `lead` includes an
+  advisory `Strict TDD` block for testable tasks.
 - `specifier` waits for research/design when those results affect requirements.
+- `specifier` includes `estimated_scope`, `affected_files`, and
+  `suggested_phases` for non-trivial specs that feed implementation.
 - `reviewer` waits for a diff, reviewable implementation, or `/plan` artifact.
 - `evaluator`, `debugger`, and `evolver` are optional sidecars.
 - `evolver` works only on the OpenCode harness.
@@ -63,6 +74,9 @@ For long, multi-agent, or resumable work, the responsible agent adds a compact
 `handoff_packet` with current objective, decisions made, files read/touched,
 validation state, blockers, and next action. Long logs are referenced by path
 and are not pasted into context.
+
+`lead` must consult `docs/ai/harness/skill_registry.md` before delegating
+non-trivial work, selecting 0-3 relevant skills per handoff.
 
 ## Result Contract
 

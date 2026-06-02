@@ -10,6 +10,7 @@ here.
 - `commands.md`: command contracts and phase barriers.
 - `evidence.md`: evidence types and required threshold by change type.
 - `checks.md`: local validation and lightweight doc gardening.
+- `skill_registry.md`: generated skill index for selective `lead` handoffs.
 - `docs/ai/evolution/`: AHE history, benchmarks, manifests, and attribution.
 
 ## Principles

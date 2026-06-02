@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 
 const root = process.cwd();
 const errors = [];
@@ -1010,6 +1011,87 @@ function checkCommandContracts() {
   ], "commands/design.md flow");
 }
 
+function checkSkillRegistryPresence() {
+  const rel = "docs/ai/harness/skill_registry.md";
+  if (!exists(rel)) {
+    console.warn(`Warning: ${rel} missing (soft check)`);
+  }
+}
+
+function checkLeadSkillResolution() {
+  const text = read("agents/lead.md");
+  if (!text.includes("Skill Resolution") && !text.includes("registry")) {
+    fail("agents/lead.md: missing Skill Resolution or registry reference");
+  }
+}
+
+function checkAgentSkillLoading() {
+  const requiredAgents = ["developer", "researcher", "specifier", "reviewer", "designer", "scoper"];
+  for (const agent of requiredAgents) {
+    const rel = `agents/${agent}.md`;
+    const text = read(rel);
+    if (!text.includes("Skill Resolution") && !text.includes("selected_skills")) {
+      fail(`${rel}: missing Skill Resolution or selected_skills behavior`);
+    }
+  }
+}
+
+function checkSkillRegistryGenerator() {
+  const generatorRel = "scripts/update-skill-registry.mjs";
+  if (!exists(generatorRel)) return;
+  try {
+    execSync(`node ${generatorRel} --check`, { cwd: root, stdio: "pipe" });
+  } catch (error) {
+    fail(`Skill registry generator --check failed: ${error.message}`);
+  }
+}
+
+function checkInitCommand() {
+  if (!exists("commands/init.md")) {
+    console.warn("Warning: commands/init.md missing (soft check)");
+  }
+
+  const commandDocs = read("docs/ai/harness/commands.md");
+  if (!commandDocs.includes("/init")) {
+    fail("docs/ai/harness/commands.md: missing /init documentation");
+  }
+
+  if (!exists("docs/ai/harness/init-detection-rules.md")) {
+    console.warn("Warning: docs/ai/harness/init-detection-rules.md missing (soft check)");
+  }
+}
+
+function checkAutoForecastContract() {
+  const specifier = read("agents/specifier.md");
+  for (const token of ["estimated_scope", "affected_files", "suggested_phases"]) {
+    if (!specifier.includes(token)) fail(`agents/specifier.md: missing auto-forecast token ${token}`);
+  }
+
+  const lead = read("agents/lead.md");
+  for (const token of ["Auto-Forecast", "estimated_scope", "large", "developer"]) {
+    if (!lead.includes(token)) fail(`agents/lead.md: missing auto-forecast token ${token}`);
+  }
+}
+
+function checkStrictTddContract() {
+  const lead = read("agents/lead.md");
+  for (const token of ["Strict TDD", "strict_tdd_recommended", "advisory_active"]) {
+    if (!lead.includes(token)) fail(`agents/lead.md: missing strict TDD token ${token}`);
+  }
+
+  const developer = read("agents/developer.md");
+  for (const token of ["Strict TDD", "advisory_active", "Verification Envelope.not_run"]) {
+    if (!developer.includes(token)) fail(`agents/developer.md: missing strict TDD token ${token}`);
+  }
+}
+
+function checkContextQuarantineContract() {
+  const lead = read("agents/lead.md");
+  for (const token of ["minimum handoff", "compact output"]) {
+    if (!lead.includes(token)) fail(`agents/lead.md: missing context quarantine token ${token}`);
+  }
+}
+
 checkConfig();
 checkAgentsIndex();
 checkFrontmatter();
@@ -1029,6 +1111,14 @@ checkEvolveContract();
 checkSessionSourceDocs();
 checkCrossAgentContract();
 checkCommandContracts();
+checkSkillRegistryPresence();
+checkLeadSkillResolution();
+checkAgentSkillLoading();
+checkSkillRegistryGenerator();
+checkInitCommand();
+checkAutoForecastContract();
+checkStrictTddContract();
+checkContextQuarantineContract();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");
