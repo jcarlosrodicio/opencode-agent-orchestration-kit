@@ -36,6 +36,7 @@ docs/ai/evolution/
   benchmarks/router-scenarios.jsonl
   runs/
     iteration-XXX/
+      preflight-audit.json
       evaluation.md
       analysis/overview.md
       change_manifest.json
@@ -44,15 +45,20 @@ docs/ai/evolution/
 
 ## AHE Flow
 
-1. `evaluator` runs or defines benchmark/smoke scenarios.
+1. **Preflight audit** runs `node scripts/preflight-audit.mjs --iteration iteration-XXX` to produce an objective harness-state baseline (`preflight-audit.json`).
 2. OpenCode session sources are staged before evaluation with `collect-session-evidence.mjs`.
-3. `debugger` analyzes results and produces root causes.
-4. `evolver` proposes changes only with evidence and manifest.
-5. `developer` applies bounded approved changes.
-6. `evaluator` measures again.
-7. `debugger` attributes fixes and regressions.
-8. `reviewer` reviews diff, spec, manifest, and evaluation.
-9. `lead` decides keep, improve, or rollback+pivot.
+3. `evaluator` runs or defines benchmark/smoke scenarios.
+4. `debugger` analyzes results and produces root causes.
+5. `evolver` proposes changes only with evidence and manifest.
+6. `developer` applies bounded approved changes.
+7. `evaluator` measures again.
+8. `debugger` attributes fixes and regressions.
+9. `reviewer` reviews diff, spec, manifest, and evaluation.
+10. `lead` decides keep, improve, or rollback+pivot.
+
+The preflight audit reuses existing staging, docs, and contracts. It produces a
+scorecard, doc/runtime matrix, drifts, and prioritized recommendations as a
+per-iteration artifact.
 
 Minimum evidence hygiene in this flow:
 

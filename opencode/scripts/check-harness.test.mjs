@@ -448,3 +448,62 @@ test("harness rejects missing context quarantine contract", () => {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("harness rejects evolve flow without preflight audit reference", () => {
+  const cwd = makeFixture();
+  try {
+    const evolve = fs.readFileSync(path.join(cwd, "commands/evolve.md"), "utf8");
+    write(
+      "commands/evolve.md",
+      evolve
+        .replace(/preflight audit/g, "initial check")
+        .replace(/Preflight Audit/g, "Initial Check")
+        .replace(/preflight-audit\.mjs/g, "initial-check.mjs")
+        .replace(/preflight-audit\.json/g, "initial-check.json")
+        .replace(/audit-only/g, "check-only"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted evolve without preflight audit contract");
+    assert.match(result.stderr, /commands\/evolve\.md: missing preflight audit token preflight audit/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects evaluator without preflight-audit.json reference", () => {
+  const cwd = makeFixture();
+  try {
+    const evaluator = fs.readFileSync(path.join(cwd, "agents/evaluator.md"), "utf8");
+    write(
+      "agents/evaluator.md",
+      evaluator.replace(/preflight-audit\.json/g, "baseline.json"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted evaluator without preflight reference");
+    assert.match(result.stderr, /agents\/evaluator\.md: missing preflight-audit\.json reference/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects debugger without preflight-audit.json reference", () => {
+  const cwd = makeFixture();
+  try {
+    const debuggerDoc = fs.readFileSync(path.join(cwd, "agents/debugger.md"), "utf8");
+    write(
+      "agents/debugger.md",
+      debuggerDoc.replace(/preflight-audit\.json/g, "baseline.json"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted debugger without preflight reference");
+    assert.match(result.stderr, /agents\/debugger\.md: missing preflight-audit\.json reference/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});

@@ -77,27 +77,56 @@ Raw exports are supplemental:
 
 If no external raw exports are available, `/evolve` still runs from `opencode.db`.
 
+## Preflight Audit
+
+Before evaluating or proposing changes, run the preflight audit to produce an
+objective harness-state baseline:
+
+```bash
+node scripts/preflight-audit.mjs --iteration iteration-XXX
+```
+
+The preflight writes `preflight-audit.json` with:
+
+- `scores`: `contract_coverage`, `runtime_evidence_coverage`, `doc_runtime_alignment`, `drift_severity`.
+- `doc_runtime_matrix`: per-surface matrix for agents, commands, workflows, and evidence.
+- `drifts`: observable drifts classified by severity.
+- `recommendations`: prioritized recommendations.
+- `confidence`: preflight confidence level.
+
+Allowed preflight branches:
+
+- `audit-only`: run only preflight and report results without invoking
+  `evaluator`, `debugger`, or `evolver`.
+- `debugger-only`: run preflight + `evaluator` + `debugger` without reaching
+  `evolver`.
+- `full evolve`: preflight + the complete flow.
+
+The preflight reuses existing staging, docs, and contracts. It is a per-iteration
+artifact, not a parallel system.
+
 ## Flow
 
-1. Collect `session_sources` and stage normalized artifacts with `collect-session-evidence.mjs`.
-2. Invoke `evaluator` for benchmark/smoke evidence.
-3. If the user requested evaluation/audit only and did not authorize analysis,
+1. Run preflight audit for the target iteration.
+2. Collect `session_sources` and stage normalized artifacts with `collect-session-evidence.mjs`.
+3. Invoke `evaluator` for benchmark/smoke evidence.
+4. If the user requested evaluation/audit only and did not authorize analysis,
    manifest, or implementation, stop here with results, limitations, and the
    next handoff; do not create a manifest.
-4. Invoke `debugger` for patterns and root causes when there are results or
+5. Invoke `debugger` for patterns and root causes when there are results or
    traces to attribute.
-5. If the scope is debugger-only, no-apply, or no-manifest, stop here with root
+6. If the scope is debugger-only, no-apply, or no-manifest, stop here with root
    causes, falsification criteria, and recommendation; do not invoke `evolver`
    or `developer`.
-6. Invoke `evolver` only if evidence is sufficient and the user scope allows
+7. Invoke `evolver` only if evidence is sufficient and the user scope allows
    harness change proposals.
-7. Review the proposed manifest.
-8. If the manifest is valid and applying is approved, invoke `developer` for
+8. Review the proposed manifest.
+9. If the manifest is valid and applying is approved, invoke `developer` for
    bounded harness changes.
-9. Re-run evaluator.
-10. Re-run debugger for attribution.
-11. Invoke reviewer against diff, manifest, and evaluation.
-12. Close with keep / improve / rollback+pivot.
+10. Re-run evaluator.
+11. Re-run debugger for attribution.
+12. Invoke reviewer against diff, manifest, and evaluation.
+13. Close with keep / improve / rollback+pivot.
 
 ## Rules
 
@@ -124,6 +153,7 @@ If no external raw exports are available, `/evolve` still runs from `opencode.db
 
 ## Expected Result
 
+- Preflight audit run with `preflight-audit.json` produced.
 - Evaluated iteration.
 - Staged `session_sources` and `execution tree` artifacts.
 - Manifest created or updated only when the branch reached a change proposal.

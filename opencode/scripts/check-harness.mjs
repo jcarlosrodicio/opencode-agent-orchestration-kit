@@ -1092,6 +1092,44 @@ function checkContextQuarantineContract() {
   }
 }
 
+function checkPreflightAuditContract() {
+  const evolve = read("commands/evolve.md");
+  for (const token of [
+    "preflight audit",
+    "preflight-audit.mjs",
+    "preflight-audit.json",
+    "audit-only",
+  ]) {
+    if (!evolve.includes(token)) fail(`commands/evolve.md: missing preflight audit token ${token}`);
+  }
+
+  const commandDocs = read("docs/ai/harness/commands.md");
+  const evolveSection = commandDocs.split("## `/evolve`")[1]?.split("## `/review`")[0] || "";
+  for (const token of ["preflight audit", "preflight-audit.json"]) {
+    if (!evolveSection.includes(token)) fail(`docs/ai/harness/commands.md /evolve: missing preflight token ${token}`);
+  }
+
+  const readme = read("docs/ai/evolution/README.md");
+  for (const token of ["preflight-audit.json", "preflight audit"]) {
+    if (!readme.includes(token)) fail(`docs/ai/evolution/README.md: missing preflight token ${token}`);
+  }
+
+  const evaluator = read("agents/evaluator.md");
+  if (!evaluator.includes("preflight-audit.json")) {
+    fail("agents/evaluator.md: missing preflight-audit.json reference");
+  }
+
+  const debuggerDoc = read("agents/debugger.md");
+  if (!debuggerDoc.includes("preflight-audit.json")) {
+    fail("agents/debugger.md: missing preflight-audit.json reference");
+  }
+
+  const evolver = read("agents/evolver.md");
+  if (!evolver.includes("preflight audit") && !evolver.includes("Preflight audit")) {
+    fail("agents/evolver.md: missing preflight reference");
+  }
+}
+
 checkConfig();
 checkAgentsIndex();
 checkFrontmatter();
@@ -1119,6 +1157,7 @@ checkInitCommand();
 checkAutoForecastContract();
 checkStrictTddContract();
 checkContextQuarantineContract();
+checkPreflightAuditContract();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");

@@ -172,12 +172,17 @@ Criteria:
 
 ## `/evolve`
 
-Full contract for real harness changes: `evaluator -> debugger -> evolver -> lead approval -> developer -> evaluator -> debugger -> reviewer`.
+Full contract for real harness changes: `preflight audit -> session_sources/staging -> evaluator -> debugger -> evolver -> lead approval -> developer -> evaluator -> debugger -> reviewer`.
+
+The preflight audit is an integrated initial stage, not a parallel system. It
+produces `preflight-audit.json` with a scorecard, doc/runtime matrix, drifts,
+and recommendations before `evaluator` runs scenarios.
 
 Init/context policy:
 
 - Confirm harness `cwd`, `AGENTS.md`, `git state`, `validation commands`, and
   `repo docs` before proposing or applying changes.
+- Run preflight audit: `node scripts/preflight-audit.mjs --iteration iteration-XXX`.
 - Consult `mechanisms.jsonl`, `rejected_mechanisms.jsonl`, and benchmarks for
   novelty/pruning before the manifest.
 - Consult `docs/ai/evolution/session-sources.md` before evaluation.
@@ -205,6 +210,8 @@ Local validation expectations in AHE:
 
 Allowed no-apply branches:
 
+- `audit-only`: stops after preflight audit when the user requested only harness
+  audit/status; it does not invoke `evaluator`, `debugger`, or `evolver`.
 - `evaluation-only`: stops after `evaluator` when the user requested audit or
   evaluation only and did not authorize analysis, manifest, or implementation.
 - `debugger-only` / `no-apply` / `no-manifest`: stops after `debugger` with root
