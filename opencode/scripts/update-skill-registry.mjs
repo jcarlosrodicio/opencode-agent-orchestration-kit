@@ -7,9 +7,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
 // Paths
-const registryRel = "docs/ai/harness/skill_registry.md";
+const registryMdRel = "docs/ai/harness/skill_registry.md";
+const registryJsonRel = "docs/ai/harness/skill_registry.json";
 const builtInSkillsDir = path.join(root, "skills");
 const userSkillsDir = path.join(process.env.HOME, ".agents", "skills");
+
+const SCHEMA_VERSION = 2;
 
 // Header to preserve (everything before the first table)
 const header = `# Skill Registry
@@ -32,7 +35,7 @@ If this file is missing, \`lead\` continues using the global \`<available_skills
 
 `;
 
-const agentTypes = [
+const allAgentTypes = [
   "developer",
   "researcher",
   "designer",
@@ -42,33 +45,118 @@ const agentTypes = [
   "lead",
 ];
 
+// ---------------------------------------------------------------------------
+// Frontmatter parser — enhanced to handle YAML arrays
+// ---------------------------------------------------------------------------
+
 function parseFrontmatter(content) {
   if (!content.startsWith("---\n")) return {};
   const end = content.indexOf("\n---", 4);
   if (end === -1) return {};
   const lines = content.slice(4, end).split("\n");
   const data = {};
-  for (let i = 0; i < lines.length; i++) {
+  let i = 0;
+  while (i < lines.length) {
     const line = lines[i];
-    if (!line.trim()) continue;
-    if (/^\s/.test(line)) continue;
-    const match = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
-    if (match) {
-      const key = match[1];
-      const value = match[2].replace(/^"(.*)"$/, "$1");
-      if (value === ">-" || value === ">" || value === "|" || value === "|-" || value === "") {
-        const parts = [];
-        while (i + 1 < lines.length && /^\s+/.test(lines[i + 1])) {
-          parts.push(lines[i + 1].trim());
-          i++;
-        }
-        data[key] = parts.join(" ").trim();
-      } else {
-        data[key] = value;
-      }
+    if (!line.trim() || /^\s/.test(line)) {
+      i++;
+      continue;
     }
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (!match) {
+      i++;
+      continue;
+    }
+    const key = match[1];
+    let value = match[2].replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
+
+    // Inline array: [item1, item2, item3]
+    const inlineArrayMatch = value.match(/^\[(.*)\]$/);
+    if (inlineArrayMatch) {
+      const inner = inlineArrayMatch[1].trim();
+      if (inner === "") {
+        data[key] = [];
+      } else {
+        data[key] = inner.split(/\s*,\s*/).map((s) =>
+          s.replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1").trim()
+        );
+      }
+      i++;
+      continue;
+    }
+
+    // Block-style array or multiline: value is empty / indicator, followed by indented lines
+    if (
+      value === "" ||
+      value === ">-" ||
+      value === ">" ||
+      value === "|" ||
+      value === "|-"
+    ) {
+      const parts = [];
+      // Check if next lines are block-array items (start with `- `)
+      const arrayItems = [];
+      let j = i + 1;
+      while (j < lines.length && /^\s+/.test(lines[j])) {
+        const trimmed = lines[j].trim();
+        if (trimmed.startsWith("- ")) {
+          arrayItems.push(
+            trimmed.slice(2).replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1").trim()
+          );
+        } else if (trimmed.startsWith("-")) {
+          // bare dash with no space (e.g., "-item")
+          arrayItems.push(
+            trimmed.slice(1).replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1").trim()
+          );
+        } else {
+          parts.push(trimmed);
+        }
+        j++;
+      }
+
+      if (arrayItems.length > 0) {
+        data[key] = arrayItems;
+      } else {
+        data[key] = parts.join(" ").trim();
+      }
+      i = j;
+      continue;
+    }
+
+    data[key] = value;
+    i++;
   }
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Skill enrichment — apply fallbacks for missing fields
+// ---------------------------------------------------------------------------
+
+function coerceNull(val) {
+  if (val === "null" || val === "Null" || val === "NULL") return null;
+  return val;
+}
+
+function enrichSkill(raw, source, skillFile) {
+  const allowed = Array.isArray(raw.allowed_agents)
+    ? raw.allowed_agents
+    : allAgentTypes;
+
+  return {
+    name: raw.name || "",
+    description: (raw.description || "").replace(/\s+/g, " ").trim(),
+    source,
+    phase: raw.phase || "unknown",
+    domains: Array.isArray(raw.domains) ? raw.domains : [],
+    stacks: Array.isArray(raw.stacks) ? raw.stacks : ["any"],
+    allowed_agents: allowed,
+    surfaces: Array.isArray(raw.surfaces) ? raw.surfaces : [],
+    status: raw.status || "active",
+    skill_source: raw.skill_source || source,
+    origin: coerceNull(raw.origin) || null,
+    loadPath: displayPath(skillFile, source),
+  };
 }
 
 function displayPath(skillFile, source) {
@@ -84,6 +172,10 @@ function displayPath(skillFile, source) {
   return skillFile.split(path.sep).join("/");
 }
 
+// ---------------------------------------------------------------------------
+// Scanner
+// ---------------------------------------------------------------------------
+
 function scanSkills(dir, source) {
   if (!fs.existsSync(dir)) return [];
   const skills = [];
@@ -93,34 +185,76 @@ function scanSkills(dir, source) {
     const skillFile = path.join(dir, entry.name, "SKILL.md");
     if (!fs.existsSync(skillFile)) continue;
     const content = fs.readFileSync(skillFile, "utf8");
-    const frontmatter = parseFrontmatter(content);
-    if (!frontmatter.name) continue;
-    skills.push({
-      name: frontmatter.name,
-      description: frontmatter.description || "",
-      source,
-      loadPath: displayPath(skillFile, source),
-    });
+    const raw = parseFrontmatter(content);
+    if (!raw.name) continue;
+    skills.push(enrichSkill(raw, source, skillFile));
   }
   return skills.sort((left, right) => left.name.localeCompare(right.name));
 }
 
+// ---------------------------------------------------------------------------
+// Markdown table generation — enriched columns
+// ---------------------------------------------------------------------------
+
+function truncate(str, maxLen) {
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen - 1) + "\u2026";
+}
+
+function escapeCell(str) {
+  return str.replace(/\|/g, "\\|").replace(/\n/g, " ");
+}
+
 function generateTable(skills) {
-  const headerRow = "| Skill | Source | Allowed Agents | Trigger Condition | Load Path |";
-  const separatorRow = "| --- | --- | --- | --- | --- |";
+  const headerRow =
+    "| Skill | Source | Phase | Domains | Stacks | Allowed Agents | Status | Trigger Summary | Load Path |";
+  const separatorRow =
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |";
   if (skills.length === 0) {
     return `${headerRow}\n${separatorRow}\n`;
   }
   const rows = skills.map((skill) => {
-    const agents = agentTypes.join(", ");
-    // Escape pipe characters in description
-    const description = skill.description.replace(/\s+/g, " ").replace(/\|/g, "\\|").trim();
-    return `| ${skill.name} | ${skill.source} | ${agents} | ${description} | ${skill.loadPath} |`;
+    const domains =
+      skill.domains.length > 0 ? skill.domains.join(", ") : "—";
+    const stacks =
+      skill.stacks.length > 0 ? skill.stacks.join(", ") : "—";
+    const agents = skill.allowed_agents.join(", ");
+    const trigger = truncate(escapeCell(skill.description), 120);
+    return `| ${skill.name} | ${skill.source} | ${skill.phase} | ${domains} | ${stacks} | ${agents} | ${skill.status} | ${trigger} | ${skill.loadPath} |`;
   });
   return `${headerRow}\n${separatorRow}\n${rows.join("\n")}\n`;
 }
 
-function generateRegistry(builtInSkills, userSkills) {
+// ---------------------------------------------------------------------------
+// JSON generation
+// ---------------------------------------------------------------------------
+
+function generateJson(skills, generatedAt) {
+  return {
+    generated_at: generatedAt,
+    schema_version: SCHEMA_VERSION,
+    skills: skills.map((s) => ({
+      name: s.name,
+      source: s.source,
+      phase: s.phase,
+      domains: s.domains,
+      stacks: s.stacks,
+      allowed_agents: s.allowed_agents,
+      surfaces: s.surfaces,
+      skill_source: s.skill_source,
+      status: s.status,
+      description: s.description,
+      load_path: s.loadPath,
+      origin: s.origin,
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Registry generation
+// ---------------------------------------------------------------------------
+
+function generateRegistryMd(builtInSkills, userSkills) {
   const builtInTable = generateTable(builtInSkills);
   const userTable = generateTable(userSkills);
   return (
@@ -132,36 +266,115 @@ function generateRegistry(builtInSkills, userSkills) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Deterministic ISO timestamp (date only, no time, for determinism)
+// ---------------------------------------------------------------------------
+
+function deterministicTimestamp() {
+  const now = new Date();
+  return now.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+// ---------------------------------------------------------------------------
+// Check mode — verify both MD and JSON are up to date
+// ---------------------------------------------------------------------------
+
+function checkMode(builtInSkills, userSkills) {
+  let ok = true;
+
+  // Check Markdown
+  const registryMdPath = path.join(root, registryMdRel);
+  if (!fs.existsSync(registryMdPath)) {
+    console.error(`Registry MD missing: ${registryMdRel}`);
+    ok = false;
+  } else {
+    const existing = fs.readFileSync(registryMdPath, "utf8");
+    const expected = generateRegistryMd(builtInSkills, userSkills);
+    if (existing !== expected) {
+      console.error(
+        `Registry MD is stale. Run 'node scripts/update-skill-registry.mjs' to update.`
+      );
+      ok = false;
+    }
+  }
+
+  // Check JSON
+  const registryJsonPath = path.join(root, registryJsonRel);
+  if (!fs.existsSync(registryJsonPath)) {
+    console.error(`Registry JSON missing: ${registryJsonRel}`);
+    ok = false;
+  } else {
+    const existing = fs.readFileSync(registryJsonPath, "utf8");
+    const parsed = JSON.parse(existing);
+    // Regenerate with same timestamp for comparison
+    const expectedObj = {
+      generated_at: parsed.generated_at,
+      schema_version: SCHEMA_VERSION,
+      skills: generateJson([...builtInSkills, ...userSkills], "").skills,
+    };
+    const expected = JSON.stringify(expectedObj, null, 2) + "\n";
+    const actual = JSON.stringify(
+      {
+        generated_at: parsed.generated_at,
+        schema_version: parsed.schema_version,
+        skills: parsed.skills,
+      },
+      null,
+      2
+    ) + "\n";
+    if (actual !== expected) {
+      console.error(
+        `Registry JSON is stale. Run 'node scripts/update-skill-registry.mjs' to update.`
+      );
+      ok = false;
+    }
+  }
+
+  if (ok) {
+    console.log("Registry check passed (MD + JSON).");
+  }
+  process.exit(ok ? 0 : 1);
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 function main() {
   const args = process.argv.slice(2);
-  const checkMode = args.includes("--check");
+  const checkModeFlag = args.includes("--check");
 
   const builtInSkills = scanSkills(builtInSkillsDir, "built-in");
   const includeUserSkills = process.env.OPENCODE_INCLUDE_USER_SKILLS === "1";
   const userSkills = includeUserSkills ? scanSkills(userSkillsDir, "user-installed") : [];
 
-  const generated = generateRegistry(builtInSkills, userSkills);
-
-  if (checkMode) {
-    const registryPath = path.join(root, registryRel);
-    if (!fs.existsSync(registryPath)) {
-      console.error(`Registry file missing: ${registryRel}`);
-      process.exit(1);
-    }
-    const existing = fs.readFileSync(registryPath, "utf8");
-    if (existing !== generated) {
-      console.error(`Registry is stale. Run 'node scripts/update-skill-registry.mjs' to update.`);
-      process.exit(1);
-    }
-    console.log("Registry check passed.");
-    process.exit(0);
+  if (checkModeFlag) {
+    checkMode(builtInSkills, userSkills);
+    return;
   }
 
-  // Write registry
-  const registryPath = path.join(root, registryRel);
-  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
-  fs.writeFileSync(registryPath, generated, "utf8");
-  console.log(`Registry written to ${registryRel}`);
+  const generatedAt = deterministicTimestamp();
+
+  // Write Markdown registry
+  const mdContent = generateRegistryMd(builtInSkills, userSkills);
+  const registryMdPath = path.join(root, registryMdRel);
+  fs.mkdirSync(path.dirname(registryMdPath), { recursive: true });
+  fs.writeFileSync(registryMdPath, mdContent, "utf8");
+  console.log(`Registry MD written to ${registryMdRel}`);
+
+  // Write JSON registry
+  const allSkills = [...builtInSkills, ...userSkills];
+  const jsonContent = generateJson(allSkills, generatedAt);
+  const registryJsonPath = path.join(root, registryJsonRel);
+  fs.writeFileSync(
+    registryJsonPath,
+    JSON.stringify(jsonContent, null, 2) + "\n",
+    "utf8"
+  );
+  console.log(`Registry JSON written to ${registryJsonRel}`);
+  console.log(
+    `  schema_version: ${SCHEMA_VERSION}, skills: ${allSkills.length}`
+  );
 }
 
 main();

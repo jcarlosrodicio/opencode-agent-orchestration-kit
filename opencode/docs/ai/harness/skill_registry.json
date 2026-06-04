@@ -1,0 +1,443 @@
+{
+  "generated_at": "2026-06-04T06:46:29Z",
+  "schema_version": 2,
+  "skills": [
+    {
+      "name": "api-and-interface-design",
+      "source": "built-in",
+      "phase": "define",
+      "domains": [
+        "api-design",
+        "backend",
+        "frontend"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "researcher",
+        "designer",
+        "specifier",
+        "reviewer",
+        "scoper",
+        "lead"
+      ],
+      "surfaces": [
+        "api-contracts",
+        "module-boundaries"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Guides stable API and interface design. Use when designing APIs, module boundaries, or any public interface. Use when creating REST or GraphQL endpoints, defining type contracts between modules, or establishing boundaries between frontend and backend.",
+      "load_path": "skills/api-and-interface-design/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "autonomous-loops",
+      "source": "built-in",
+      "phase": "operate",
+      "domains": [
+        "orchestration",
+        "evolution",
+        "release"
+      ],
+      "stacks": [
+        "any",
+        "harness"
+      ],
+      "allowed_agents": [
+        "lead",
+        "evolver"
+      ],
+      "surfaces": [
+        "autonomous-orchestration",
+        "ci-cd-pipelines",
+        "multi-agent-orchestration"
+      ],
+      "skill_source": "external",
+      "status": "active",
+      "description": "Patterns and architectures for autonomous loops — from simple sequential pipelines to RFC-driven multi-agent DAG systems. Use when setting up autonomous development workflows, choosing the right loop architecture, or building CI/CD-style continuous development pipelines.",
+      "load_path": "skills/autonomous-loops/SKILL.md",
+      "origin": "affaan-m/ecc"
+    },
+    {
+      "name": "code-review-and-quality",
+      "source": "built-in",
+      "phase": "review",
+      "domains": [
+        "review",
+        "security",
+        "testing",
+        "performance"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "reviewer",
+        "lead",
+        "developer"
+      ],
+      "surfaces": [
+        "diff-review",
+        "quality-gates"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Conducts multi-axis code review. Use before merging any change. Use when reviewing code written by yourself, another agent, or a human. Use when you need to assess code quality across multiple dimensions before it enters the main branch.",
+      "load_path": "skills/code-review-and-quality/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "code-simplification",
+      "source": "built-in",
+      "phase": "build",
+      "domains": [
+        "debugging"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "reviewer",
+        "lead"
+      ],
+      "surfaces": [
+        "code-refactoring"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Simplifies code for clarity. Use when refactoring code for clarity without changing behavior. Use when code works but is harder to read, maintain, or extend than it should be. Use when reviewing code that has accumulated unnecessary complexity.",
+      "load_path": "skills/code-simplification/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "context-engineering",
+      "source": "built-in",
+      "phase": "build",
+      "domains": [
+        "context-management",
+        "orchestration"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "lead",
+        "researcher",
+        "specifier",
+        "developer"
+      ],
+      "surfaces": [
+        "session-setup",
+        "context-loading"
+      ],
+      "skill_source": "external",
+      "status": "active",
+      "description": "Optimizes agent context setup. Use when starting a new session, when agent output quality degrades, when switching between tasks, or when you need to configure rules files and context for a project.",
+      "load_path": "skills/context-engineering/SKILL.md",
+      "origin": "addyosmani/agent-skills"
+    },
+    {
+      "name": "debugging-and-error-recovery",
+      "source": "built-in",
+      "phase": "verify",
+      "domains": [
+        "debugging",
+        "testing"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "lead",
+        "reviewer"
+      ],
+      "surfaces": [
+        "bug-fix",
+        "error-triage"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Guides systematic root-cause debugging. Use when tests fail, builds break, behavior doesn't match expectations, or you encounter any unexpected error. Use when you need a systematic approach to finding and fixing the root cause rather than guessing.",
+      "load_path": "skills/debugging-and-error-recovery/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "documentation-and-adrs",
+      "source": "built-in",
+      "phase": "define",
+      "domains": [
+        "documentation",
+        "specification"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "researcher",
+        "designer",
+        "specifier",
+        "reviewer",
+        "scoper",
+        "lead"
+      ],
+      "surfaces": [
+        "adr-writing",
+        "api-docs"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Records decisions and documentation. Use when making architectural decisions, changing public APIs, shipping features, or when you need to record context that future engineers and agents will need to understand the codebase.",
+      "load_path": "skills/documentation-and-adrs/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "doubt-driven-development",
+      "source": "built-in",
+      "phase": "review",
+      "domains": [
+        "review",
+        "debugging",
+        "security"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "lead",
+        "developer",
+        "reviewer"
+      ],
+      "surfaces": [
+        "code-implementation",
+        "adversarial-review"
+      ],
+      "skill_source": "external",
+      "status": "active",
+      "description": "Subjects every non-trivial decision to a fresh-context adversarial review before it stands. Use when correctness matters more than speed, when working in unfamiliar code, when stakes are high (production, security-sensitive logic, irreversible operations), or any time a confident output would be cheaper to verify now than to debug later.",
+      "load_path": "skills/doubt-driven-development/SKILL.md",
+      "origin": "addyosmani/agent-skills"
+    },
+    {
+      "name": "iterative-retrieval",
+      "source": "built-in",
+      "phase": "operate",
+      "domains": [
+        "orchestration",
+        "context-management",
+        "research"
+      ],
+      "stacks": [
+        "any",
+        "harness"
+      ],
+      "allowed_agents": [
+        "lead",
+        "researcher",
+        "developer"
+      ],
+      "surfaces": [
+        "context-loading",
+        "multi-agent-orchestration"
+      ],
+      "skill_source": "external",
+      "status": "active",
+      "description": "Pattern for progressively refining context retrieval to solve the subagent context problem. Use when spawning subagents that need codebase context they cannot predict upfront, or when building multi-agent workflows where context is progressively refined.",
+      "load_path": "skills/iterative-retrieval/SKILL.md",
+      "origin": "affaan-m/ecc"
+    },
+    {
+      "name": "open-design",
+      "source": "built-in",
+      "phase": "build",
+      "domains": [
+        "ui-ux"
+      ],
+      "stacks": [
+        "open-design"
+      ],
+      "allowed_agents": [
+        "designer",
+        "lead",
+        "developer"
+      ],
+      "surfaces": [
+        "visual-design",
+        "prototyping"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use the Open Design workbench to create editable visual projects, prototypes, landing pages, dashboards, mobile screens, decks, and implementation handoffs.",
+      "load_path": "skills/open-design/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "performance-optimization",
+      "source": "built-in",
+      "phase": "verify",
+      "domains": [
+        "performance"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "reviewer",
+        "lead"
+      ],
+      "surfaces": [
+        "profiling",
+        "optimization"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Optimizes application performance. Use when performance requirements exist, when you suspect performance regressions, or when Core Web Vitals or load times need improvement. Use when profiling reveals bottlenecks that need fixing.",
+      "load_path": "skills/performance-optimization/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "security-and-hardening",
+      "source": "built-in",
+      "phase": "build",
+      "domains": [
+        "security"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "researcher",
+        "designer",
+        "specifier",
+        "reviewer",
+        "scoper",
+        "lead"
+      ],
+      "surfaces": [
+        "input-validation",
+        "auth",
+        "secrets-management"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Hardens code against vulnerabilities. Use when handling user input, authentication, data storage, or external integrations. Use when building any feature that accepts untrusted data, manages user sessions, or interacts with third-party services.",
+      "load_path": "skills/security-and-hardening/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "source-driven-development",
+      "source": "built-in",
+      "phase": "build",
+      "domains": [
+        "research",
+        "specification"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "lead",
+        "researcher"
+      ],
+      "surfaces": [
+        "framework-integration",
+        "doc-verification"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Grounds every implementation decision in official documentation. Use when you want authoritative, source-cited code free from outdated patterns. Use when building with any framework or library where correctness matters.",
+      "load_path": "skills/source-driven-development/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "test-driven-development",
+      "source": "built-in",
+      "phase": "verify",
+      "domains": [
+        "testing",
+        "debugging"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer",
+        "reviewer",
+        "specifier",
+        "lead"
+      ],
+      "surfaces": [
+        "code-implementation",
+        "bug-fix"
+      ],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Drives development with tests. Use when implementing any logic, fixing any bug, or changing any behavior. Use when you need to prove that code works, when a bug report arrives, or when you're about to modify existing functionality.",
+      "load_path": "skills/test-driven-development/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "using-agent-skills",
+      "source": "built-in",
+      "phase": "meta",
+      "domains": [
+        "orchestration",
+        "specification"
+      ],
+      "stacks": [
+        "any",
+        "harness"
+      ],
+      "allowed_agents": [
+        "lead",
+        "researcher",
+        "specifier"
+      ],
+      "surfaces": [
+        "skill-discovery",
+        "orchestration"
+      ],
+      "skill_source": "external",
+      "status": "active",
+      "description": "Discovers and invokes agent skills. Use when starting a session or when you need to discover which skill applies to the current task. This is the meta-skill that governs how all other skills are discovered and invoked.",
+      "load_path": "skills/using-agent-skills/SKILL.md",
+      "origin": "addyosmani/agent-skills"
+    },
+    {
+      "name": "verification-loop",
+      "source": "built-in",
+      "phase": "verify",
+      "domains": [
+        "testing",
+        "evaluation",
+        "release"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "lead",
+        "developer",
+        "reviewer",
+        "evaluator"
+      ],
+      "surfaces": [
+        "quality-gates",
+        "pre-pr-checks"
+      ],
+      "skill_source": "external",
+      "status": "active",
+      "description": "Comprehensive multi-phase verification system. Use after completing a feature, before creating a PR, when ensuring quality gates pass, or after refactoring.",
+      "load_path": "skills/verification-loop/SKILL.md",
+      "origin": "affaan-m/ecc"
+    }
+  ]
+}

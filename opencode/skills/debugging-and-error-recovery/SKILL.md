@@ -1,6 +1,22 @@
 ---
 name: debugging-and-error-recovery
 description: Guides systematic root-cause debugging. Use when tests fail, builds break, behavior doesn't match expectations, or you encounter any unexpected error. Use when you need a systematic approach to finding and fixing the root cause rather than guessing.
+phase: verify
+domains:
+  - debugging
+  - testing
+stacks:
+  - any
+allowed_agents:
+  - developer
+  - lead
+  - reviewer
+surfaces:
+  - bug-fix
+  - error-triage
+skill_source: built-in
+origin: null
+status: active
 ---
 
 # Debugging and Error Recovery

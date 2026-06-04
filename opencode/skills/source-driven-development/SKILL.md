@@ -1,6 +1,22 @@
 ---
 name: source-driven-development
 description: Grounds every implementation decision in official documentation. Use when you want authoritative, source-cited code free from outdated patterns. Use when building with any framework or library where correctness matters.
+phase: build
+domains:
+  - research
+  - specification
+stacks:
+  - any
+allowed_agents:
+  - developer
+  - lead
+  - researcher
+surfaces:
+  - framework-integration
+  - doc-verification
+skill_source: built-in
+origin: null
+status: active
 ---
 
 # Source-Driven Development

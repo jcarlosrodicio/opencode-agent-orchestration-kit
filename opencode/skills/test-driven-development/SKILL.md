@@ -1,6 +1,23 @@
 ---
 name: test-driven-development
 description: Drives development with tests. Use when implementing any logic, fixing any bug, or changing any behavior. Use when you need to prove that code works, when a bug report arrives, or when you're about to modify existing functionality.
+phase: verify
+domains:
+  - testing
+  - debugging
+stacks:
+  - any
+allowed_agents:
+  - developer
+  - reviewer
+  - specifier
+  - lead
+surfaces:
+  - code-implementation
+  - bug-fix
+skill_source: built-in
+origin: null
+status: active
 ---
 
 # Test-Driven Development

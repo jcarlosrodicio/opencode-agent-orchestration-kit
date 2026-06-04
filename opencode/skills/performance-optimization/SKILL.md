@@ -1,6 +1,21 @@
 ---
 name: performance-optimization
 description: Optimizes application performance. Use when performance requirements exist, when you suspect performance regressions, or when Core Web Vitals or load times need improvement. Use when profiling reveals bottlenecks that need fixing.
+phase: verify
+domains:
+  - performance
+stacks:
+  - any
+allowed_agents:
+  - developer
+  - reviewer
+  - lead
+surfaces:
+  - profiling
+  - optimization
+skill_source: built-in
+origin: null
+status: active
 ---
 
 # Performance Optimization

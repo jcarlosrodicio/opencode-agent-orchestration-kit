@@ -5,6 +5,21 @@ compatibility: opencode
 metadata:
   surface: visual-design
   backend: open-design
+phase: build
+domains:
+  - ui-ux
+stacks:
+  - open-design
+allowed_agents:
+  - designer
+  - lead
+  - developer
+surfaces:
+  - visual-design
+  - prototyping
+skill_source: built-in
+origin: null
+status: active
 ---
 
 # Open Design Skill
