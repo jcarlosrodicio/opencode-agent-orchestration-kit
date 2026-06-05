@@ -6,6 +6,10 @@ This project is for developers who want a reproducible global OpenCode setup wit
 
 This repository is not affiliated with OpenCode, Open Design, Impeccable, or Superpowers.
 
+## Why this matters
+
+Agentic coding workflows are becoming complex to configure and maintain. This kit provides a reproducible, documented OpenCode harness with role-based agents, process skills, validation scripts, Open Design integration, and safe installation defaults. The goal is to help developers and small teams adopt agent orchestration without starting from scratch.
+
 ## Architecture
 
 By default, free-form messages open with `lead` as a bounded router. Lead quickly chooses `developer`, `researcher`, `designer`, or `specifier`, and asks the user when ambiguity changes the correct flow. Small, clear, low-risk changes are usually delegated straight to `developer`.
