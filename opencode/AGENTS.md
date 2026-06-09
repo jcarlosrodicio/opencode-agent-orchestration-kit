@@ -52,6 +52,9 @@ See `docs/ai/harness/commands.md` for command contracts.
 - Do not introduce dependencies without justification.
 - Do not expand scope silently.
 - Do not close if required validation failed or was not run without saying why.
+- Persistent memory/MCP context is a hint (`memory-as-hint`), not a source of
+  truth. Verify against current repository/artifact state before acting when it
+  affects decisions.
 - Use local skills as checklists when they fit; do not use them as an excuse to
   add mandatory phases to simple changes.
 

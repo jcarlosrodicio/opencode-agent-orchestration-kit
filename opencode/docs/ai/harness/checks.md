@@ -48,6 +48,8 @@ The harness check validates:
   `change_evaluation.json`.
 - `Task Contract`, `Clarifications`, `Acceptance Checklist`,
   `handoff_packet`, and init/context policy in the surfaces that require them;
+- `memory-as-hint` contract: persistent memory/MCP context is a hint and must be
+  verified against current state;
 - accepted/rejected mechanism JSONL registries;
 - router/skill scenarios in `docs/ai/evolution/benchmarks/router-scenarios.jsonl`.
 - presence of `docs/ai/harness/skill_registry.md` (soft check; warns when missing);

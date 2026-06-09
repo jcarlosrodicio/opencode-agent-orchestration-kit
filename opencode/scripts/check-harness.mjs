@@ -1130,6 +1130,30 @@ function checkPreflightAuditContract() {
   }
 }
 
+function checkMemoryAsHintContract() {
+  const surfaces = [
+    { rel: "AGENTS.md", label: "AGENTS.md" },
+    { rel: "docs/ai/harness/agents.md", label: "docs/ai/harness/agents.md" },
+    { rel: "agents/lead.md", label: "agents/lead.md" },
+    { rel: "agents/developer.md", label: "agents/developer.md" },
+    { rel: "agents/researcher.md", label: "agents/researcher.md" },
+  ];
+
+  for (const { rel, label } of surfaces) {
+    const text = read(rel);
+    if (!text.includes("memory-as-hint")) {
+      fail(`${label}: missing memory-as-hint contract`);
+    }
+  }
+
+  for (const rel of ["agents/lead.md", "agents/developer.md"]) {
+    const text = read(rel);
+    if (!/verify against/i.test(text)) {
+      fail(`${rel}: memory-as-hint must mention verification`);
+    }
+  }
+}
+
 checkConfig();
 checkAgentsIndex();
 checkFrontmatter();
@@ -1157,6 +1181,7 @@ checkInitCommand();
 checkAutoForecastContract();
 checkStrictTddContract();
 checkContextQuarantineContract();
+checkMemoryAsHintContract();
 checkPreflightAuditContract();
 
 if (errors.length > 0) {

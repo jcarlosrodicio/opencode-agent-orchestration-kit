@@ -15,7 +15,10 @@ function makeFixture() {
     recursive: true,
     filter: (source) => {
       const rel = path.relative(root, source);
-      return rel !== ".git" && !rel.startsWith(`.git${path.sep}`);
+      if (rel === ".git" || rel.startsWith(`.git${path.sep}`)) return false;
+      if (rel === ".codegraph" || rel.startsWith(`.codegraph${path.sep}`)) return false;
+      if (rel === "node_modules" || rel.startsWith(`node_modules${path.sep}`)) return false;
+      return true;
     },
   });
   return tmp;
@@ -503,6 +506,109 @@ test("harness rejects debugger without preflight-audit.json reference", () => {
     const result = runHarness(cwd);
     assert.notEqual(result.status, 0, "checker accepted debugger without preflight reference");
     assert.match(result.stderr, /agents\/debugger\.md: missing preflight-audit\.json reference/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects missing memory-as-hint contract", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "AGENTS.md",
+      fs.readFileSync(path.join(cwd, "AGENTS.md"), "utf8").replace(/memory-as-hint/g, "memory-as-fact"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted missing memory-as-hint contract");
+    assert.match(result.stderr, /memory-as-hint/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects developer prompt missing memory-as-hint verification", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "agents/developer.md",
+      fs.readFileSync(path.join(cwd, "agents/developer.md"), "utf8").replace(/memory-as-hint/g, "memory-as-fact"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted developer without memory-as-hint");
+    assert.match(result.stderr, /agents\/developer\.md: missing memory-as-hint contract/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects lead prompt missing memory-as-hint contract", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "agents/lead.md",
+      fs.readFileSync(path.join(cwd, "agents/lead.md"), "utf8").replace(/memory-as-hint/g, "memory-as-fact"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted lead without memory-as-hint");
+    assert.match(result.stderr, /agents\/lead\.md: missing memory-as-hint contract/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects researcher prompt missing memory-as-hint contract", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "agents/researcher.md",
+      fs.readFileSync(path.join(cwd, "agents/researcher.md"), "utf8").replace(/memory-as-hint/g, "memory-as-fact"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted researcher without memory-as-hint");
+    assert.match(result.stderr, /agents\/researcher\.md: missing memory-as-hint contract/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects agents docs missing memory-as-hint contract", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/harness/agents.md",
+      fs.readFileSync(path.join(cwd, "docs/ai/harness/agents.md"), "utf8").replace(/memory-as-hint/g, "memory-as-fact"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted agents docs without memory-as-hint");
+    assert.match(result.stderr, /docs\/ai\/harness\/agents\.md: missing memory-as-hint contract/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects developer prompt missing verification phrase", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "agents/developer.md",
+      fs.readFileSync(path.join(cwd, "agents/developer.md"), "utf8")
+        .replace(/Verify against current repository\/artifact state/g, "Trust memory"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted developer without verification phrase");
+    assert.match(result.stderr, /memory-as-hint must mention verification/);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }

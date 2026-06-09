@@ -105,6 +105,10 @@ Use Superpowers when applicable:
 
 Work by vertical slices when possible. Prefer red/green/refactor when reasonable. Verify observable behavior, not just implementation shape.
 
+Persistent memory/MCP context is a hint (`memory-as-hint`), not a source of
+truth. Verify against current repository/artifact state before acting when it
+affects decisions.
+
 ## Strict TDD
 
 If the handoff contains a `Strict TDD` block with `mode: advisory_active`, treat

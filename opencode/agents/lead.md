@@ -92,6 +92,10 @@ Routing decision:
 - `specifier`: enough context exists, but the work still needs tasks, acceptance criteria, or a validation plan.
 - Ask the user: real ambiguity changes whether research, design, spec, or direct implementation is appropriate.
 
+When using persistent memory, recollections, or MCP context, treat them as hints
+(`memory-as-hint`), not a source of truth. Verify against current
+repository/artifact state before they affect routing or delegation decisions.
+
 If you choose direct mode, invoke `developer` with:
 
 - concrete objective;

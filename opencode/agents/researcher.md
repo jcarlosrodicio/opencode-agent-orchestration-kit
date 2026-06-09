@@ -39,6 +39,9 @@ If your handoff prompt contains a `Skill Resolution` block:
 
 ## Rules
 
+- Persistent memory/MCP context is a hint (`memory-as-hint`), not a source of
+  truth. Verify against primary sources and current repository state before using
+  it as the basis for recommendations.
 - Prioritize repository documentation and code before external research.
 - Prioritize primary sources when using the web.
 - Do not implement code.

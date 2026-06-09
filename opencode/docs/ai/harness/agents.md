@@ -44,6 +44,9 @@
   non-trivial work, selecting 0-3 relevant skills per handoff.
 - `lead` preserves context quarantine: minimum handoff + compact output,
   without carrying long history when decisions, paths, and evidence are enough.
+- Persistent memory/MCP context is a hint (`memory-as-hint`), not a source of
+  truth; verify it against current repository/artifact state before it affects
+  decisions.
 - If `specifier` marks `estimated_scope: large`, `lead` asks the user whether
   to split, continue as one change, or adjust scope before delegating to
   `developer`.
