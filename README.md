@@ -57,6 +57,17 @@ The goal is not to force every request through a heavy process. Small, clear, lo
 | Optional token visibility | TUI plugin for lead and subagent token usage when OpenCode exposes session trees |
 | Versioned documentation | Agent, command, evidence, and validation contracts stored alongside the configuration |
 
+## Built around
+
+This kit builds on and integrates with the following projects:
+
+- [OpenCode](https://opencode.ai/) — the coding-agent runtime and configuration surface.
+- [Open Design](https://github.com/nexu-io/open-design) — optional local-first design workspace integration.
+- [Superpowers](https://github.com/obra/Superpowers) — optional agentic skills and development methodology.
+- [Impeccable](https://github.com/pbakaus/impeccable) — optional design guidance for AI-generated frontend work.
+
+Each integration is optional. The core workflow can be used with OpenCode alone.
+
 ## Who this is for
 
 This kit is a good fit if you:
@@ -371,7 +382,15 @@ They are designed to help agents make better engineering decisions without forci
 
 ## Optional integrations
 
-### Open Design
+The integrations below are optional extensions. They are not required for the core agent workflow.
+
+| Integration | What it adds | Setup |
+|---|---|---|
+| [Open Design](https://github.com/nexu-io/open-design) | Editable, local-first design workspace workflows | [Open Design guide](docs/open-design.md) |
+| [Superpowers](https://github.com/obra/Superpowers) | Additional skills and software-development workflow discipline | [Superpowers guide](docs/superpowers.md) |
+| [Impeccable](https://github.com/pbakaus/impeccable) | Design guidance and deterministic frontend-quality checks | [Impeccable guide](docs/impeccable.md) |
+
+### [Open Design](https://github.com/nexu-io/open-design)
 
 Open Design is included as an optional local integration for design-oriented workflows.
 
@@ -428,7 +447,7 @@ Then configure the Open Design base URL:
 export OPEN_DESIGN_URL="http://192.168.1.50:7456"
 ```
 
-### Superpowers
+### [Superpowers](https://github.com/obra/Superpowers)
 
 Superpowers is not vendored into this repository.
 
@@ -454,7 +473,7 @@ For reproducibility, pin a version:
 
 If your existing `opencode.json` was preserved during installation, add the plugin manually.
 
-### Impeccable
+### [Impeccable](https://github.com/pbakaus/impeccable)
 
 Impeccable is optional and is not included in this repository.
 
@@ -658,6 +677,13 @@ Detailed guides are available in [`docs/`](docs/):
 - [Security](docs/security.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Synology notes](docs/synology.md)
+
+## Compatibility and scope
+
+- The core kit requires OpenCode.
+- Open Design, Superpowers, Impeccable, Docker, and token-usage plugins are optional.
+- Integrations are maintained as adapters around upstream projects and may require updates when upstream APIs or plugin formats change.
+- The project intentionally favors local, inspectable configuration over hosted orchestration services.
 
 ## Contributing
 
