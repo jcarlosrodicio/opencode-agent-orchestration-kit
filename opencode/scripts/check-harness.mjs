@@ -123,6 +123,236 @@ function checkFrontmatter() {
   }
 }
 
+function checkOrchestratedReviewContract() {
+  const preflightCommandRel = "commands/review-preflight.md";
+  const commandRel = "commands/review-orchestrated.md";
+  const docRel = "docs/ai/harness/orchestrated-review.md";
+  const prepareRel = "scripts/review-orchestrated-prepare.mjs";
+  const prepareTestRel = "scripts/review-orchestrated-prepare.test.mjs";
+
+  for (const rel of [preflightCommandRel, commandRel, docRel, prepareRel, prepareTestRel]) {
+    if (!exists(rel)) fail(`${rel}: missing orchestrated review surface`);
+  }
+
+  if (exists("commands/review.md")) {
+    const review = read("commands/review.md");
+    for (const token of ["agent: reviewer", "Review the current diff", "git diff"]) {
+      if (!review.includes(token)) fail(`commands/review.md: existing /review contract changed or missing ${token}`);
+    }
+    if (review.includes("review_coordinator") || review.includes("review-orchestrated")) {
+      fail("commands/review.md: /review must not invoke orchestrated review");
+    }
+  }
+
+  if (exists(preflightCommandRel)) {
+    const command = read(preflightCommandRel);
+    for (const token of [
+      "agent: lead",
+      "recommended daily path",
+      "rtk node scripts/review-orchestrated-prepare.mjs --dry-run",
+      "manifest.json",
+      "shared-review-context.md",
+      "patches/",
+      "findings/",
+      "Do not invoke reviewers",
+      "Do not claim an AI review was performed",
+      "Do not ask follow-up questions",
+    ]) {
+      if (!command.includes(token)) fail(`${preflightCommandRel}: missing ${token}`);
+    }
+  }
+
+  if (exists(commandRel)) {
+    const command = read(commandRel);
+    for (const token of [
+      "agent: review_coordinator",
+      "node scripts/review-orchestrated-prepare.mjs $ARGUMENTS",
+      "manifest.json",
+      "shared-review-context.md",
+      "patches/",
+      "findings/",
+      "untrusted data",
+      "--dry-run",
+      "--agents",
+      "--full-agents",
+      "Do not invoke `task`",
+      "do not write or list `findings/`",
+      "at most one finding",
+      "Do not use `git diff`",
+      "--reviewer-timeout-ms",
+      "--retain",
+      "Do not claim an AI review was performed",
+      "preflight_only",
+      "Do not ask follow-up questions",
+      "Always enumerate `review_quality`",
+      "skipped",
+      "lite",
+    ]) {
+      if (!command.includes(token)) fail(`${commandRel}: missing ${token}`);
+    }
+  }
+
+  const agentRels = [
+    "agents/review_coordinator.md",
+    "agents/review_quality.md",
+    "agents/review_security.md",
+    "agents/review_tests.md",
+    "agents/review_api.md",
+  ];
+  for (const rel of agentRels) {
+    if (!exists(rel)) {
+      fail(`${rel}: missing orchestrated review agent`);
+      continue;
+    }
+    const text = read(rel);
+    const frontmatter = frontmatterBlock(rel);
+    if (!/^\s*edit:\s*deny\s*$/m.test(frontmatter)) {
+      fail(`${rel}: review agents must be read-only`);
+    }
+    for (const token of ["manifest.json", "shared-review-context.md", "patches/", "findings/"]) {
+      if (!text.includes(token)) fail(`${rel}: missing workspace token ${token}`);
+    }
+    for (const token of ["untrusted data", "instructions", "diff"]) {
+      if (!text.toLowerCase().includes(token)) fail(`${rel}: missing anti-injection token ${token}`);
+    }
+  }
+
+  if (exists("agents/review_coordinator.md")) {
+    const coordinator = read("agents/review_coordinator.md");
+    const coordinatorFrontmatter = frontmatterBlock("agents/review_coordinator.md");
+    if (!/^\s*mode:\s*primary\s*$/m.test(coordinatorFrontmatter)) {
+      fail("agents/review_coordinator.md: --agents must run in the primary coordinator session without a wrapper task");
+    }
+    if (!/^\s*"ls\*":\s*allow\s*$/m.test(coordinatorFrontmatter)) {
+      fail("agents/review_coordinator.md: harmless preparer existence checks must not abort --agents");
+    }
+    for (const token of [
+      "node scripts/review-orchestrated-prepare.mjs*",
+      "node ./scripts/review-orchestrated-prepare.mjs*",
+      "node *scripts/review-orchestrated-prepare.mjs*",
+      "Use a relative path",
+      "Call the preparer exactly once",
+      "execution_plan.mode",
+      "preflight_only",
+      "--agents",
+      "--full-agents",
+      "Do not invoke `task`",
+      "do not write or list `findings/`",
+      "at most one finding",
+      "Do not run `git diff`",
+      "timed_out",
+      "always enumerate all four reviewers",
+    ]) {
+      if (!coordinator.includes(token)) fail(`agents/review_coordinator.md: missing preparer permission/routing token ${token}`);
+    }
+  }
+
+  if (exists(docRel)) {
+    const doc = read(docRel);
+    for (const token of [
+      "manifest.json",
+      "shared-review-context.md",
+      "patches/",
+      "findings/",
+      "/review-preflight",
+      "BEGIN_UNTRUSTED_PATCH_DATA",
+      "END_UNTRUSTED_PATCH_DATA",
+      "--base",
+      "--staged",
+      "--include-untracked",
+      "--dry-run",
+      "--agents",
+      "--full-agents",
+      "--reviewer-timeout-ms",
+      "--retain",
+      "staged + unstaged",
+      "untracked",
+      "lockfiles",
+      "does not open filtered files or run an alternate diff",
+      "sourcemaps",
+      "minified",
+      "Database migrations are not automatically excluded",
+      "max_reviewers",
+      "max_patch_bytes_per_reviewer",
+      "max_total_patch_bytes",
+      "reviewer_patch_sets",
+      "dropped_patches",
+      "execution_plan",
+      "reviewer_timeout_ms",
+      "preflight_only",
+      "skipped",
+      "trivial",
+      "lite",
+      "full",
+      "no automatic provider failover",
+      "There is no remote control plane",
+      "Real concurrency is deferred",
+      "timed_out",
+      "workspace is cleaned by default",
+      "requires_human_verification",
+    ]) {
+      if (!doc.includes(token)) fail(`${docRel}: missing ${token}`);
+    }
+  }
+
+  if (exists(prepareRel)) {
+    const prepare = read(prepareRel);
+    for (const token of [
+      "manifest.json",
+      "shared-review-context.md",
+      "patches",
+      "findings",
+      "BEGIN_UNTRUSTED_PATCH_DATA",
+      "END_UNTRUSTED_PATCH_DATA",
+      "max_reviewers",
+      "max_patch_bytes_per_reviewer",
+      "max_total_patch_bytes",
+      "reviewer_timeout_ms",
+      "workspace_retention",
+      ".opencode-review-",
+      "reviewer_patch_sets",
+      "dropped_patches",
+      "execution_plan",
+      "recommended_reviewers",
+      "timed_out_reviewers",
+      "include_untracked",
+      "untracked_files",
+      "filtered_files",
+      "generated_files",
+      "skipped_reason",
+      "hasHighRisk",
+    ]) {
+      if (!prepare.includes(token)) fail(`${prepareRel}: missing ${token}`);
+    }
+  }
+
+  if (exists(prepareTestRel)) {
+    const tests = read(prepareTestRel);
+    for (const token of [
+      "doc-only",
+      "security and api",
+      "lockfiles and generated files",
+      "database migrations",
+      "untracked files",
+      "tests-only risk stays lite",
+      "auth permission changes plan the security reviewer",
+      "dependency manifests select security while lockfiles stay filtered",
+      "deleted regression tests plan the tests reviewer",
+      "default workspace is created inside the repo",
+      "per-reviewer patch budget",
+      "dry-run is a preflight-compatible alias",
+      "--agents mode plans at most one focused reviewer",
+      "--full-agents mode caps planned specialized reviewers at four",
+      "reviewer timeout and failure statuses",
+      "parseArgs rejects invalid invocation shapes",
+      "budget overflow",
+      "cleanup removes workspace",
+    ]) {
+      if (!tests.includes(token)) fail(`${prepareTestRel}: missing scenario ${token}`);
+    }
+  }
+}
+
 function checkConfig() {
   const config = parseJson("opencode.json");
   if (!config) return;
@@ -1183,6 +1413,7 @@ checkStrictTddContract();
 checkContextQuarantineContract();
 checkMemoryAsHintContract();
 checkPreflightAuditContract();
+checkOrchestratedReviewContract();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");

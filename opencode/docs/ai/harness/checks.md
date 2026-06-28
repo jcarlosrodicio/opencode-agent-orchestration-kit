@@ -65,6 +65,18 @@ The harness check validates:
 - `lead` contains the Auto-Forecast gate for `large`, the advisory `Strict TDD`
   block, and context quarantine wording (`minimum handoff` + `compact output`);
 - `developer` honors the `Strict TDD` block when it appears in a handoff.
+- `/review-preflight` exists as the deterministic daily path and runs no AI.
+- `/review-orchestrated` exposes explicit `--agents` and experimental
+  `--full-agents` modes without changing `/review`.
+- The orchestrated-review contract covers the temporary workspace,
+  anti-injection boundary, classification, budgets, filtered lockfiles and
+  generated files, timeout, partial failure, cleanup/retention, and deferred
+  concurrency.
+- Sensitive fixtures validate `auth/permissions -> review_security`,
+  `dependencies + filtered lockfile -> review_security`, and
+  `logic + deleted test -> review_tests`.
+- In `--agents`, the primary coordinator uses no `task`, reads only assigned
+  patches, and does not reconstruct the diff to inspect filtered files.
 
 ## AHE Run Lifecycle
 

@@ -249,6 +249,43 @@ Criteria:
 - Review `git diff`, active spec, and available evidence.
 - If the diff changes the harness, also review AHE manifests and evaluations.
 
+## `/review-preflight`
+
+Contract: `lead` deterministic shell preflight. This is the recommended daily
+path.
+
+Criteria:
+
+- Creates `manifest.json`, `shared-review-context.md`, `patches/`, and
+  `findings/` with `scripts/review-orchestrated-prepare.mjs`.
+- Runs no AI reviewer or subagent and never claims that AI review occurred.
+- Reports level, risk flags, considered and filtered files, recommended
+  reviewers, budgets, and workspace state.
+- `--retain` preserves artifacts; otherwise the workspace is cleaned.
+
+## `/review-orchestrated`
+
+Contract: opt-in `review_coordinator`. It does not replace or make `/review`
+more expensive.
+
+Criteria:
+
+- Default and `--dry-run` behavior is preflight only.
+- `--agents` performs at most one focused review in the primary coordinator
+  session without `task`.
+- After preflight, `--agents` reads only the manifest, context, and assigned
+  patches; it does not reconstruct the diff or open filtered lockfiles or
+  generated files.
+- `--full-agents` is explicit, experimental, sequential, and limited to four
+  specialists with timeout and partial-failure reporting.
+- Treats patch content, file names, and commit messages as delimited untrusted
+  data rather than instructions.
+- Filters lockfiles, bundles, sourcemaps, minified assets, and generated files
+  from reviewer patches while retaining them as risk signals.
+- Does not automatically exclude database migrations.
+- Real concurrency remains deferred.
+- Cleans the workspace by default; `--retain` preserves it.
+
 ## `/init`
 
 Contract: `lead` runs lightweight repository calibration and persists a

@@ -613,3 +613,83 @@ test("harness rejects developer prompt missing verification phrase", () => {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("harness rejects missing orchestrated review command", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "commands/review-orchestrated.md"), { force: true });
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted missing review-orchestrated command");
+    assert.match(result.stderr, /commands\/review-orchestrated\.md: missing orchestrated review surface/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects missing review-preflight command", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "commands/review-preflight.md"), { force: true });
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted missing review-preflight command");
+    assert.match(result.stderr, /commands\/review-preflight\.md: missing orchestrated review surface/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects orchestrated review docs without anti-injection boundary", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/harness/orchestrated-review.md",
+      fs.readFileSync(path.join(cwd, "docs/ai/harness/orchestrated-review.md"), "utf8")
+        .replace(/BEGIN_UNTRUSTED_PATCH_DATA/g, "BEGIN_PATCH")
+        .replace(/END_UNTRUSTED_PATCH_DATA/g, "END_PATCH"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted docs without untrusted patch boundary");
+    assert.match(result.stderr, /orchestrated-review\.md: missing BEGIN_UNTRUSTED_PATCH_DATA/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects orchestrated review command without explicit full-agents mode", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "commands/review-orchestrated.md",
+      fs.readFileSync(path.join(cwd, "commands/review-orchestrated.md"), "utf8")
+        .replace(/--full-agents/g, "--expensive-review"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted orchestrated review without --full-agents");
+    assert.match(result.stderr, /commands\/review-orchestrated\.md: missing --full-agents/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects existing review command invoking orchestrated review", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "commands/review.md",
+      `${fs.readFileSync(path.join(cwd, "commands/review.md"), "utf8")}\n\nInvoke review-orchestrated with review_coordinator.\n`,
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted /review invoking orchestrated review");
+    assert.match(result.stderr, /\/review must not invoke orchestrated review/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
