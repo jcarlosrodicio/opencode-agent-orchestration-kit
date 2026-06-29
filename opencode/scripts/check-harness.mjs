@@ -114,6 +114,28 @@ function checkCommandDocsCoverage() {
   }
 }
 
+function checkLoopContract() {
+  const rel = "commands/loop.md";
+  if (!exists(rel)) {
+    fail(`${rel}: missing command`);
+    return;
+  }
+
+  const text = read(rel);
+  const required = [
+    "approval_gate: explicit_before_writes",
+    "max_iterations_per_invocation: 3",
+    "completion_authority: reviewer_only",
+    "state_path: .opencode/loops/<slug>.md",
+    "worktree_mode: explicit_opt_in",
+    "developer -> reviewer -> developer (state sync)",
+  ];
+
+  for (const token of required) {
+    if (!text.includes(token)) fail(`${rel}: missing ${token}`);
+  }
+}
+
 function checkFrontmatter() {
   for (const rel of listMarkdown("agents")) {
     requireFields(rel, parseFrontmatter(rel), ["description", "mode"]);
@@ -1389,6 +1411,7 @@ checkAgentsIndex();
 checkFrontmatter();
 checkAgentDocsCoverage();
 checkCommandDocsCoverage();
+checkLoopContract();
 checkLeadRouterContract();
 checkFeatureContract();
 checkPlanContract();

@@ -48,7 +48,7 @@ The goal is not to force every request through a heavy process. Small, clear, lo
 | Capability | What it gives you |
 |---|---|
 | Role-based agents | Dedicated agents for routing, research, design, specification, implementation, review, and optional harness evolution |
-| Product-development workflows | Structured flows for features, plans, scoped research, MVP specs, testing, simplification, and review |
+| Product-development workflows | Structured flows for features, plans, scoped research, bounded engineering loops, MVP specs, testing, simplification, and review |
 | Bounded routing | A default `lead` agent that routes simple requests directly and escalates only when needed |
 | Local skills | Practical checklists for testing, debugging, security, performance, documentation, APIs, code review, and more |
 | Safe installation | Backup-aware install and uninstall scripts, plus a project-local test mode |
@@ -121,6 +121,13 @@ lead
         └── specifier
               └── reviewer
 
+Bounded engineering loop
+lead
+  └── human approval gate
+        └── developer
+              └── reviewer
+                    └── developer state sync
+
 Scoped research and specification
 scoper
   └── researcher
@@ -146,6 +153,8 @@ Use the smallest useful flow:
 - `/plan` when you want an implementation-ready plan but no code changes.
 - `/scope` when you need research and an MVP-oriented specification.
 - `/feature` when the work deserves full orchestration.
+- `/loop` when you want an approved, resumable implementation-review cycle with
+  durable state and a three-iteration cap.
 
 ## Included agents
 
@@ -171,6 +180,7 @@ The `evaluator`, `debugger`, and `evolver` agents are optional harness-evolution
 | `/feature` | Run the full feature workflow |
 | `/plan` | Research and create an implementation-ready plan without implementing |
 | `/scope` | Research a topic and produce a scoped MVP specification |
+| `/loop` | Design and run a bounded, resumable engineering loop |
 | `/mvp-spec` | Create a strict MVP spec with small tasks and explicit out-of-scope items |
 | `/design` | Create or evolve a design through project context and Open Design |
 | `/research` | Run a direct research task |
@@ -190,6 +200,10 @@ Examples:
 /plan Add a dry-run flag to the harness check without implementing it yet
 
 /scope Research Stripe Checkout integration and generate an MVP spec
+
+/loop Add request retries with focused tests and independent review
+
+/loop resume request-retries
 
 /mvp-spec Email notifications when an agent finishes a task
 

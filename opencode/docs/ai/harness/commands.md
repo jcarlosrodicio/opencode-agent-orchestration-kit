@@ -98,6 +98,36 @@ Criteria:
 - `debugger` enters only for traces, results, or concrete previous evidence.
 - Output is scoped specs, atomic tasks, and validation.
 
+## `/loop`
+
+Contract: human gate -> `developer -> reviewer -> developer (state sync)` with
+durable state and at most three iterations per invocation.
+
+Interface:
+
+- `/loop <objective>` designs a new loop.
+- `/loop resume <slug>` resumes `.opencode/loops/<slug>.md`.
+- The current checkout is the default. A worktree is enabled only by an explicit
+  user request.
+
+Criteria:
+
+- `lead` performs a lightweight preflight and presents a `Loop Contract` with
+  objective, verifiable success, scope, non-goals, validation, risks, and limits.
+- No state is written and `developer` is not invoked before explicit human
+  approval of the contract.
+- Each iteration allows one focused `developer` change; `reviewer` has exclusive
+  authority to approve or escalate.
+- `developer` synchronizes the verdict into state without mixing in
+  implementation changes; this administrative write does not consume an
+  iteration.
+- Resume opens another block of at most three iterations and preserves history.
+- Stop on approved success, exhausted budget, two iterations without progress,
+  impossible validation, scope expansion, overlap with local changes, or a
+  sensitive path.
+- No auto-merge, scheduling, write-enabled MCP connectors, parallel execution,
+  or implicit worktree creation.
+
 ## `/mvp-spec`
 
 Contract: `scoper -> researcher -> scoper synthesis -> specifier`.

@@ -11,7 +11,7 @@ This file is the short map for the harness. Detailed contracts live in
   adjustment or correction for that same free-form request goes back to
   `developer`; `lead` does not edit.
 - Full flows activate through slash commands such as `/feature`, `/plan`,
-  `/scope`, `/design`, `/review`, or `/evolve`.
+  `/scope`, `/design`, `/loop`, `/review`, or `/evolve`.
 - Auxiliary commands such as `/test` and `/code-simplify` trigger focused
   checks without turning a small request into a full feature flow.
 - Before implementing, understand the stack, scope, and minimum validation.
@@ -39,6 +39,7 @@ See `docs/ai/harness/agents.md` for full contracts.
 - Plan without implementation: `lead -> researcher -> specifier -> reviewer`.
 - Scope/spec without implementation: `scoper -> researcher -> scoper synthesis -> specifier`.
 - Design: `designer -> open design`.
+- Bounded manual loop: human gate -> `developer -> reviewer -> developer (state sync)`, at most 3 iterations per invocation.
 - AHE evolution: `evaluator -> debugger -> evolver -> lead approval -> developer -> evaluator -> debugger -> reviewer`.
 
 See `docs/ai/harness/commands.md` for command contracts.

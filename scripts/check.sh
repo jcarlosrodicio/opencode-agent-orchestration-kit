@@ -23,6 +23,7 @@ opencode/package-lock.json
 opencode/plugins/token-tree-usage.tsx
 opencode/tools/open_design.ts
 opencode/scripts/check-harness.mjs
+opencode/commands/loop.md
 opencode/commands/plan.md
 opencode/commands/test.md
 opencode/commands/code-simplify.md
@@ -106,6 +107,9 @@ grep -q 'Never invoke `developer` before' opencode/agents/lead.md
 grep -q 'Never invoke `reviewer` before' opencode/agents/lead.md
 grep -q 'agent: lead' opencode/commands/feature.md
 grep -q 'agent: lead' opencode/commands/plan.md
+grep -q 'approval_gate: explicit_before_writes' opencode/commands/loop.md
+grep -q 'max_iterations_per_invocation: 3' opencode/commands/loop.md
+grep -q 'completion_authority: reviewer_only' opencode/commands/loop.md
 grep -q 'agent: scoper' opencode/commands/scope.md
 grep -q 'agent: designer' opencode/commands/design.md
 grep -q 'agent: developer' opencode/commands/test.md

@@ -35,11 +35,79 @@ function write(rel, content, cwd) {
   fs.writeFileSync(path.join(cwd, rel), content);
 }
 
+const validLoopCommand = `---
+description: Run a bounded and verifiable engineering loop.
+agent: lead
+---
+
+approval_gate: explicit_before_writes
+max_iterations_per_invocation: 3
+completion_authority: reviewer_only
+state_path: .opencode/loops/<slug>.md
+worktree_mode: explicit_opt_in
+
+developer -> reviewer -> developer (state sync)
+`;
+
+function writeLoopFixture(cwd, command) {
+  write("commands/loop.md", command, cwd);
+  const docsPath = path.join(cwd, "docs/ai/harness/commands.md");
+  fs.appendFileSync(docsPath, "\n## `/loop`\n");
+}
+
 test("harness accepts prose evidence that mentions markdown filenames", () => {
   const cwd = makeFixture();
   try {
     const result = runHarness(cwd);
     assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects loop without approval before writes", () => {
+  const cwd = makeFixture();
+  try {
+    writeLoopFixture(
+      cwd,
+      validLoopCommand.replace("approval_gate: explicit_before_writes", "approval_gate: automatic"),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted loop without an explicit approval gate");
+    assert.match(result.stderr, /commands\/loop\.md: missing approval_gate: explicit_before_writes/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects loop without the three-iteration cap", () => {
+  const cwd = makeFixture();
+  try {
+    writeLoopFixture(
+      cwd,
+      validLoopCommand.replace("max_iterations_per_invocation: 3", "max_iterations_per_invocation: unlimited"),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an unbounded loop command");
+    assert.match(result.stderr, /commands\/loop\.md: missing max_iterations_per_invocation: 3/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects loop when developer can approve itself", () => {
+  const cwd = makeFixture();
+  try {
+    writeLoopFixture(
+      cwd,
+      validLoopCommand.replace("completion_authority: reviewer_only", "completion_authority: developer"),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted developer self-approval");
+    assert.match(result.stderr, /commands\/loop\.md: missing completion_authority: reviewer_only/);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
