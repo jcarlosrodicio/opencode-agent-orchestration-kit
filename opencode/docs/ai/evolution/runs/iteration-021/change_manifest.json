@@ -1,0 +1,50 @@
+{
+  "iteration": 21,
+  "changes": [
+    {
+      "id": "chg-1",
+      "type": "improvement",
+      "description": "Optimizar collect-session-evidence.mjs para escalar con DBs grandes (>1GB). Implementar filtrado SQL por cutoff temporal, streaming con spawn en vez de spawnSync, y selección mínima de columnas.",
+      "files": ["scripts/collect-session-evidence.mjs"],
+      "failure_pattern": "CPU-bound serialization timeout",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-021/analysis/detail/evidence-collection-blocker.md",
+        "docs/ai/evolution/runs/iteration-021/analysis/overview.md"
+      ],
+      "predicted_fixes": [
+        "Reducción de tiempo de query de ~10min a <1min",
+        "Eliminación de buffer de 208MB en heap",
+        "Reducción de uso de memoria de ~256MB a <50MB"
+      ],
+      "risk_tasks": [
+        "Benchmark con DB actual (1.1GB, 60K parts)",
+        "Timeout explícito documentado"
+      ],
+      "constraint_level": "tool",
+      "why_this_component": "El root cause es un problema de implementación del tool: carga datos completos sin filtrado, usa spawnSync sin streaming, y no selecciona columnas mínimas. El fix a nivel tool resuelve el cuello de botella sin cambiar contratos ni flujos."
+    },
+    {
+      "id": "chg-2",
+      "type": "improvement",
+      "description": "Alinear el esquema entre collector y auditor: añadir campos 'root_agent' y 'participating_agents' como campos de evidencia válidos en preflight-audit.mjs.",
+      "files": ["scripts/preflight-audit.mjs"],
+      "failure_pattern": "Schema mismatch collector↔auditor",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-021/analysis/detail/contract-vs-runtime-gap.md",
+        "docs/ai/evolution/runs/iteration-021/analysis/overview.md"
+      ],
+      "predicted_fixes": [
+        "Cobertura de runtime evidence de 0% a ~30-50%",
+        "Detección correcta de agentes en execution trees",
+        "Eliminación de falsos negativos en drift detection"
+      ],
+      "risk_tasks": [
+        "Verificar que el fix no genera falsos positivos",
+        "Validar que el mapeo es semánticamente correcto",
+        "Asegurar compatibilidad con normalized-sessions.jsonl existente"
+      ],
+      "constraint_level": "tool",
+      "why_this_component": "El auditor es un tool que consume evidencia del collector. El fix a nivel tool (añadir campos de mapeo) resuelve el gap de contrato sin cambiar la interfaz del collector ni los flujos de orquestación."
+    }
+  ]
+}

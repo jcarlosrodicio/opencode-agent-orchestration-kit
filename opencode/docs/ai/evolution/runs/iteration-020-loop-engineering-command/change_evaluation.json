@@ -1,0 +1,46 @@
+{
+  "iteration": 20,
+  "evaluates_iteration": 20,
+  "results": [
+    {
+      "change_id": "chg-20-1",
+      "predicted_fixes_confirmed": [
+        "manual-loop-missing-gate",
+        "manual-loop-unbounded",
+        "manual-loop-amnesia",
+        "manual-loop-self-approval"
+      ],
+      "predicted_fixes_not_confirmed": [],
+      "risk_tasks_regressed": [],
+      "risk_tasks_not_regressed": [
+        "worktree-enabled-without-explicit-opt-in",
+        "existing-command-contract-regression"
+      ],
+      "unpredicted_regressions": [],
+      "decision": "keep",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-020-loop-engineering-command/evaluation.md"
+      ],
+      "notes": "Static contracts cover the approved v1. Runtime multi-turn behavior remains intentionally unclaimed until first interactive use."
+    },
+    {
+      "change_id": "chg-20-2",
+      "predicted_fixes_confirmed": [
+        "loop-command-contract-drift",
+        "loop-command-developer-self-approval"
+      ],
+      "predicted_fixes_not_confirmed": [],
+      "risk_tasks_regressed": [],
+      "risk_tasks_not_regressed": [
+        "checker-false-positive-on-prose",
+        "existing-harness-tests-regress"
+      ],
+      "unpredicted_regressions": [],
+      "decision": "keep",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-020-loop-engineering-command/evaluation.md"
+      ],
+      "notes": "Focused RED/GREEN and the full 43-test harness suite pass."
+    }
+  ]
+}

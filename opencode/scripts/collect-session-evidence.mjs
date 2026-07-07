@@ -3,72 +3,112 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
-
-const SQLITE_JSON_MAX_BUFFER = 256 * 1024 * 1024;
 
 function fail(message) {
   console.error(message);
   process.exit(1);
 }
 
-function formatSqliteProcessError(dbPath, result) {
-  const error = result.error;
-  if (!error) return null;
-  const details = [error.code, error.message].filter(Boolean).join(": ");
-  if (error.code === "ENOBUFS") {
-    return `sqlite3 spawn/buffer error for ${dbPath}: ${details || "output exceeded maxBuffer"}`;
-  }
-  return `sqlite3 spawn error for ${dbPath}: ${details || "unknown child process failure"}`;
-}
+/**
+ * Stream sqlite3 JSON output via spawn, collecting stdout chunks incrementally.
+ * This avoids the 208MB+ buffer accumulation from spawnSync.
+ */
+function streamSqliteJson(dbPath, sql, timeoutMs = 0) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("sqlite3", ["-json", dbPath, sql], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    let timer = null;
 
-export function runSqliteJson(dbPath, sql, options = {}) {
-  const { spawnImpl = spawnSync, maxBuffer = SQLITE_JSON_MAX_BUFFER } = options;
-  const result = spawnImpl("sqlite3", ["-json", dbPath, sql], { encoding: "utf8", maxBuffer });
-  const processError = formatSqliteProcessError(dbPath, result);
-  if (processError) {
-    throw new Error(processError);
-  }
-  if (result.status !== 0) {
-    const details = result.stderr.trim() || result.stdout.trim() || `sqlite3 failed for ${dbPath}`;
-    throw new Error(`sqlite3 runtime error for ${dbPath}: ${details}`);
-  }
-  return JSON.parse(result.stdout || "[]");
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new Error(`sqlite3 timeout for ${dbPath} after ${timeoutMs}ms`));
+      }, timeoutMs);
+    }
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+
+    child.on("error", (error) => {
+      if (timer) clearTimeout(timer);
+      reject(new Error(`sqlite3 spawn error for ${dbPath}: ${error.message}`));
+    });
+
+    child.on("close", (code) => {
+      if (timer) clearTimeout(timer);
+      if (code !== 0) {
+        const details = stderr.trim() || stdout.trim() || `sqlite3 failed for ${dbPath}`;
+        reject(new Error(`sqlite3 runtime error for ${dbPath}: ${details}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout || "[]"));
+      } catch (error) {
+        reject(new Error(`sqlite3 JSON parse error for ${dbPath}: ${error.message}`));
+      }
+    });
+  });
 }
 
 function parseArgs(argv) {
   const args = { sources: [], fullRescan: false };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
-    if (token === "--iteration") args.iteration = argv[++i];
-    else if (token === "--output-dir") args.outputDir = argv[++i];
-    else if (token === "--source") args.sources.push(argv[++i]);
-    else if (token === "--full-rescan") args.fullRescan = true;
-    else fail(`Unknown argument: ${token}`);
+    if (token === "--iteration") {
+      args.iteration = argv[++i];
+    } else if (token === "--output-dir") {
+      args.outputDir = argv[++i];
+    } else if (token === "--source") {
+      args.sources.push(argv[++i]);
+    } else if (token === "--full-rescan") {
+      args.fullRescan = true;
+    } else {
+      fail(`Unknown argument: ${token}`);
+    }
   }
   return args;
 }
 
 function defaultSources() {
-  const sources = [path.join(os.homedir(), ".local", "share", "opencode", "opencode.db")];
+  const home = os.homedir();
+  const sources = [path.join(home, ".local", "share", "opencode", "opencode.db")];
   const envRaw = process.env.RAW_SESSIONS_DIR;
+  const localRaw = "/Volumes/ingestion/raw-sessions/opencode";
   const fallbackRaw = "/raw-sessions";
-  if (envRaw && fs.existsSync(envRaw)) sources.push(envRaw);
-  else if (fs.existsSync(fallbackRaw)) sources.push(fallbackRaw);
+  if (envRaw && fs.existsSync(envRaw)) {
+    sources.push(envRaw);
+  } else if (fs.existsSync(localRaw)) {
+    sources.push(localRaw);
+  } else if (fs.existsSync(fallbackRaw)) {
+    sources.push(fallbackRaw);
+  }
   return sources;
 }
 
 function resolveOutputDir(args) {
   if (args.outputDir) return path.resolve(args.outputDir);
-  if (args.iteration) return path.resolve("docs/ai/evolution/runs", args.iteration, "raw");
+  if (args.iteration) {
+    return path.resolve("docs/ai/evolution/runs", args.iteration, "raw");
+  }
   fail("Pass --output-dir or --iteration.");
 }
 
 function detectSource(sourcePath) {
   const stat = fs.statSync(sourcePath);
-  if (stat.isFile() && path.basename(sourcePath) === "opencode.db") return "opencode-sqlite";
-  if (stat.isDirectory()) return "opencode-raw-json";
+  if (stat.isFile() && path.basename(sourcePath) === "opencode.db") {
+    return "opencode-sqlite";
+  }
+  if (stat.isDirectory()) {
+    return "opencode-raw-json";
+  }
   throw new Error(`Unsupported source: ${sourcePath}`);
 }
 
@@ -118,19 +158,50 @@ function loadPreviousCursor(iteration, outputDir) {
   return null;
 }
 
-function summarizeSqlite(dbPath) {
-  const sessions = runSqliteJson(
+async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
+  const cutoff = !fullRescan && previousCursor ? previousCursor.cursor_end_time_updated_max : null;
+  const cutoffFilter = cutoff ? `AND time_created > ${Number(cutoff)}` : "";
+
+  // Session query: always full (lightweight, needed for parent resolution)
+  const sessions = await streamSqliteJson(
     dbPath,
-    "select id, parent_id, directory, title, version, time_created, time_updated, path, agent, model, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write from session order by time_updated desc, id desc;",
+    `
+    select
+      id,
+      project_id,
+      parent_id,
+      slug,
+      directory,
+      title,
+      version,
+      time_created,
+      time_updated,
+      workspace_id,
+      path,
+      agent,
+      model,
+      cost,
+      tokens_input,
+      tokens_output,
+      tokens_reasoning,
+      tokens_cache_read,
+      tokens_cache_write
+    from session
+    order by time_updated desc, id desc;
+    `,
+    300_000,
   );
-  const messages = runSqliteJson(
-    dbPath,
-    "select id, session_id, time_created, time_updated, data from message order by session_id, time_created, id;",
-  );
-  const parts = runSqliteJson(
-    dbPath,
-    "select id, message_id, session_id, time_created, time_updated, data from part order by session_id, time_created, id;",
-  );
+
+  // Message query: extract only role from JSON data (reduces output from ~31MB to ~200KB)
+  // Apply time cutoff when not in full-rescan mode
+  const messageSql = fullRescan
+    ? `select id, session_id, time_created, time_updated, data from message order by session_id, time_created, id;`
+    : `select id, session_id, time_created, time_updated, json_extract(data, '$.role') as role from message where 1=1 ${cutoffFilter} order by session_id, time_created, id;`;
+  const messages = await streamSqliteJson(dbPath, messageSql, 300_000);
+
+  // Part query: need full data for text extraction, but apply time cutoff to reduce rows scanned
+  const partsSql = `select id, message_id, session_id, time_created, time_updated, data from part where 1=1 ${cutoffFilter} order by session_id, time_created, id;`;
+  const parts = await streamSqliteJson(dbPath, partsSql, 300_000);
 
   const messagesBySession = new Map();
   for (const message of messages) {
@@ -147,19 +218,48 @@ function summarizeSqlite(dbPath) {
   }
 
   const normalized = [];
+  let skipped = 0;
+  const skipReasons = {};
+
   for (const session of sessions) {
-    if (!session.id) continue;
+    if (!session.id) {
+      skipped += 1;
+      skipReasons.missing_session_id = (skipReasons.missing_session_id || 0) + 1;
+      continue;
+    }
+    let model = null;
+    if (typeof session.model === "string" && session.model) {
+      const parsed = parseJson(session.model);
+      model = parsed.ok ? parsed.value : { raw: session.model };
+    }
+
     const sessionMessages = messagesBySession.get(session.id) || [];
-    const firstUser = sessionMessages.find((message) => {
-      const parsed = parseJson(message.data);
-      return parsed.ok && parsed.value?.role === "user";
-    });
-    const assistantMessages = sessionMessages.filter((message) => {
-      const parsed = parseJson(message.data);
-      return parsed.ok && parsed.value?.role === "assistant";
-    });
+    const userMessages = [];
+    const assistantMessages = [];
+    for (const message of sessionMessages) {
+      // In incremental mode, role is extracted directly from SQL; in full-rescan, parse from data JSON.
+      // Cache parseJson(message.data) to avoid parsing twice when message.role is falsy (m2).
+      const parsedData = parseJson(message.data);
+      const role = message.role || (parsedData.ok ? parsedData.value?.role : null);
+      if (role === "user") userMessages.push(message);
+      if (role === "assistant") assistantMessages.push(message);
+    }
+
+    const firstUser = userMessages[0];
     const lastAssistant = assistantMessages.at(-1);
-    const parsedModel = typeof session.model === "string" && session.model ? parseJson(session.model) : null;
+    const userPrompt = firstUser ? firstTextPart(partsByMessage.get(firstUser.id) || []) : null;
+    const assistantSummary = lastAssistant ? firstTextPart(partsByMessage.get(lastAssistant.id) || []) : null;
+
+    // M1: in incremental mode (cutoff active), a session created at or before the cursor has its
+    // messages/parts dropped by the SQL `time_created > cutoff` filter. The tree can still be
+    // re-activated (tree_time_updated_max > cursor) via a child updated after the cursor, so the
+    // session loads with empty messages. Mark this explicitly so consumers (debugger, humans) do
+    // not trust incomplete content: message_count becomes null (not 0) and content_filtered: true.
+    // We use session.time_created <= cutoff as the signal because the filter is on message/part
+    // time_created, and messages are created during the session — a session born before the cutoff
+    // cannot have reliable content in incremental mode.
+    const contentFiltered =
+      cutoff !== null && typeof session.time_created === "number" && session.time_created <= cutoff;
 
     normalized.push({
       source_label: "local-opencode-db",
@@ -168,7 +268,7 @@ function summarizeSqlite(dbPath) {
       parent_session_id: session.parent_id || null,
       title: session.title || null,
       agent: session.agent || null,
-      model: parsedModel?.ok ? parsedModel.value : null,
+      model,
       directory: session.directory || null,
       path: session.path || "",
       version: session.version || null,
@@ -184,9 +284,10 @@ function summarizeSqlite(dbPath) {
         },
       },
       cost: session.cost ?? 0,
-      user_prompt: firstUser ? firstTextPart(partsByMessage.get(firstUser.id) || []) : null,
-      assistant_summary: lastAssistant ? firstTextPart(partsByMessage.get(lastAssistant.id) || []) : null,
-      message_count: sessionMessages.length,
+      user_prompt: userPrompt,
+      assistant_summary: assistantSummary,
+      message_count: contentFiltered ? null : sessionMessages.length,
+      content_filtered: contentFiltered,
     });
   }
 
@@ -197,22 +298,27 @@ function summarizeSqlite(dbPath) {
       format: "opencode-sqlite",
       discovered: sessions.length,
       accepted: normalized.length,
-      skipped: 0,
-      skip_reasons: {},
+      skipped,
+      skip_reasons: skipReasons,
     },
     normalized,
   };
 }
 
 function summarizeRawDir(dirPath) {
-  const files = fs.readdirSync(dirPath).filter((file) => file.startsWith("ses_") && file.endsWith(".json")).sort();
+  const files = fs
+    .readdirSync(dirPath)
+    .filter((file) => file.startsWith("ses_") && file.endsWith(".json"))
+    .sort();
+
   const normalized = [];
   const skipReasons = {};
   let skipped = 0;
 
   for (const file of files) {
     const fullPath = path.join(dirPath, file);
-    const parsed = parseJson(fs.readFileSync(fullPath, "utf8"));
+    const text = fs.readFileSync(fullPath, "utf8");
+    const parsed = parseJson(text);
     if (!parsed.ok) {
       skipped += 1;
       skipReasons.invalid_json = (skipReasons.invalid_json || 0) + 1;
@@ -223,6 +329,7 @@ function summarizeRawDir(dirPath) {
       skipReasons.empty_array = (skipReasons.empty_array || 0) + 1;
       continue;
     }
+
     const info = !Array.isArray(parsed.value) ? parsed.value?.info : null;
     const sessionId = info?.id || path.basename(file, ".json");
     if (!sessionId) {
@@ -230,6 +337,7 @@ function summarizeRawDir(dirPath) {
       skipReasons.missing_session_id = (skipReasons.missing_session_id || 0) + 1;
       continue;
     }
+
     normalized.push({
       source_label: "external-opencode-raw",
       source_format: "opencode-raw-json",
@@ -283,8 +391,12 @@ function resolveRootId(row, sessionMap) {
   let current = row;
   while (current.parent_session_id) {
     const parent = sessionMap.get(current.parent_session_id);
-    if (!parent || parent.source_format !== "opencode-sqlite") return row.session_id;
-    if (seen.has(parent.session_id)) return row.session_id;
+    if (!parent || parent.source_format !== "opencode-sqlite") {
+      return row.session_id;
+    }
+    if (seen.has(parent.session_id)) {
+      return row.session_id;
+    }
     seen.add(parent.session_id);
     current = parent;
   }
@@ -354,6 +466,9 @@ function buildExecutionTrees(sqliteRows, rawRows, previousCursor, fullRescan) {
       representative_user_prompt:
         rootSession.user_prompt || sortedRows.find((row) => typeof row.user_prompt === "string")?.user_prompt || null,
       representative_assistant_summary: treeRepresentativeSummary(sortedRows),
+      // M1: a tree is content_filtered when any of its sessions had content dropped by the
+      // incremental cutoff. Consumers must not trust representative prompts/summaries as complete.
+      content_filtered: sortedRows.some((row) => row.content_filtered === true),
       session_ids: sortedRows.map((row) => row.session_id),
       supplemental_raw_session_ids: matchedRawIds,
       source_formats: [...new Set(["opencode-sqlite", ...matchedRawIds.map(() => "opencode-raw-json")])],
@@ -438,37 +553,60 @@ function makeCursor(previousCursor, treeSummary, trees, supplementalRawSummary, 
   };
 }
 
-export function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const outputDir = resolveOutputDir(args);
   fs.mkdirSync(outputDir, { recursive: true });
+
   const sourcePaths = args.sources.length > 0 ? args.sources.map((item) => path.resolve(item)) : defaultSources();
   const summaries = [];
   let sqliteRows = [];
   let rawRows = [];
 
+  const previousCursor = args.fullRescan ? null : loadPreviousCursor(args.iteration, outputDir);
+
   for (const sourcePath of sourcePaths) {
     if (!fs.existsSync(sourcePath)) continue;
     const kind = detectSource(sourcePath);
-    const result = kind === "opencode-sqlite" ? summarizeSqlite(sourcePath) : summarizeRawDir(sourcePath);
+    const result =
+      kind === "opencode-sqlite"
+        ? await summarizeSqlite(sourcePath, previousCursor, args.fullRescan)
+        : summarizeRawDir(sourcePath);
     summaries.push(result.source);
-    if (kind === "opencode-sqlite") sqliteRows = sqliteRows.concat(result.normalized);
-    else rawRows = rawRows.concat(result.normalized);
+    if (kind === "opencode-sqlite") {
+      sqliteRows = sqliteRows.concat(result.normalized);
+    } else {
+      rawRows = rawRows.concat(result.normalized);
+    }
   }
 
-  const previousCursor = args.fullRescan ? null : loadPreviousCursor(args.iteration, outputDir);
   const built = buildExecutionTrees(sqliteRows, rawRows, previousCursor, args.fullRescan);
   const acceptedSessionIds = new Set(built.trees.flatMap((tree) => tree.session_ids));
   const filteredSessionRows = sortSessions(sqliteRows.filter((row) => acceptedSessionIds.has(row.session_id)));
   const cursor = makeCursor(previousCursor, built.treeSummary, built.trees, built.supplementalRawSummary, args.fullRescan);
 
-  fs.writeFileSync(path.join(outputDir, "session-sources.summary.json"), JSON.stringify({ sources: summaries }, null, 2), "utf8");
-  fs.writeFileSync(path.join(outputDir, "normalized-sessions.jsonl"), `${filteredSessionRows.map((row) => JSON.stringify(row)).join("\n")}${filteredSessionRows.length ? "\n" : ""}`, "utf8");
-  fs.writeFileSync(path.join(outputDir, "execution-trees.jsonl"), `${built.trees.map((tree) => JSON.stringify(tree)).join("\n")}${built.trees.length ? "\n" : ""}`, "utf8");
+  fs.writeFileSync(
+    path.join(outputDir, "session-sources.summary.json"),
+    JSON.stringify({ sources: summaries }, null, 2),
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(outputDir, "normalized-sessions.jsonl"),
+    `${filteredSessionRows.map((row) => JSON.stringify(row)).join("\n")}${filteredSessionRows.length ? "\n" : ""}`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(outputDir, "execution-trees.jsonl"),
+    `${built.trees.map((tree) => JSON.stringify(tree)).join("\n")}${built.trees.length ? "\n" : ""}`,
+    "utf8",
+  );
   fs.writeFileSync(path.join(outputDir, "cursor.json"), JSON.stringify(cursor, null, 2), "utf8");
   console.log(`Collected ${built.trees.length} execution trees from ${summaries.length} sources.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
+  main().catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
 }

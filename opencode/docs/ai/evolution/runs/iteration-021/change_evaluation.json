@@ -1,0 +1,52 @@
+{
+  "iteration": 21,
+  "manifest_ref": "change_manifest.json",
+  "evaluation_date": "2026-07-06",
+  "decision": "keep",
+  "predicted_fixes": {
+    "confirmed": [
+      "Reducción de tiempo de query de ~10min a 1m22s",
+      "Eliminación de buffer de 208MB en heap",
+      "Cobertura de runtime evidence de 0% a 36.1%",
+      "Reducción de drifts de 31 a 17 (45%)",
+      "Detección correcta de agentes en execution trees"
+    ],
+    "not_confirmed": []
+  },
+  "risk_tasks": {
+    "addressed": [
+      "Benchmark con DB actual (1.1GB, 60K parts) — collector completa en 1m22s",
+      "Timeout explícito documentado — 300_000ms (5min) en las 3 queries",
+      "Verificar que el fix no genera falsos positivos — reviewer verificó, 0 falsos positivos"
+    ],
+    "regressed": []
+  },
+  "unexpected_regressions": [
+    "Test regression en collect-session-evidence.test.mjs (import de API removida) — fixeado en ronda de corrección"
+  ],
+  "evidence": {
+    "preflight_before": "docs/ai/evolution/runs/iteration-020-harness-evolution/preflight-audit.json",
+    "preflight_after": "docs/ai/evolution/runs/iteration-021/preflight-audit.json",
+    "evaluation": "docs/ai/evolution/runs/iteration-021/evaluation.md",
+    "analysis": "docs/ai/evolution/runs/iteration-021/analysis/overview.md",
+    "review": "reviewer pass — both fixes verified"
+  },
+  "scores_before": {
+    "contract_coverage": 1.0,
+    "runtime_evidence_coverage": 0.0,
+    "doc_runtime_alignment": 0.167,
+    "confidence": "low"
+  },
+  "scores_after": {
+    "contract_coverage": 1.0,
+    "runtime_evidence_coverage": 0.361,
+    "doc_runtime_alignment": 0.528,
+    "confidence": "medium"
+  },
+  "remaining_work": [
+    "review_security and scoper agents still lack runtime evidence (expected — rarely used)",
+    "Command surfaces still at 0% evidence (expected — commands are invoked less frequently)",
+    "Full-rescan mode not benchmarked"
+  ],
+  "next_iteration_focus": "Evaluate whether 36.1% agent coverage is sufficient for AHE cycle, or if command evidence collection needs schema alignment"
+}

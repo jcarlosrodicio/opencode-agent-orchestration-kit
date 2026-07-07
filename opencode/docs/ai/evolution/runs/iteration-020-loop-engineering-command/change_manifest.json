@@ -1,0 +1,57 @@
+{
+  "iteration": 20,
+  "changes": [
+    {
+      "id": "chg-20-1",
+      "type": "new",
+      "description": "Add a bounded, resumable /loop command using the existing lead, developer and reviewer contracts.",
+      "files": [
+        "commands/loop.md",
+        "docs/ai/harness/commands.md",
+        "AGENTS.md"
+      ],
+      "failure_pattern": "The harness has maker/checker primitives but no explicit command that gates writes, persists loop state and caps repeated implementation-review cycles.",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-020-loop-engineering-command/evaluation.md",
+        "docs/ai/evolution/runs/iteration-020-loop-engineering-command/analysis/overview.md"
+      ],
+      "predicted_fixes": [
+        "manual-loop-missing-gate",
+        "manual-loop-unbounded",
+        "manual-loop-amnesia",
+        "manual-loop-self-approval"
+      ],
+      "risk_tasks": [
+        "simple-task-orchestration-overhead",
+        "worktree-enabled-without-explicit-opt-in",
+        "existing-command-contract-regression"
+      ],
+      "constraint_level": "command",
+      "why_this_component": "The missing behavior is composition of existing agents and skills. A command is the smallest owning surface and avoids a one-use agent, skill or runtime engine."
+    },
+    {
+      "id": "chg-20-2",
+      "type": "new",
+      "description": "Mechanically enforce the loop command's approval, iteration, reviewer, state and worktree invariants.",
+      "files": [
+        "scripts/check-harness.mjs",
+        "scripts/check-harness.test.mjs"
+      ],
+      "failure_pattern": "A future prompt edit could silently remove the safety gate, bounded iteration policy or maker/checker separation.",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-020-loop-engineering-command/evaluation.md",
+        "docs/ai/evolution/runs/iteration-020-loop-engineering-command/analysis/overview.md"
+      ],
+      "predicted_fixes": [
+        "loop-command-contract-drift",
+        "loop-command-developer-self-approval"
+      ],
+      "risk_tasks": [
+        "checker-false-positive-on-prose",
+        "existing-harness-tests-regress"
+      ],
+      "constraint_level": "tool",
+      "why_this_component": "The existing harness checker already owns command-contract drift detection, so adding one focused check and three negative tests is the local extension."
+    }
+  ]
+}

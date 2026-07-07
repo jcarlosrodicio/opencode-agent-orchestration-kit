@@ -93,14 +93,17 @@ function parseJsonlFile(filePath) {
   }
 }
 
-const EVIDENCE_FIELDS = ["agent", "agentName", "type", "command", "commandName"];
+const EVIDENCE_FIELDS = ["agent", "agentName", "root_agent", "type", "command", "commandName"];
 
 function hasStructuredEvidence(records, name) {
   for (const rec of records) {
     if (!rec || typeof rec !== "object") continue;
+    // Check string fields (agent, agentName, root_agent, type, command, commandName)
     for (const field of EVIDENCE_FIELDS) {
       if (typeof rec[field] === "string" && rec[field] === name) return true;
     }
+    // Check participating_agents array (collector-produced execution trees)
+    if (Array.isArray(rec.participating_agents) && rec.participating_agents.includes(name)) return true;
     // Recurse into children arrays (e.g. execution tree nodes)
     if (Array.isArray(rec.children)) {
       if (hasStructuredEvidence(rec.children, name)) return true;

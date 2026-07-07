@@ -1,0 +1,61 @@
+{
+  "iteration": 17,
+  "changes": [
+    {
+      "id": "chg-17-1",
+      "type": "new",
+      "description": "Tighten AHE evidence-classification guidance so coercive '/feature' flow-test prompts (for example, prompts that explicitly demand talking to every agent/sidecar) are tagged as synthetic routing tests and cannot, by themselves, justify a sidecar-overreach regression claim without a second proof source.",
+      "files": [
+        "commands/evolve.md",
+        "docs/ai/harness/commands.md",
+        "docs/ai/evolution/README.md"
+      ],
+      "failure_pattern": "The evaluator can treat a coercive routing-test tree as if it were a natural '/feature' request, producing a false positive that normal feature flow now overuses evaluator/debugger/evolver.",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/overview.md",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/detail/pattern-1-feature-sidecar-false-positive.md"
+      ],
+      "root_cause": "Workflow-level evidence selection/classification error: scenario S3 mixed a synthetic prompt ('Habla con cada agente...') into the negative corpus for normal '/feature' behavior, so the observed sidecar fan-out is non-diagnostic for ordinary routing.",
+      "predicted_fixes": [
+        "feature-sidecar-false-positive",
+        "synthetic-routing-test-misclassified-as-natural-feature"
+      ],
+      "risk_tasks": [
+        "natural-feature-sidecar-regression-still-detected",
+        "synthetic-prompt-classifier-not-overbroad",
+        "explicit-user-requested-sidecars-remain-legal"
+      ],
+      "constraint_level": "workflow",
+      "why_this_component": "The debugger attributes the problem to benchmark hygiene and evidence attribution, not to '/feature' routing logic or any single agent prompt. Updating the AHE workflow contract is the most local fix that addresses the root cause without re-opening the already rejected mechanism 'mech-sidecars-for-every-feature'."
+    },
+    {
+      "id": "chg-17-2",
+      "type": "new",
+      "description": "Reframe 'node --test scripts/check-harness.test.mjs' in AHE docs as a long validation with an explicit timeout budget and runtime recording requirement, separate from the quick smoke check 'node scripts/check-harness.mjs', so timeout cancellations are not misreported as functional harness failures.",
+      "files": [
+        "commands/evolve.md",
+        "docs/ai/harness/commands.md",
+        "docs/ai/harness/checks.md"
+      ],
+      "failure_pattern": "A passing checker suite can be marked as a baseline failure when run under the default 120s command timeout, because external cancellation arrives near the suite's runtime ceiling.",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/overview.md",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/detail/pattern-2-checker-time-budget.md"
+      ],
+      "root_cause": "Operational framing/budget issue: the full checker suite passed 14/14 in about 113s when given enough time, but the evaluator treated a 120s timeout cancellation as a functional failure even though the suite cost is dominated by copying the full repo per test.",
+      "predicted_fixes": [
+        "checker-suite-timeout-misclassification",
+        "ahe-validation-budget-underreported"
+      ],
+      "risk_tasks": [
+        "hidden-async-leak-not-masked-by-bigger-timeout",
+        "suite-runtime-growth-tracked-as-repo-expands",
+        "full-suite-rerun-under-generous-timeout-still-required"
+      ],
+      "constraint_level": "workflow",
+      "why_this_component": "The supported root cause is not a proven logic defect in scripts/check-harness.test.mjs but how AHE validation budgets and expectations are documented and applied. A workflow-level change is smaller and more evidence-backed than changing test code or checker internals prematurely."
+    }
+  ]
+}

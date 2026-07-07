@@ -1,0 +1,61 @@
+{
+  "iteration": 17,
+  "evaluates_iteration": 17,
+  "results": [
+    {
+      "change_id": "chg-17-1",
+      "predicted_fixes_confirmed": [
+        "feature-sidecar-false-positive",
+        "synthetic-routing-test-misclassified-as-natural-feature"
+      ],
+      "predicted_fixes_not_confirmed": [],
+      "risk_tasks_regressed": [],
+      "risk_tasks_not_regressed": [
+        "explicit-user-requested-sidecars-remain-legal"
+      ],
+      "risk_tasks_unconfirmed": [
+        "natural-feature-sidecar-regression-still-detected",
+        "synthetic-prompt-classifier-not-overbroad"
+      ],
+      "unpredicted_regressions": [],
+      "decision": "keep",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md:289-313",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md:385-400",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md:418-430",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/overview.md:28-30",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/detail/pattern-1-feature-sidecar-false-positive.md:19-47",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/change_manifest.json:5-30"
+      ],
+      "notes": "The approved workflow/docs change is supported at documentation-evidence level: the target surfaces now classify coercive '/feature' prompts as synthetic routing tests, require a second proof source before claiming sidecar overreach, and preserve legality for explicit user-requested sidecars. Behavior-level confirmation is still missing because no new natural-feature corpus sample or stable replay was run post-apply. No unexpected regression is evidenced in the changed surfaces."
+    },
+    {
+      "change_id": "chg-17-2",
+      "predicted_fixes_confirmed": [
+        "checker-suite-timeout-misclassification",
+        "ahe-validation-budget-underreported"
+      ],
+      "predicted_fixes_not_confirmed": [],
+      "risk_tasks_regressed": [],
+      "risk_tasks_not_regressed": [
+        "suite-runtime-growth-tracked-as-repo-expands",
+        "full-suite-rerun-under-generous-timeout-still-required"
+      ],
+      "risk_tasks_unconfirmed": [
+        "hidden-async-leak-not-masked-by-bigger-timeout"
+      ],
+      "unpredicted_regressions": [],
+      "decision": "keep",
+      "evidence": [
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md:314-339",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md:341-367",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md:402-416",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/evaluation.md:418-430",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/overview.md:47-68",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/analysis/detail/pattern-2-checker-time-budget.md:19-48",
+        "docs/ai/evolution/runs/iteration-017-ahe-cycle/change_manifest.json:33-58"
+      ],
+      "notes": "The approved docs/workflow change is supported at documentation-evidence level: AHE guidance now distinguishes the quick smoke check from the long checker suite, requires an explicit time budget, and records observed runtime. Post-apply evidence also shows the full suite no longer timed out in this run; the remaining failure was the expected lifecycle gate for missing change_evaluation.json. That supports the timeout-misclassification diagnosis, but it still does not behaviorally falsify a hidden async leak across future runs."
+    }
+  ]
+}
