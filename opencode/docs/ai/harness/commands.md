@@ -17,6 +17,25 @@ Criteria:
   `reviewer` instead of reviewing it as `lead`.
 - If ambiguity changes the correct flow, ask the user before delegating.
 
+### Declarative routing
+
+The prose criteria above remain as context. This table is an additional
+mechanical layer that reduces ambiguity in common cases; it does not replace
+the adaptive flexibility of `lead`.
+
+| Observable condition | Target agent |
+| --- | --- |
+| technical uncertainty, APIs, libraries, risks, or architecture | `researcher` |
+| diff, implementation, or reviewable plan | `reviewer` |
+| UX/UI, brand, layout, interaction, or visual criteria | `designer` |
+| enough context but missing plan, criteria, or tasks | `specifier` |
+| small, clear, low-risk change | `developer` |
+| ambiguity that changes the correct flow | ask the user |
+
+Adaptive fallback: the table is declarative but not exhaustive. `lead`
+retains authority to route outside the table when context justifies it,
+recording the deviation in the handoff.
+
 ## `/feature`
 
 Contract: `lead -> designer if applicable -> researcher -> specifier -> developer -> reviewer`.
@@ -54,6 +73,11 @@ Criteria:
 - `designer` and `researcher` may run in parallel only if their results are
   independent.
 - `developer` does not act without acceptance criteria.
+- If `specifier` marks `estimated_scope: large`, `lead` asks the user whether to
+  split, continue as one change, or adjust scope before delegating to
+  `developer`, and persists the approval in a durable `handoff_packet`
+  (`.opencode/handoffs/<slug>.md` with `approval_status`) so the approval state
+  survives session restarts.
 - `reviewer` does not act without a reviewable diff.
 - `lead` does not replace `reviewer`; it only consolidates the verdict and sends
   bounded fixes back to `developer` when changes are required.
@@ -114,6 +138,11 @@ Criteria:
 
 - `lead` performs a lightweight preflight and presents a `Loop Contract` with
   objective, verifiable success, scope, non-goals, validation, risks, and limits.
+- Before invoking `developer`, `lead` persists human approval in a durable
+  `handoff_packet` (`.opencode/handoffs/<slug>.md` with `approval_status`) so
+  the approval state survives session restarts. `/loop` keeps
+  `.opencode/loops/<slug>.md` as primary state; the durable `handoff_packet`
+  complements approval persistence.
 - No state is written and `developer` is not invoked before explicit human
   approval of the contract.
 - Each iteration allows one focused `developer` change; `reviewer` has exclusive
@@ -138,6 +167,29 @@ Criteria:
 - Produces a strict MVP spec with small 1-2 hour tasks.
 - Makes out of scope explicit.
 - Stops if research is not ready for spec.
+
+## Retry Policies
+
+General retry policy per agent. The limits are contractual: the LLM (scheduler)
+must respect them; there is no automatic temporal backoff (no runtime).
+
+- **`developer`**: maximum 2 attempts per delegated task. If validation fails
+  twice, `lead` escalates to `reviewer` or asks the user instead of retrying
+  indefinitely.
+- **`reviewer`**: maximum 2 rounds (generalizes the "1 pass" of `/plan`).
+  After the second round, `lead` delivers the state with risks or declares it
+  blocked.
+- **`/loop`**: maximum 3 iterations per invocation (unchanged; reference to the
+  `/loop` contract).
+- **`/loop` vs `developer` retries interaction**: the 2-attempt limit for
+  `developer` applies to delegations outside `/loop`. Inside `/loop`, the
+  3-iterations-per-invocation limit takes precedence; each iteration may
+  contain one `developer` attempt and retry counting does not accumulate across
+  iterations of the same block.
+- **Conceptual backoff**: between attempts, `lead` waits for user feedback or
+  additional evidence before retrying. There is no automatic temporal backoff;
+  the backoff is contractual: "do not retry immediately without new
+  information".
 
 ## Visible Auxiliary/Subtask Commands
 

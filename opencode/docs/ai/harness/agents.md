@@ -79,6 +79,11 @@ four specialists. Real concurrency is not promised.
 
 The complete contract lives in `docs/ai/harness/orchestrated-review.md`.
 
+## Retry invariant
+
+- Agents respect the retry limits in `commands.md` (section "Retry Policies");
+  they do not retry indefinitely.
+
 ## Task Contract and handoff_packet
 
 `specifier`, `developer`, and `reviewer` must work against a `Task Contract`
@@ -97,6 +102,27 @@ For long, multi-agent, or resumable work, the responsible agent adds a compact
 `handoff_packet` with current objective, decisions made, files read/touched,
 validation state, blockers, and next action. Long logs are referenced by path
 and are not pasted into context.
+
+### Durable `handoff_packet` (resumable HITL)
+
+The durable `handoff_packet` persists human approval state so it survives
+session restarts in commands that require HITL (`/loop`, `/feature` with
+`estimated_scope: large`). It is not a runtime primitive: persistence is
+markdown and resumption depends on the LLM reading the `handoff_packet`.
+
+- **Path**: `.opencode/handoffs/<slug>.md`. The slug is kebab-case from the first
+  5-10 words of the objective, prefixed by the command when applicable (e.g.
+  `feature-migrate-esm`, `loop-simplify-check-harness`). `/loop` keeps
+  `.opencode/loops/<slug>.md` as primary state; `.opencode/handoffs/` is the
+  durable mechanism for `/feature` with `estimated_scope: large` and other
+  commands with human approval outside `/loop`.
+- **Minimum content**: current objective, decisions made, files read/touched,
+  validation state, blockers, next action, and `approval_status`: `pending` |
+  `approved` | `rejected`.
+- **Resumption protocol**: when starting a new session, if
+  `.opencode/handoffs/<slug>.md` exists with `approval_status: pending`, `lead`
+  reads it first and presents the summary to the user before continuing or
+  discarding.
 
 `lead` must consult `docs/ai/harness/skill_registry.md` before delegating
 non-trivial work, selecting 0-3 relevant skills per handoff.

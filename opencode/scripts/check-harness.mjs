@@ -1406,6 +1406,128 @@ function checkMemoryAsHintContract() {
   }
 }
 
+
+/**
+ * Validate the HITL durable `handoff_packet` contract (ADK pattern 1).
+ * Ensures the durable handoff surface is formalized in agents.md, referenced
+ * from commands.md (/loop and /feature), visible in commands/loop.md during
+ * execution, and mentioned in the root AGENTS.md index.
+ */
+function checkHitlDurableContract() {
+  // `handoff_packet` is a code identifier; the repo writes it with backticks.
+  // Whitespace is normalized so line-wrapping in markdown doesn't break matches.
+  const includesPhrase = (text, phrase) =>
+    text.replace(/\s+/g, " ").includes(phrase.replace(/\s+/g, " "));
+  const handoffDurable = "durable `handoff_packet`";
+
+  const agentsDocs = read("docs/ai/harness/agents.md");
+  for (const token of [
+    handoffDurable,
+    "approval_status",
+    ".opencode/handoffs/",
+    "resumable",
+  ]) {
+    if (!includesPhrase(agentsDocs, token)) {
+      fail(`docs/ai/harness/agents.md: missing HITL durable token ${token}`);
+    }
+  }
+
+  const commandDocs = read("docs/ai/harness/commands.md");
+  const loopSection = commandDocs.split("## `/loop`")[1]?.split(/\n## (?![#])/)[0] || "";
+  if (!includesPhrase(loopSection, handoffDurable)) {
+    fail(`docs/ai/harness/commands.md: missing HITL durable token ${handoffDurable} in /loop`);
+  }
+
+  const featureSection = commandDocs.split("## `/feature`")[1]?.split(/\n## (?![#])/)[0] || "";
+  if (!includesPhrase(featureSection, handoffDurable)) {
+    fail(`docs/ai/harness/commands.md: missing HITL durable token ${handoffDurable} in /feature`);
+  }
+
+  const loopCommand = read("commands/loop.md");
+  for (const token of [handoffDurable, ".opencode/handoffs/"]) {
+    if (!includesPhrase(loopCommand, token)) {
+      fail(`commands/loop.md: missing HITL durable token ${token}`);
+    }
+  }
+
+  const agentsIndex = read("AGENTS.md");
+  if (!includesPhrase(agentsIndex, handoffDurable)) {
+    fail(`AGENTS.md: missing HITL durable token ${handoffDurable}`);
+  }
+}
+
+/**
+ * Validate the declarative routing table contract (ADK pattern 2).
+ * Ensures commands.md "Free-form Message" contains a declarative routing table
+ * with the expected agent targets and a fallback adaptive note, and that
+ * commands/feature.md references the table so the contract is visible during
+ * /feature execution.
+ */
+function checkRoutingDeclarativoContract() {
+  const commandDocs = read("docs/ai/harness/commands.md");
+  // Split on top-level "## " headers (not "### " sub-headers) to capture the
+  // full Free-form Message section including its "### Declarative routing" subsection.
+  const freeSection = commandDocs.split("## Free-form Message")[1]?.split(/\n## (?![#])/)[0] || "";
+
+  if (!freeSection.includes("Declarative routing")) {
+    fail("docs/ai/harness/commands.md: missing declarative routing token Declarative routing");
+  }
+
+  for (const token of [
+    "`researcher`",
+    "`reviewer`",
+    "`designer`",
+    "`specifier`",
+    "`developer`",
+    "ask the user",
+  ]) {
+    if (!freeSection.includes(token)) {
+      fail(`docs/ai/harness/commands.md: missing declarative routing token ${token}`);
+    }
+  }
+
+  if (!/adaptive fallback/i.test(freeSection)) {
+    fail("docs/ai/harness/commands.md: missing declarative routing token adaptive fallback");
+  }
+
+  const featureCommand = read("commands/feature.md");
+  if (!featureCommand.includes("Declarative routing")) {
+    fail("commands/feature.md: missing declarative routing token Declarative routing");
+  }
+}
+
+/**
+ * Validate the retry policies contract (ADK pattern 3).
+ * Ensures commands.md contains a "Retry Policies" section with explicit
+ * limits for developer (max 2 attempts), reviewer (max 2 rounds), /loop
+ * (max 3 iterations) and a conceptual backoff note. Also ensures agents.md
+ * declares the retry invariant.
+ */
+function checkRetryPoliciesContract() {
+  const commandDocs = read("docs/ai/harness/commands.md");
+  const retrySection = commandDocs.split("## Retry Policies")[1]?.split(/\n## (?![#])/)[0] || "";
+
+  if (!retrySection) {
+    fail("docs/ai/harness/commands.md: missing retry policy token Retry Policies");
+  }
+
+  for (const token of [
+    "maximum 2 attempts",
+    "maximum 2 rounds",
+    "maximum 3 iterations",
+    "backoff",
+  ]) {
+    if (!retrySection.includes(token)) {
+      fail(`docs/ai/harness/commands.md: missing retry policy token ${token}`);
+    }
+  }
+
+  const agentsDocs = read("docs/ai/harness/agents.md");
+  if (!/retry limits/i.test(agentsDocs) || !/do not retry indefinitely/i.test(agentsDocs)) {
+    fail("docs/ai/harness/agents.md: missing retry policy token retry invariant");
+  }
+}
+
 checkConfig();
 checkAgentsIndex();
 checkFrontmatter();
@@ -1437,6 +1559,9 @@ checkContextQuarantineContract();
 checkMemoryAsHintContract();
 checkPreflightAuditContract();
 checkOrchestratedReviewContract();
+checkHitlDurableContract();
+checkRoutingDeclarativoContract();
+checkRetryPoliciesContract();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");

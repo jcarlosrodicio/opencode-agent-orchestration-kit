@@ -53,6 +53,9 @@ See `docs/ai/harness/commands.md` for command contracts.
 - Do not introduce dependencies without justification.
 - Do not expand scope silently.
 - Do not close if required validation failed or was not run without saying why.
+- Human approval requiring HITL is persisted in a durable `handoff_packet`
+  (`.opencode/handoffs/<slug>.md` with `approval_status`) to survive session
+  restarts; see `docs/ai/harness/agents.md`.
 - Persistent memory/MCP context is a hint (`memory-as-hint`), not a source of
   truth. Verify against current repository/artifact state before acting when it
   affects decisions.

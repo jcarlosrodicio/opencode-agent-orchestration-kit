@@ -21,6 +21,12 @@ state_path: .opencode/loops/<slug>.md
 worktree_mode: explicit_opt_in
 ```
 
+The durable `handoff_packet` (`.opencode/handoffs/<slug>.md` with
+`approval_status`) persists human approval to survive session restarts. `/loop`
+keeps `.opencode/loops/<slug>.md` as the primary state; the durable
+`handoff_packet` complements approval persistence. See
+`docs/ai/harness/agents.md` section "Durable `handoff_packet` (resumable HITL)".
+
 Each iteration follows:
 
 ```text

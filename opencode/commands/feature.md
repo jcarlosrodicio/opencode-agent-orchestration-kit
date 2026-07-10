@@ -10,6 +10,10 @@ $ARGUMENTS
 
 Run the feature flow with explicit barriers.
 
+> Routing: for free-form messages without a command, `lead` uses the declarative
+> routing table in `docs/ai/harness/commands.md` (section "Declarative routing").
+> In `/feature` the mandatory flow below applies and takes precedence.
+
 ## Init/context policy
 
 Before the first handoff, confirm only what is needed for correct routing:

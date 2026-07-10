@@ -761,3 +761,60 @@ test("harness rejects existing review command invoking orchestrated review", () 
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("harness rejects agents.md without HITL durable approval_status", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/harness/agents.md",
+      fs.readFileSync(path.join(cwd, "docs/ai/harness/agents.md"), "utf8")
+        .replace(/approval_status/g, "approval_state"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted agents.md without HITL durable approval_status");
+    assert.match(result.stderr, /docs\/ai\/harness\/agents\.md: missing HITL durable token approval_status/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects commands.md without declarative routing table", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/harness/commands.md",
+      fs.readFileSync(path.join(cwd, "docs/ai/harness/commands.md"), "utf8")
+        .replace(/Declarative routing/g, "Implicit routing")
+        .replace(/ask the user/g, "consult the user"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted commands.md without declarative routing table");
+    assert.match(result.stderr, /docs\/ai\/harness\/commands\.md: missing declarative routing token/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects commands.md without Retry Policies section", () => {
+  const cwd = makeFixture();
+  try {
+    write(
+      "docs/ai/harness/commands.md",
+      fs.readFileSync(path.join(cwd, "docs/ai/harness/commands.md"), "utf8")
+        .replace(/Retry Policies/g, "Retries")
+        .replace(/maximum 2 attempts/g, "up to 2 attempts")
+        .replace(/maximum 2 rounds/g, "up to 2 rounds"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted commands.md without Retry Policies section");
+    assert.match(result.stderr, /docs\/ai\/harness\/commands\.md: missing retry policy token/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
