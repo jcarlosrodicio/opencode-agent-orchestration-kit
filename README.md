@@ -302,9 +302,10 @@ Try one of these commands:
 
 ## Install globally
 
-Once you are happy with the workflow, install it into your OpenCode configuration directory:
+Once you are happy with the workflow, preview and install it into your OpenCode configuration directory:
 
 ```bash
+./install.sh --dry-run
 ./install.sh
 ```
 
@@ -320,22 +321,21 @@ Use a custom target when needed:
 ./install.sh --target "$HOME/.config/opencode"
 ```
 
-The installer copies the kit’s agents, commands, skills, tools, plugins, references, and documentation into the target configuration directory.
+An explicit `--target` wins over a non-empty `OPENCODE_CONFIG_DIR`, which wins over `$HOME/.config/opencode`. Argument values are literal; `~` is not expanded.
+
+The installer inventories the payload, computes a complete plan, and tracks ownership in `TARGET/.oak/manifest.json`. A dry run performs no writes. A real operation recomputes the plan under an exclusive lock and commits through a durable journal with one rollback generation.
 
 ### Safe defaults
 
-The installer is designed to avoid destructive changes:
+Initial install preserves differing `AGENTS.md`, `opencode.json`, `tui.json`, `package.json`, and `package-lock.json` as user-owned files. Exact existing matches may be adopted without rewriting. Any other collision blocks the whole operation. A legacy installation without a manifest follows these same initial-install rules.
 
-- It creates a backup when existing files are present.
-- It preserves existing `opencode.json` unless `--force` is used.
-- It preserves existing `AGENTS.md` unless `--force` is used.
-- It preserves existing `tui.json` unless `--force` is used.
-
-Use `--force` only when you explicitly want to overwrite those files:
+Use `--force` only on initial install to authorize replacement of colliding regular files after their bytes and modes are durably backed up:
 
 ```bash
 ./install.sh --force
 ```
+
+It never authorizes directory or symlink replacement, unsafe paths, state repair, upgrade conflicts, or deletion of user-modified files.
 
 After global installation, install the OpenCode config dependencies:
 
@@ -343,25 +343,45 @@ After global installation, install the OpenCode config dependencies:
 (cd "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}" && npm install)
 ```
 
-## Uninstall
+## Upgrade, diagnose, uninstall, and rollback
 
-The repository includes an uninstall script for removing the files installed by this kit.
+Preview an ownership-safe upgrade, then apply it:
 
 ```bash
+./upgrade.sh --dry-run
+./upgrade.sh
+```
+
+Upgrade aborts before writing if an owned file is missing or modified, an obsolete owned file changed, or an unowned collision exists. Preserved files remain user-owned. When a shipped protected file changes, `doctor` reports whether the source, user copy, or both changed:
+
+```bash
+./doctor.sh
+```
+
+Doctor returns `0` for a healthy installation, `1` for safely actionable state, and `2` for invalid invocation, corrupt/unsafe state, or an unrecoverable filesystem error. To acknowledge a completed manual merge, run:
+
+```bash
+./doctor.sh --accept-preserved opencode.json
+```
+
+The command prints a full `ACK-PRESERVED` line containing the exact target/source hashes and modes. Paste that line back byte-for-byte; `yes`, a path alone, truncated values, or a stale tuple do not authorize mutation.
+
+Uninstall previews first and removes only unchanged files owned by the manifest. Modified, missing, preserved, and unrelated user files are never deleted:
+
+```bash
+./uninstall.sh --dry-run
 ./uninstall.sh
-```
-
-Use a custom target when needed:
-
-```bash
-./uninstall.sh --target "$HOME/.config/opencode"
-```
-
-Skip confirmation only when running in a controlled environment:
-
-```bash
 ./uninstall.sh --yes
 ```
+
+The most recent committed install, upgrade, acknowledgement, or uninstall can be reversed once:
+
+```bash
+./rollback.sh --dry-run
+./rollback.sh
+```
+
+If an operation was interrupted, `rollback.sh` uses the active journal to restore the pre-operation state instead. Do not delete or edit `.oak` manually: it contains ownership metadata, recovery state, and potentially sensitive exact backup bytes. See [the installation lifecycle guide](docs/installation.md) for command syntax, conflict handling, and recovery details.
 
 ## Skills
 
@@ -514,13 +534,19 @@ If your existing `tui.json` was preserved during installation, add the bundled p
 
 ## Validation
 
-Run the repository checks with:
+Run the normal local check with:
 
 ```bash
 npm run check
 ```
 
-This validates the shipped harness, including:
+This runs the fast contract checker and every bundled `node:test` suite. For a
+fast structural check while editing documentation or contracts, use
+`npm run check:quick`. Before a release, use `npm run check:release`; it performs
+a clean dependency install and also runs typechecking, the dependency audit, and
+an installation smoke test.
+
+The contract checker validates the shipped harness, including:
 
 - Configuration JSON.
 - Agent and command frontmatter.
@@ -581,9 +607,15 @@ node scripts/check-harness.mjs
 │   ├── opencode.json
 │   └── tui.json
 ├── scripts/
-│   └── check.sh
+│   ├── check.sh
+│   ├── install-smoke.sh
+│   ├── manage-installation.mjs
+│   └── manage-installation.test.mjs
+├── doctor.sh
 ├── install.sh
+├── rollback.sh
 ├── uninstall.sh
+├── upgrade.sh
 └── env.example
 ```
 
@@ -719,6 +751,8 @@ Before opening a pull request:
 ```bash
 npm run check
 ```
+
+Use `npm run check:release` for release readiness.
 
 If Docker files changed:
 

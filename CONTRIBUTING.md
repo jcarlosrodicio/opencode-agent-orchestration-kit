@@ -23,6 +23,10 @@ This repository is a starter kit, so changes should stay small, portable, and sa
    npm run check
    ```
 
+   This runs the contract checker and all bundled `node:test` suites. Use
+   `npm run check:quick` for a fast contract-only iteration and
+   `npm run check:release` before preparing a release.
+
 4. If you changed Docker files, also run:
 
    ```bash
@@ -43,6 +47,6 @@ This repository is a starter kit, so changes should stay small, portable, and sa
 ## Pull request checklist
 
 - [ ] The change is scoped and documented.
-- [ ] `npm run check` passes.
+- [ ] `npm run check` passes, including all bundled `node:test` suites.
 - [ ] No secrets, auth files, sessions, logs, or private paths are included.
 - [ ] Public behavior changes are reflected in README/docs.

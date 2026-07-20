@@ -13,7 +13,12 @@ SECURITY.md
 env.example
 install.sh
 uninstall.sh
+upgrade.sh
+doctor.sh
+rollback.sh
 package.json
+scripts/manage-installation.mjs
+scripts/manage-installation.test.mjs
 opencode/AGENTS.md
 opencode/opencode.json
 opencode/tui.json
@@ -57,7 +62,7 @@ for file in $required_files; do
   test -f "$file" || { echo "Missing required file: $file" >&2; exit 1; }
 done
 
-for file in install.sh uninstall.sh scripts/check.sh; do
+for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh; do
   test -x "$file" || { echo "Not executable: $file" >&2; exit 1; }
 done
 

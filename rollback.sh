@@ -2,4 +2,4 @@
 set -euo pipefail
 
 root="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-exec node "$root/scripts/manage-installation.mjs" install "$@"
+exec node "$root/scripts/manage-installation.mjs" rollback "$@"

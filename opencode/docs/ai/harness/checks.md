@@ -12,17 +12,21 @@ This is the cheap local smoke check for the harness. It should remain the
 default low-cost validation before closing small documentation or structural
 changes.
 
-For the full checker suite, also run:
+For all bundled script tests from this public repository, run:
 
 ```bash
-(cd opencode && node --test scripts/check-harness.test.mjs)
+npm run unit-and-script-tests
 ```
 
-From this public repository, run:
+The normal local check combines both paths:
 
 ```bash
 npm run check
 ```
+
+Use `npm run check:quick` when only the fast contract checker is needed. Use
+`npm run check:release` for a clean dependency install followed by contracts,
+all script tests, typechecking, dependency audit, and installation smoke.
 
 The harness check validates:
 

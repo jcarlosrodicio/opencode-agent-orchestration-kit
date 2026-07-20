@@ -5,8 +5,15 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "check": "bash scripts/check.sh",
-    "lint": "bash scripts/check.sh",
+    "contract-check": "bash scripts/check.sh",
+    "unit-and-script-tests": "node --test scripts/*.test.mjs opencode/scripts/*.test.mjs",
+    "typecheck": "npm --prefix opencode exec -- tsc --noEmit --jsx preserve --jsxImportSource @opentui/solid --module NodeNext --moduleResolution NodeNext --target ES2022 --strict --skipLibCheck opencode/plugins/token-tree-usage.tsx",
+    "dependency-audit": "npm --prefix opencode audit --omit=dev --audit-level=moderate",
+    "installation-smoke": "bash scripts/install-smoke.sh",
+    "check:quick": "npm run contract-check",
+    "check": "npm run contract-check && npm run unit-and-script-tests",
+    "check:release": "npm --prefix opencode ci && npm run check && npm run typecheck && npm run dependency-audit && npm run installation-smoke",
+    "lint": "npm run contract-check",
     "format": "echo 'No formatter configured. Markdown and shell are intentionally plain.'"
   }
 }

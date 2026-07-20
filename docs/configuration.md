@@ -19,7 +19,11 @@ The default permissions are conservative: reads are allowed, edits and bash ask 
 
 The default agent is `lead`, acting as a bounded router for free-form messages. For small, clear, low-risk work, lead delegates direct mode to `developer`; for technical uncertainty it delegates to `researcher`; for visual or interaction work it delegates to `designer`; and for planning gaps it delegates to `specifier`. Slash commands still route to their explicit agents, for example `/feature` and `/plan` to `lead`, `/scope` to `scoper`, and `/design` to `designer`.
 
-Run `node scripts/check-harness.mjs` from an installed OpenCode config directory to validate the core harness contracts. In this repository, `npm run check` runs the same validator against `opencode/`.
+Run `node scripts/check-harness.mjs` from an installed OpenCode config directory
+to validate the core harness contracts. In this repository,
+`npm run check:quick` runs the contract path against `opencode/`, while
+`npm run check` also runs every bundled `node:test` suite. Use
+`npm run check:release` for the complete release-readiness path.
 
 The bundled TUI token plugin is registered in `tui.json`. It shows lead token
 usage and total usage across child/subagent sessions when OpenCode exposes that

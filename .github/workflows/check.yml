@@ -21,21 +21,21 @@ jobs:
         with:
           node-version: 24
 
-      - name: Repository check
-        run: npm run check
+      - name: Contract check
+        run: npm run contract-check
+
+      - name: Unit and script tests
+        run: npm run unit-and-script-tests
 
       - name: Install OpenCode tool dependencies
         working-directory: opencode
         run: npm ci
 
       - name: Audit OpenCode tool dependencies
-        working-directory: opencode
-        run: npm audit --omit=dev --audit-level=moderate
+        run: npm run dependency-audit
 
       - name: Typecheck TUI token plugin
-        working-directory: opencode
-        run: npx tsc --noEmit --jsx preserve --jsxImportSource @opentui/solid --module NodeNext --moduleResolution NodeNext --target ES2022 --strict --skipLibCheck plugins/token-tree-usage.tsx
+        run: npm run typecheck
 
-      - name: Smoke import OpenCode plugin
-        working-directory: opencode
-        run: node --input-type=module -e "import('@opencode-ai/plugin').then(() => console.log('plugin import ok'))"
+      - name: Installation smoke
+        run: npm run installation-smoke

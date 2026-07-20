@@ -56,10 +56,13 @@ Expected flow: designer checks docs, optionally uses Impeccable, then uses Open 
 
 Expected flow: lead decides research/design needs, then specifier -> developer -> reviewer.
 
-## 8. Validate harness contracts
+## 8. Validate the harness
 
 ```bash
 npm run check
 ```
 
-The check validates config JSON, agent/command frontmatter, the default `lead` router contract, `/feature` sidecar boundaries, the `/plan` contract, and the agent-readable docs under `opencode/docs/ai/harness/`.
+The check validates the contracts and runs every bundled `node:test` suite. Use
+`npm run check:quick` for the contract-only path or `npm run check:release` for
+the dependency install, typecheck, audit, and installation smoke used for
+release readiness.
