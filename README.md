@@ -325,6 +325,18 @@ An explicit `--target` wins over a non-empty `OPENCODE_CONFIG_DIR`, which wins o
 
 The installer inventories the payload, computes a complete plan, and tracks ownership in `TARGET/.oak/manifest.json`. A dry run performs no writes. A real operation recomputes the plan under an exclusive lock and commits through a durable journal with one rollback generation.
 
+The root `package.json` is the canonical kit-version source. Display the same
+identity through the manager or any lifecycle wrapper:
+
+```bash
+node scripts/version.mjs
+./install.sh --version
+./upgrade.sh --version
+./doctor.sh --version
+./uninstall.sh --version
+./rollback.sh --version
+```
+
 ### Safe defaults
 
 Initial install preserves differing `AGENTS.md`, `opencode.json`, `tui.json`, `package.json`, and `package-lock.json` as user-owned files. Exact existing matches may be adopted without rewriting. Any other collision blocks the whole operation. A legacy installation without a manifest follows these same initial-install rules.
@@ -357,6 +369,14 @@ Upgrade aborts before writing if an owned file is missing or modified, an obsole
 ```bash
 ./doctor.sh
 ```
+
+Upgrade also compares the local source version with `kit_version` in the active
+manifest. A newer source may upgrade; equal version and payload is a no-op;
+equal version with a different payload is blocked as an identity contradiction;
+and an older source is blocked to prevent downgrade. `doctor` reports
+`not-installed`, `current`, `upgrade-available`, `source-older`,
+`same-version-different-payload`, or `invalid-version-state` without consulting
+the network.
 
 Doctor returns `0` for a healthy installation, `1` for safely actionable state, and `2` for invalid invocation, corrupt/unsafe state, or an unrecoverable filesystem error. To acknowledge a completed manual merge, run:
 
@@ -545,6 +565,17 @@ fast structural check while editing documentation or contracts, use
 `npm run check:quick`. Before a release, use `npm run check:release`; it performs
 a clean dependency install and also runs typechecking, the dependency audit, and
 an installation smoke test.
+
+Validate only the canonical identity and current release note with:
+
+```bash
+npm run check:version
+node scripts/version.mjs --check-tag v1.0.27
+```
+
+Tag validation compares an explicitly supplied tag with the package identity.
+It does not create or push a tag, publish npm content, or create a hosted
+release. Those remain separate manual, explicitly approved steps.
 
 The contract checker validates the shipped harness, including:
 

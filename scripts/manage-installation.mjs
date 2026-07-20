@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { parseStableVersion, readCanonicalVersion, formatVersion, compareStableVersions } from "./version.mjs";
 
 export const SCHEMA_VERSION = 1;
 export const PROTECTED_ROOT_FILES = [
@@ -216,7 +217,7 @@ function assertTimestamp(value, label) {
 }
 
 const MANIFEST_KEYS = [
-  "schema_version", "manager", "payload_sha256", "created_at", "updated_at",
+  "schema_version", "manager", "kit_version", "payload_sha256", "created_at", "updated_at",
   "last_transaction_id", "owned_files", "preserved_files",
 ];
 const OWNED_KEYS = ["path", "sha256", "mode"];
@@ -232,6 +233,11 @@ export function validateManifest(manifest) {
   assertExactKeys(manifest, MANIFEST_KEYS, "manifest");
   if (manifest.schema_version !== SCHEMA_VERSION) throw invalid("manifest schema_version must be 1");
   if (manifest.manager !== "opencode-agent-orchestration-kit") throw invalid("manifest manager is invalid");
+  try {
+    parseStableVersion(manifest.kit_version);
+  } catch (error) {
+    throw invalid(`manifest kit_version is invalid: ${error.message}`);
+  }
   assertHash(manifest.payload_sha256, "manifest payload_sha256");
   assertTimestamp(manifest.created_at, "manifest created_at");
   assertTimestamp(manifest.updated_at, "manifest updated_at");
@@ -534,6 +540,7 @@ function makeNextManifest({ inspection, ownedFiles, preservedFiles, options }) {
   return {
     schema_version: SCHEMA_VERSION,
     manager: "opencode-agent-orchestration-kit",
+    kit_version: parseStableVersion(options.kitVersion).canonical,
     payload_sha256: inspection.source.payloadSha256,
     created_at: inspection.manifest?.created_at ?? now,
     updated_at: now,
@@ -541,6 +548,18 @@ function makeNextManifest({ inspection, ownedFiles, preservedFiles, options }) {
     owned_files: ownedFiles.sort((left, right) => left.path.localeCompare(right.path)),
     preserved_files: preservedFiles.sort((left, right) => left.path.localeCompare(right.path)),
   };
+}
+
+function classifyVersionState(sourceVersion, manifest, sourcePayloadSha256) {
+  const source = parseStableVersion(sourceVersion).canonical;
+  if (!manifest) return "not-installed";
+  const installed = parseStableVersion(manifest.kit_version).canonical;
+  const comparison = compareStableVersions(source, installed);
+  if (comparison > 0) return "upgrade-available";
+  if (comparison < 0) return "source-older";
+  return manifest.payload_sha256 === sourcePayloadSha256
+    ? "current"
+    : "same-version-different-payload";
 }
 
 export function buildPlan({ command, inspection, options = {} }) {
@@ -557,6 +576,12 @@ export function buildPlan({ command, inspection, options = {} }) {
   const nextOwned = [];
   const nextPreserved = [];
   const allPaths = new Set([...sourceByPath.keys(), ...ownedByPath.keys(), ...preservedByPath.keys()]);
+  const versionState = command === "upgrade"
+    ? classifyVersionState(options.kitVersion, inspection.manifest, inspection.source.payloadSha256)
+    : null;
+  if (versionState === "source-older" || versionState === "same-version-different-payload") {
+    blockers.push({ path: "kit_version", classification: versionState });
+  }
 
   for (const managedPath of [...allPaths].sort()) {
     const source = sourceByPath.get(managedPath);
@@ -664,7 +689,8 @@ export function buildPlan({ command, inspection, options = {} }) {
   const nextManifest = command === "uninstall" ? null : makeNextManifest({ inspection, ownedFiles: nextOwned, preservedFiles: nextPreserved, options });
   const hasWork = command !== "upgrade"
     || entries.length > 0
-    || inspection.manifest.payload_sha256 !== inspection.source.payloadSha256;
+    || inspection.manifest.payload_sha256 !== inspection.source.payloadSha256
+    || versionState === "upgrade-available";
   return {
     command,
     entries,
@@ -875,6 +901,13 @@ export function createInstallationManager(options) {
   const pid = options.pid ?? process.pid;
   const stdin = options.stdin ?? process.stdin;
   const stdout = options.stdout ?? process.stdout;
+  const versionProvider = options.versionProvider ?? (() => {
+    throw invalid("canonical kit version provider is required");
+  });
+
+  function currentKitVersion() {
+    return parseStableVersion(versionProvider()).canonical;
+  }
 
   function acquireLock(targetRoot, transactionId, command) {
     const oakPath = path.join(targetRoot, ".oak");
@@ -1140,28 +1173,77 @@ export function createInstallationManager(options) {
   }
 
   function doctorReport(targetRoot) {
+    const oakPath = path.join(targetRoot, ".oak");
+    const manifestPath = path.join(oakPath, "manifest.json");
+    const manifestPresent = Boolean(lstatIfExists(manifestPath, fsOps));
     const operation = operationalState(targetRoot);
+    const activeTransaction = operation.transaction;
+    const activeLock = operation.lock;
+    const residue = ["rollback.next", "rollback.previous"].filter((name) => lstatIfExists(path.join(oakPath, name), fsOps));
+    const common = {
+      blockers: [],
+      warnings: [],
+      activeTransaction: Boolean(activeTransaction),
+      activeLock: activeLock ? classifyExistingLock(activeLock) : null,
+      rollbackAvailable: Boolean(lstatIfExists(path.join(oakPath, "rollback", "transaction.json"), fsOps)),
+      cleanupResidue: residue,
+    };
+    let sourceVersion = null;
+    let sourceInvalid = false;
+    try {
+      sourceVersion = parseStableVersion(currentKitVersion()).canonical;
+    } catch (error) {
+      if (error.code !== "INVALID_VERSION") throw error;
+      sourceInvalid = true;
+    }
+    let validatedManifest = null;
+    try {
+      validatedManifest = readManifest(targetRoot, fsOps);
+    } catch (error) {
+      if (!manifestPresent || error.code !== "INVALID_INVOCATION") throw error;
+      return {
+        exitCode: 2,
+        report: {
+          ...common,
+          manifest: "invalid",
+          blockers: [{ path: "kit_version", classification: "invalid-installed-version-state" }],
+          sourceVersion,
+          installedVersion: null,
+          versionState: "invalid-version-state",
+        },
+      };
+    }
+    const installedVersion = validatedManifest?.kit_version ?? null;
+    if (sourceInvalid) return {
+      exitCode: 2,
+      report: {
+        ...common,
+        manifest: validatedManifest ? "valid" : "absent",
+        blockers: [{ path: "package.json", classification: "invalid-source-version-state" }],
+        sourceVersion: null,
+        installedVersion,
+        versionState: "invalid-version-state",
+      },
+    };
     const inspection = inspectInstallation({ sourceRoot, targetRoot, deps: { fsOps } });
     if (!inspection.manifest) return {
       exitCode: 1,
       report: {
+        ...common,
         manifest: "absent",
-        blockers: [],
-        warnings: [],
-        activeTransaction: Boolean(operation.transaction),
-        activeLock: operation.lock ? classifyExistingLock(operation.lock) : null,
+        sourceVersion,
+        installedVersion: null,
+        versionState: "not-installed",
       },
     };
-    const plan = buildPlan({ command: "upgrade", inspection, options: { clock, transactionId: "doctor-read-only" } });
-    const oakPath = path.join(targetRoot, ".oak");
-    const activeTransaction = operation.transaction;
-    const activeLock = operation.lock;
-    const residue = ["rollback.next", "rollback.previous"].filter((name) => lstatIfExists(path.join(oakPath, name), fsOps));
+    const versionState = classifyVersionState(sourceVersion, inspection.manifest, inspection.source.payloadSha256);
+    const plan = buildPlan({ command: "upgrade", inspection, options: { clock, transactionId: "doctor-read-only", kitVersion: sourceVersion } });
     const actionableWarnings = new Set([
       "preserved-source-changed", "preserved-both-changed", "preserved-missing",
       "obsolete-preserved-present", "obsolete-preserved-missing",
     ]);
-    const actionable = plan.blockers.length > 0
+    const actionable = versionState !== "current"
+      || plan.blockers.length > 0
       || plan.warnings.some((warning) => actionableWarnings.has(warning.classification))
       || activeTransaction || activeLock || residue.length > 0;
     return {
@@ -1174,6 +1256,9 @@ export function createInstallationManager(options) {
         activeLock: activeLock ? classifyExistingLock(activeLock) : null,
         rollbackAvailable: Boolean(lstatIfExists(path.join(oakPath, "rollback", "transaction.json"), fsOps)),
         cleanupResidue: residue,
+        sourceVersion,
+        installedVersion,
+        versionState,
       },
     };
   }
@@ -1193,6 +1278,8 @@ export function createInstallationManager(options) {
     const transactionId = newTransactionId();
     const inspection = inspectInstallation({ sourceRoot, targetRoot, deps: { fsOps } });
     if (!inspection.manifest) throw invalid("accept-preserved requires a valid manifest");
+    const versionState = classifyVersionState(currentKitVersion(), inspection.manifest, inspection.source.payloadSha256);
+    if (versionState !== "current") return { exitCode: 1, versionState };
     const preserved = inspection.manifest.preserved_files.find((entry) => entry.path === preservedPath);
     if (!preserved) throw invalid("accept-preserved path is not preserved");
     const source = inspection.source.entries.find((entry) => entry.path === preservedPath);
@@ -1204,7 +1291,7 @@ export function createInstallationManager(options) {
     const supplied = await readAuthorizationLine();
     if (supplied !== authorization) return { exitCode: 1, authorization };
     failpoint("after-ack-confirmation");
-    const globalPlan = buildPlan({ command: "upgrade", inspection, options: { clock, transactionId } });
+    const globalPlan = buildPlan({ command: "upgrade", inspection, options: { clock, transactionId, kitVersion: currentKitVersion() } });
     if (!globalPlan.canApply) return { exitCode: 1, plan: globalPlan, authorization };
     acquireLock(targetRoot, transactionId, "accept-preserved");
     try {
@@ -1281,7 +1368,8 @@ export function createInstallationManager(options) {
       }
       const transactionId = newTransactionId();
       const inspection = inspectInstallation({ sourceRoot, targetRoot, deps: { fsOps } });
-      const plan = buildPlan({ command, inspection, options: { ...runOptions, clock, transactionId } });
+      const kitVersion = currentKitVersion();
+      const plan = buildPlan({ command, inspection, options: { ...runOptions, clock, transactionId, kitVersion } });
       if (!plan.canApply) return { exitCode: 1, plan };
       if (runOptions.dryRun) return { exitCode: 0, plan };
       if (command === "upgrade" && !plan.hasWork) return { exitCode: 0, plan };
@@ -1289,7 +1377,7 @@ export function createInstallationManager(options) {
       acquireLock(targetRoot, transactionId, command);
       invocationLockOwned = true;
       const lockedInspection = inspectInstallation({ sourceRoot, targetRoot, deps: { fsOps } });
-      const lockedPlan = buildPlan({ command, inspection: lockedInspection, options: { ...runOptions, clock, transactionId } });
+      const lockedPlan = buildPlan({ command, inspection: lockedInspection, options: { ...runOptions, clock, transactionId, kitVersion } });
       if (lockedPlan.fingerprint !== plan.fingerprint || !lockedPlan.canApply) {
         releaseLock(targetRoot);
         return { exitCode: 1, plan: lockedPlan };
@@ -1328,6 +1416,18 @@ export async function main(argv, options = {}) {
   const stderr = options.stderr ?? process.stderr;
   const input = options.stdin ?? process.stdin;
   try {
+    const directVersion = argv[0] === "--version";
+    const wrapperVersion = Object.hasOwn(USAGE, argv[0]) && argv[1] === "--version";
+    if (directVersion || wrapperVersion) {
+      const expectedLength = directVersion ? 1 : 2;
+      if (argv.length !== expectedLength) throw invalid("--version must be used alone");
+      const repositoryRoot = options.sourceRoot
+        ? path.dirname(options.sourceRoot)
+        : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+      const version = options.versionProvider?.() ?? readCanonicalVersion(repositoryRoot);
+      stdout.write(`${formatVersion(version)}\n`);
+      return 0;
+    }
     const [command, ...arguments_] = argv;
     const parsed = parseCliArgs(command, arguments_);
     if (parsed.help) {
@@ -1336,8 +1436,10 @@ export async function main(argv, options = {}) {
     }
     const targetRoot = resolveTarget(parsed, options.env ?? process.env);
     const sourceRoot = options.sourceRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "opencode");
+    const repositoryRoot = path.dirname(sourceRoot);
     const manager = createInstallationManager({
       sourceRoot,
+      versionProvider: options.versionProvider ?? (() => readCanonicalVersion(repositoryRoot)),
       clock: options.clock,
       transactionId: options.transactionId,
       pidProbe: options.pidProbe,
@@ -1367,6 +1469,16 @@ export async function main(argv, options = {}) {
     if (result.error) stderr.write(`${result.error.message}\n`);
     else if (result.exitCode === 1 && result.plan?.blockers?.length) {
       for (const blocker of result.plan.blockers) stderr.write(`Conflict: ${blocker.path} (${blocker.classification})\n`);
+    } else if (command === "doctor" && !parsed.acceptPreserved && result.report) {
+      const actions = {
+        "not-installed": "run install --dry-run",
+        current: "none",
+        "upgrade-available": "run upgrade --dry-run",
+        "source-older": "use a source checkout at least as new as the installation",
+        "same-version-different-payload": "fix the release identity mismatch",
+        "invalid-version-state": "repair the invalid version state",
+      };
+      stdout.write(`doctor: ${result.report.versionState}; source=${result.report.sourceVersion ?? "invalid"}; installed=${result.report.installedVersion ?? "none"}; action=${actions[result.report.versionState]}\n`);
     } else if (command !== "doctor" || !parsed.acceptPreserved) {
       const changes = result.plan?.entries?.length ?? 0;
       stdout.write(`${command}: ${result.exitCode === 0 ? "ok" : "action required"}${result.plan ? ` (${changes} planned changes)` : ""}\n`);

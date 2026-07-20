@@ -59,6 +59,8 @@ Expected flow: lead decides research/design needs, then specifier -> developer -
 ## 8. Validate the harness
 
 ```bash
+node scripts/version.mjs
+npm run check:version
 npm run check
 ```
 
@@ -66,3 +68,7 @@ The check validates the contracts and runs every bundled `node:test` suite. Use
 `npm run check:quick` for the contract-only path or `npm run check:release` for
 the dependency install, typecheck, audit, and installation smoke used for
 release readiness.
+
+For an explicitly planned release tag, validate it locally with
+`node scripts/version.mjs --check-tag v1.0.27`. This check does not create,
+push, or publish the tag or a hosted release.

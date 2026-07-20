@@ -1,10 +1,11 @@
 {
   "name": "opencode-agent-orchestration-kit",
-  "version": "0.1.0",
+  "version": "1.0.27",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
+    "check:version": "node scripts/version.mjs --check",
     "contract-check": "bash scripts/check.sh",
     "unit-and-script-tests": "node --test scripts/*.test.mjs opencode/scripts/*.test.mjs",
     "typecheck": "npm --prefix opencode exec -- tsc --noEmit --jsx preserve --jsxImportSource @opentui/solid --module NodeNext --moduleResolution NodeNext --target ES2022 --strict --skipLibCheck opencode/plugins/token-tree-usage.tsx",

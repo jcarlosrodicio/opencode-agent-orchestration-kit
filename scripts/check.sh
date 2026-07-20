@@ -4,6 +4,8 @@ set -euo pipefail
 root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$root"
 
+kit_version="$(node -p "require('./package.json').version")"
+
 required_files="
 README.md
 LICENSE
@@ -17,8 +19,11 @@ upgrade.sh
 doctor.sh
 rollback.sh
 package.json
+scripts/version.mjs
+scripts/version.test.mjs
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
+docs/releases/v${kit_version}.md
 opencode/AGENTS.md
 opencode/opencode.json
 opencode/tui.json
@@ -65,6 +70,8 @@ done
 for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh; do
   test -x "$file" || { echo "Not executable: $file" >&2; exit 1; }
 done
+
+node scripts/version.mjs --check
 
 node -e "JSON.parse(require('fs').readFileSync('opencode/opencode.json','utf8')); JSON.parse(require('fs').readFileSync('docker/open-design/opencode-od/opencode.json','utf8')); console.log('json ok')"
 (cd opencode && node scripts/check-harness.mjs)

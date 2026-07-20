@@ -58,6 +58,7 @@ function validManifest(overrides = {}) {
   return {
     schema_version: 1,
     manager: "opencode-agent-orchestration-kit",
+    kit_version: "1.0.27",
     payload_sha256: HASH_A,
     created_at: "2026-07-20T00:00:00.000Z",
     updated_at: "2026-07-20T00:00:00.000Z",
@@ -155,6 +156,7 @@ function planFixture(command, sourceRoot, targetRoot, options = {}) {
     options: {
       clock: () => new Date("2026-07-20T00:00:00.000Z"),
       transactionId: "tx-plan",
+      kitVersion: command === "upgrade" ? "1.0.28" : "1.0.27",
       ...options,
     },
   });
@@ -163,6 +165,7 @@ function planFixture(command, sourceRoot, targetRoot, options = {}) {
 function managerFixture(sourceRoot, overrides = {}) {
   return createInstallationManager({
     sourceRoot,
+    versionProvider: () => "1.0.27",
     ...deterministicDeps(),
     ...overrides,
   });
@@ -586,6 +589,302 @@ test("[S001] clean install dry-run performs zero writes", async (t) => {
   assert.equal(fs.existsSync(targetRoot), false);
 });
 
+test("[V012] initial install persists kit version in active and rollback manifests", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const result = await managerFixture(sourceRoot).run("install", { targetRoot });
+  assert.equal(result.exitCode, 0);
+  const active = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"), "utf8"));
+  const rollback = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "rollback", "transaction.json"), "utf8"));
+  assert.equal(active.kit_version, "1.0.27");
+  assert.equal(rollback.next_manifest.kit_version, "1.0.27");
+});
+
+test("[V013] install dry-run reports kit version and leaves target absent", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const result = await managerFixture(sourceRoot).run("install", { targetRoot, dryRun: true });
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.plan.nextManifest.kit_version, "1.0.27");
+  assert.equal(fs.existsSync(targetRoot), false);
+});
+
+test("[V014] manifest kit version is required and canonical", () => {
+  const missing = validManifest();
+  delete missing.kit_version;
+  assert.throws(() => validateManifest(missing), /kit_version/i);
+  for (const kitVersion of ["v1.0.27", "01.0.27", "1.0.27-rc.1", "1.0"]) {
+    assert.throws(() => validateManifest(validManifest({ kit_version: kitVersion })), /version/i);
+  }
+});
+
+test("[V015] manifest digest includes kit version", () => {
+  assert.notEqual(
+    manifestDigest(validManifest({ kit_version: "1.0.26" })),
+    manifestDigest(validManifest({ kit_version: "1.0.27" })),
+  );
+});
+
+test("[V016] a newer source version commits a manifest-only upgrade", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.26" }).run("install", { targetRoot });
+
+  const result = await managerFixture(sourceRoot).run("upgrade", { targetRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(result.transaction.operations, []);
+  assert.equal(result.plan.hasWork, true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"), "utf8"));
+  assert.equal(manifest.kit_version, "1.0.27");
+});
+
+test("[V017] equal version and payload is a no-op", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const manager = managerFixture(sourceRoot);
+  await manager.run("install", { targetRoot });
+  const before = fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"));
+
+  const result = await manager.run("upgrade", { targetRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.plan.hasWork, false);
+  assert.equal(result.transaction, undefined);
+  assert.deepEqual(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json")), before);
+});
+
+test("[V018] equal version with different payload blocks before writes", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "old\n");
+  const manager = managerFixture(sourceRoot);
+  await manager.run("install", { targetRoot });
+  const manifestPath = path.join(targetRoot, ".oak", "manifest.json");
+  const rollbackPath = path.join(targetRoot, ".oak", "rollback", "transaction.json");
+  const beforeManifest = fs.readFileSync(manifestPath);
+  const beforeRollback = fs.readFileSync(rollbackPath);
+  put(sourceRoot, "agents/lead.md", "new\n");
+
+  const result = await manager.run("upgrade", { targetRoot });
+
+  assert.equal(result.exitCode, 1);
+  assert.deepEqual(result.plan.blockers.map((entry) => entry.classification), ["same-version-different-payload"]);
+  assert.equal(fs.readFileSync(path.join(targetRoot, "agents/lead.md"), "utf8"), "old\n");
+  assert.deepEqual(fs.readFileSync(manifestPath), beforeManifest);
+  assert.deepEqual(fs.readFileSync(rollbackPath), beforeRollback);
+  assert.equal(fs.existsSync(path.join(targetRoot, ".oak", "lock.json")), false);
+});
+
+test("[V019] an older source version blocks before writes", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  await managerFixture(sourceRoot).run("install", { targetRoot });
+  const manifestPath = path.join(targetRoot, ".oak", "manifest.json");
+  const before = fs.readFileSync(manifestPath);
+
+  const result = await managerFixture(sourceRoot, { versionProvider: () => "1.0.26" }).run("upgrade", { targetRoot });
+
+  assert.equal(result.exitCode, 1);
+  assert.deepEqual(result.plan.blockers.map((entry) => entry.classification), ["source-older"]);
+  assert.deepEqual(fs.readFileSync(manifestPath), before);
+  assert.equal(fs.existsSync(path.join(targetRoot, ".oak", "lock.json")), false);
+});
+
+test("[V021] doctor reports deterministic version states with additive safe fields", async (t) => {
+  const cases = [
+    { name: "current", installed: "1.0.27", source: "1.0.27", mutateSource: false, exitCode: 0 },
+    { name: "upgrade-available", installed: "1.0.26", source: "1.0.27", mutateSource: false, exitCode: 1 },
+    { name: "source-older", installed: "1.0.27", source: "1.0.26", mutateSource: false, exitCode: 1 },
+    { name: "same-version-different-payload", installed: "1.0.27", source: "1.0.27", mutateSource: true, exitCode: 1 },
+  ];
+  for (const scenario of cases) {
+    await t.test(scenario.name, async (child) => {
+      const { sourceRoot, targetRoot } = makeFixture(child);
+      put(sourceRoot, "agents/lead.md", "old\n");
+      await managerFixture(sourceRoot, { versionProvider: () => scenario.installed }).run("install", { targetRoot });
+      if (scenario.mutateSource) put(sourceRoot, "agents/lead.md", "new\n");
+
+      const result = await managerFixture(sourceRoot, { versionProvider: () => scenario.source }).run("doctor", { targetRoot });
+
+      assert.equal(result.exitCode, scenario.exitCode);
+      assert.equal(result.report.sourceVersion, scenario.source);
+      assert.equal(result.report.installedVersion, scenario.installed);
+      assert.equal(result.report.versionState, scenario.name);
+      for (const key of ["manifest", "blockers", "warnings", "activeTransaction", "activeLock", "rollbackAvailable", "cleanupResidue"]) {
+        assert.ok(Object.hasOwn(result.report, key), `missing safe report key ${key}`);
+      }
+    });
+  }
+
+  await t.test("invalid-version-state", async (child) => {
+    const { sourceRoot, targetRoot } = makeFixture(child);
+    put(sourceRoot, "agents/lead.md", "lead\n");
+    await managerFixture(sourceRoot).run("install", { targetRoot });
+    const result = await managerFixture(sourceRoot, { versionProvider: () => "v1.0.27" }).run("doctor", { targetRoot });
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.report.sourceVersion, null);
+    assert.equal(result.report.installedVersion, "1.0.27");
+    assert.equal(result.report.versionState, "invalid-version-state");
+  });
+});
+
+test("[V022] doctor distinguishes absent from present invalid manifests", async (t) => {
+  await t.test("absent", async (child) => {
+    const { sourceRoot, targetRoot } = makeFixture(child);
+    put(sourceRoot, "agents/lead.md", "lead\n");
+    const result = await managerFixture(sourceRoot).run("doctor", { targetRoot });
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.report.manifest, "absent");
+    assert.equal(result.report.sourceVersion, "1.0.27");
+    assert.equal(result.report.installedVersion, null);
+    assert.equal(result.report.versionState, "not-installed");
+  });
+
+  for (const [name, bytes] of [["malformed", "{bad\n"], ["invalid-version", `${JSON.stringify(validManifest({ kit_version: "v1.0.27" }))}\n`]]) {
+    await t.test(name, async (child) => {
+      const { sourceRoot, targetRoot } = makeFixture(child);
+      put(sourceRoot, "agents/lead.md", "lead\n");
+      fs.mkdirSync(path.join(targetRoot, ".oak"), { recursive: true });
+      fs.writeFileSync(path.join(targetRoot, ".oak", "manifest.json"), bytes);
+      const result = await managerFixture(sourceRoot).run("doctor", { targetRoot });
+      assert.equal(result.exitCode, 2);
+      assert.equal(result.report.manifest, "invalid");
+      assert.equal(result.report.sourceVersion, "1.0.27");
+      assert.equal(result.report.installedVersion, null);
+      assert.equal(result.report.versionState, "invalid-version-state");
+      assert.notEqual(result.report.versionState, "not-installed");
+    });
+  }
+});
+
+test("[V020] acknowledgement cannot bypass a newer source transition", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  const source = put(sourceRoot, "opencode.json", "source\n");
+  const target = put(targetRoot, "opencode.json", "user\n", 0o600);
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.26" }).run("install", { targetRoot });
+  const manifestPath = path.join(targetRoot, ".oak", "manifest.json");
+  const before = fs.readFileSync(manifestPath);
+  const output = capture();
+
+  const result = await managerFixture(sourceRoot, {
+    stdin: Readable.from([`${ackLine(source, target)}\n`]), stdout: output.stream,
+  }).run("doctor", { targetRoot, acceptPreserved: "opencode.json" });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.versionState, "upgrade-available");
+  assert.equal(output.read(), "");
+  assert.deepEqual(fs.readFileSync(manifestPath), before);
+});
+
+test("[V023] version upgrade snapshots record both identities", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.26" }).run("install", { targetRoot });
+  const result = await managerFixture(sourceRoot).run("upgrade", { targetRoot });
+  const rollback = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "rollback", "transaction.json"), "utf8"));
+
+  assert.equal(result.transaction.previous_manifest.kit_version, "1.0.26");
+  assert.equal(result.transaction.next_manifest.kit_version, "1.0.27");
+  assert.equal(rollback.previous_manifest.kit_version, "1.0.26");
+  assert.equal(rollback.next_manifest.kit_version, "1.0.27");
+});
+
+test("[V024] rollback restores the previous kit version", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.26" }).run("install", { targetRoot });
+  await managerFixture(sourceRoot).run("upgrade", { targetRoot });
+
+  const result = await managerFixture(sourceRoot).run("rollback", { targetRoot });
+  const manifest = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"), "utf8"));
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(manifest.kit_version, "1.0.26");
+});
+
+test("[V025] rollback of the initial versioned install restores manifest absence", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const manager = managerFixture(sourceRoot);
+  await manager.run("install", { targetRoot });
+
+  assert.equal((await manager.run("rollback", { targetRoot })).exitCode, 0);
+  assert.equal(fs.existsSync(path.join(targetRoot, ".oak", "manifest.json")), false);
+});
+
+test("[V026] interrupted recovery uses journal versions when the provider changes", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.26" }).run("install", { targetRoot });
+  const interrupted = await managerFixture(sourceRoot, {
+    failpoint(name) { if (name === "after-journal-create") throw new Error("crash"); },
+  }).run("upgrade", { targetRoot });
+  assert.equal(interrupted.exitCode, 2);
+
+  const recovered = await managerFixture(sourceRoot, { versionProvider: () => "1.0.28" }).run("rollback", { targetRoot });
+  const manifest = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"), "utf8"));
+  assert.equal(recovered.exitCode, 0);
+  assert.equal(manifest.kit_version, "1.0.26");
+});
+
+test("[V027] corrupt version state remains fail-closed across diagnostics and recovery", async (t) => {
+  await t.test("doctor retains lock evidence", async (child) => {
+    const { sourceRoot, targetRoot } = makeFixture(child);
+    put(sourceRoot, "agents/lead.md", "lead\n");
+    fs.mkdirSync(path.join(targetRoot, ".oak"), { recursive: true });
+    fs.writeFileSync(path.join(targetRoot, ".oak", "manifest.json"), `${JSON.stringify(validManifest({ kit_version: "v1.0.27" }))}\n`);
+    fs.writeFileSync(path.join(targetRoot, ".oak", "lock.json"), `${JSON.stringify({
+      transaction_id: "tx-live", pid: process.pid, command: "upgrade", created_at: "2026-07-20T00:00:00.000Z",
+    })}\n`);
+    const result = await managerFixture(sourceRoot, { pidProbe: () => ({ alive: true }) }).run("doctor", { targetRoot });
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.report.versionState, "invalid-version-state");
+    assert.ok(result.report.activeLock);
+  });
+
+  await t.test("rollback rejects a version-corrupted journal digest", async (child) => {
+    const { sourceRoot, targetRoot } = makeFixture(child);
+    put(sourceRoot, "agents/lead.md", "lead\n");
+    const manager = managerFixture(sourceRoot);
+    await manager.run("install", { targetRoot });
+    const transactionPath = path.join(targetRoot, ".oak", "rollback", "transaction.json");
+    const transaction = JSON.parse(fs.readFileSync(transactionPath, "utf8"));
+    transaction.next_manifest.kit_version = "1.0.26";
+    fs.writeFileSync(transactionPath, `${JSON.stringify(transaction)}\n`);
+    const before = fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"));
+    const result = await manager.run("rollback", { targetRoot });
+    assert.equal(result.exitCode, 2);
+    assert.deepEqual(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json")), before);
+  });
+
+  await t.test("unsafe target state is not mislabeled as a version error", async (child) => {
+    const { sourceRoot, targetRoot } = makeFixture(child);
+    const owned = put(sourceRoot, "agents/lead.md", "lead\n");
+    persistManifest(targetRoot, validManifest({
+      payload_sha256: inventorySource(sourceRoot).payloadSha256,
+      owned_files: [owned],
+      preserved_files: [],
+    }));
+    fs.mkdirSync(path.join(targetRoot, "agents"), { recursive: true });
+    fs.symlinkSync(path.join(sourceRoot, "agents", "lead.md"), path.join(targetRoot, "agents", "lead.md"));
+    const result = await managerFixture(sourceRoot).run("doctor", { targetRoot });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.error.message, /symlink/i);
+    assert.equal(result.report, undefined);
+  });
+
+  await t.test("source provider I/O failure remains a generic error", async (child) => {
+    const { sourceRoot, targetRoot } = makeFixture(child);
+    put(sourceRoot, "agents/lead.md", "lead\n");
+    await managerFixture(sourceRoot).run("install", { targetRoot });
+    const ioError = Object.assign(new Error("source read failed"), { code: "EACCES" });
+    const result = await managerFixture(sourceRoot, { versionProvider() { throw ioError; } }).run("doctor", { targetRoot });
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.error, ioError);
+    assert.equal(result.report, undefined);
+  });
+});
+
 test("[S002] clean install writes owned files and a valid sorted manifest", async (t) => {
   const { sourceRoot, targetRoot } = makeFixture(t);
   const lead = put(sourceRoot, "agents/lead.md", "lead\n", 0o640);
@@ -636,7 +935,7 @@ test("[S012] one committed rollback reverses install, upgrade, and uninstall", a
 
   await manager.run("install", { targetRoot });
   fs.writeFileSync(path.join(sourceRoot, "agents/lead.md"), "v2\n");
-  await manager.run("upgrade", { targetRoot });
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.28" }).run("upgrade", { targetRoot });
   assert.equal(fs.readFileSync(path.join(targetRoot, "agents/lead.md"), "utf8"), "v2\n");
   await manager.run("rollback", { targetRoot });
   assert.equal(fs.readFileSync(path.join(targetRoot, "agents/lead.md"), "utf8"), "v1\n");
@@ -679,7 +978,7 @@ function preservedFixture(t) {
   const source = put(sourceRoot, "opencode.json", "source-v1\n", 0o644);
   const target = put(targetRoot, "opencode.json", "user-v1\n", 0o600);
   const manifest = validManifest({
-    payload_sha256: HASH_A,
+    payload_sha256: inventorySource(sourceRoot).payloadSha256,
     owned_files: [],
     preserved_files: [{
       path: "opencode.json",
@@ -879,7 +1178,7 @@ test("[S105] upgrade cleans obsolete-preserved metadata without touching present
   const { sourceRoot, targetRoot } = preservedFixture(t);
   fs.unlinkSync(path.join(sourceRoot, "opencode.json"));
   const before = fs.readFileSync(path.join(targetRoot, "opencode.json"));
-  const result = await managerFixture(sourceRoot).run("upgrade", { targetRoot });
+  const result = await managerFixture(sourceRoot, { versionProvider: () => "1.0.28" }).run("upgrade", { targetRoot });
   assert.equal(result.exitCode, 0);
   assert.deepEqual(fs.readFileSync(path.join(targetRoot, "opencode.json")), before);
   const manifest = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"), "utf8"));
@@ -890,7 +1189,7 @@ test("[S106] upgrade cleans obsolete-preserved metadata without recreating a mis
   const { sourceRoot, targetRoot } = preservedFixture(t);
   fs.unlinkSync(path.join(sourceRoot, "opencode.json"));
   fs.unlinkSync(path.join(targetRoot, "opencode.json"));
-  const result = await managerFixture(sourceRoot).run("upgrade", { targetRoot });
+  const result = await managerFixture(sourceRoot, { versionProvider: () => "1.0.28" }).run("upgrade", { targetRoot });
   assert.equal(result.exitCode, 0);
   assert.equal(fs.existsSync(path.join(targetRoot, "opencode.json")), false);
 });
@@ -899,7 +1198,7 @@ test("[S107] rollback of obsolete cleanup restores metadata only", async (t) => 
   const { sourceRoot, targetRoot } = preservedFixture(t);
   fs.unlinkSync(path.join(sourceRoot, "opencode.json"));
   const before = fs.readFileSync(path.join(targetRoot, "opencode.json"));
-  const manager = managerFixture(sourceRoot);
+  const manager = managerFixture(sourceRoot, { versionProvider: () => "1.0.28" });
   await manager.run("upgrade", { targetRoot });
   await manager.run("rollback", { targetRoot });
   assert.deepEqual(fs.readFileSync(path.join(targetRoot, "opencode.json")), before);
@@ -918,7 +1217,7 @@ test("[S108] doctor reports obsolete preservation as actionable and offers no AC
 test("[S109] obsolete cleanup commits as a manifest-only upgrade", async (t) => {
   const { sourceRoot, targetRoot } = preservedFixture(t);
   fs.unlinkSync(path.join(sourceRoot, "opencode.json"));
-  const result = await managerFixture(sourceRoot).run("upgrade", { targetRoot });
+  const result = await managerFixture(sourceRoot, { versionProvider: () => "1.0.28" }).run("upgrade", { targetRoot });
   assert.equal(result.exitCode, 0);
   assert.deepEqual(result.transaction.operations, []);
 });
@@ -976,7 +1275,11 @@ test("[S117] acknowledgement path absent from preserved_files is invalid invocat
   const { sourceRoot, targetRoot } = makeFixture(t);
   const source = put(sourceRoot, "agents/lead.md", "lead\n");
   put(targetRoot, "agents/lead.md", "lead\n");
-  persistManifest(targetRoot, validManifest({ owned_files: [source], preserved_files: [] }));
+  persistManifest(targetRoot, validManifest({
+    payload_sha256: inventorySource(sourceRoot).payloadSha256,
+    owned_files: [source],
+    preserved_files: [],
+  }));
   const result = await managerFixture(sourceRoot, { stdin: Readable.from([]), stdout: capture().stream }).run("doctor", {
     targetRoot, acceptPreserved: "agents/lead.md",
   });
@@ -1003,6 +1306,7 @@ test("[S119] warning on another preserved file does not block acknowledgement", 
     source_sha256: otherSource.sha256, source_mode: otherSource.mode,
     reason: "preexisting-user-file", merge_acknowledgement: null,
   });
+  manifest.payload_sha256 = inventorySource(sourceRoot).payloadSha256;
   persistManifest(targetRoot, manifest);
   const result = await managerFixture(sourceRoot, { stdin: Readable.from([`${ackLine(source, target)}\n`]), stdout: capture().stream }).run("doctor", {
     targetRoot, acceptPreserved: "opencode.json",
@@ -1195,7 +1499,7 @@ test("[S034] upgrade preserves changed executable modes", async (t) => {
   const manager = managerFixture(sourceRoot);
   await manager.run("install", { targetRoot });
   put(sourceRoot, "scripts/run.sh", "v2\n", 0o755);
-  await manager.run("upgrade", { targetRoot });
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.28" }).run("upgrade", { targetRoot });
   assert.equal(fs.statSync(path.join(targetRoot, "scripts/run.sh")).mode & 0o777, 0o755);
 });
 
@@ -1205,7 +1509,7 @@ test("[S035] rollback restores executable modes", async (t) => {
   const manager = managerFixture(sourceRoot);
   await manager.run("install", { targetRoot });
   put(sourceRoot, "scripts/run.sh", "v2\n", 0o755);
-  await manager.run("upgrade", { targetRoot });
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.28" }).run("upgrade", { targetRoot });
   await manager.run("rollback", { targetRoot });
   assert.equal(fs.statSync(path.join(targetRoot, "scripts/run.sh")).mode & 0o777, 0o700);
 });
@@ -1258,6 +1562,7 @@ test("[S045] interrupted-forward recovery retains the earlier committed rollback
   const prior = fs.readFileSync(path.join(targetRoot, ".oak", "rollback", "transaction.json"));
   put(sourceRoot, "agents/lead.md", "v2\n");
   await managerFixture(sourceRoot, {
+    versionProvider: () => "1.0.28",
     transactionId: () => "tx-upgrade",
     failpoint(name) { if (name === "after-journal-create") throw new Error("stop"); },
   }).run("upgrade", { targetRoot });
@@ -1456,6 +1761,7 @@ test("[S030] failure while publishing a new rollback point preserves the previou
   const prior = fs.readFileSync(path.join(targetRoot, ".oak", "rollback", "transaction.json"));
   put(sourceRoot, "agents/lead.md", "v2\n");
   await managerFixture(sourceRoot, {
+    versionProvider: () => "1.0.28",
     transactionId: () => "tx-upgrade",
     failpoint(name) { if (name === "after-rollback-publication") throw new Error("crash"); },
   }).run("upgrade", { targetRoot });
@@ -1610,7 +1916,7 @@ test("[S102] recovery rejects manifest absence when recorded phase expects prese
   put(sourceRoot, "agents/lead.md", "v1\n");
   await managerFixture(sourceRoot).run("install", { targetRoot });
   put(sourceRoot, "agents/lead.md", "v2\n");
-  await managerFixture(sourceRoot, { transactionId: () => "tx-upgrade", failpoint(name) { if (name === "after-journal-create") throw new Error("crash"); } }).run("upgrade", { targetRoot });
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.28", transactionId: () => "tx-upgrade", failpoint(name) { if (name === "after-journal-create") throw new Error("crash"); } }).run("upgrade", { targetRoot });
   fs.unlinkSync(path.join(targetRoot, ".oak", "manifest.json"));
   assert.equal((await managerFixture(sourceRoot).run("rollback", { targetRoot })).exitCode, 2);
 });
@@ -1620,7 +1926,7 @@ test("[S133] recovery rejects wrong canonical manifest digest for its recorded p
   put(sourceRoot, "agents/lead.md", "v1\n");
   await managerFixture(sourceRoot).run("install", { targetRoot });
   put(sourceRoot, "agents/lead.md", "v2\n");
-  await managerFixture(sourceRoot, { transactionId: () => "tx-upgrade", failpoint(name) { if (name === "after-journal-create") throw new Error("crash"); } }).run("upgrade", { targetRoot });
+  await managerFixture(sourceRoot, { versionProvider: () => "1.0.28", transactionId: () => "tx-upgrade", failpoint(name) { if (name === "after-journal-create") throw new Error("crash"); } }).run("upgrade", { targetRoot });
   const manifest = JSON.parse(fs.readFileSync(path.join(targetRoot, ".oak", "manifest.json"), "utf8"));
   manifest.updated_at = "2026-07-22T00:00:00.000Z";
   fs.writeFileSync(path.join(targetRoot, ".oak", "manifest.json"), canonicalManifestBytes(manifest));
