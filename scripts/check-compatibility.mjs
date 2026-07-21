@@ -255,10 +255,32 @@ function extractWorkflowStep(workflow, name) {
   return match?.[0] ?? "";
 }
 
+function extractBlockingJob(workflow) {
+  const jobsHeaders = [...workflow.matchAll(/^jobs:\s*$/gm)];
+  if (jobsHeaders.length !== 1) {
+    throw invalid("workflow must contain exactly one unambiguous jobs.check body");
+  }
+  const jobsStart = jobsHeaders[0].index + jobsHeaders[0][0].length;
+  const afterJobs = workflow.slice(jobsStart);
+  const nextTopLevel = afterJobs.match(/^\S[^\n]*:\s*$/m);
+  const jobsBody = afterJobs.slice(0, nextTopLevel?.index ?? afterJobs.length);
+  const checkHeaders = [...jobsBody.matchAll(/^  check:\s*$/gm)];
+  if (checkHeaders.length !== 1) {
+    throw invalid("workflow must contain exactly one unambiguous jobs.check body");
+  }
+  const checkStart = checkHeaders[0].index;
+  const afterCheckHeader = jobsBody.slice(checkStart + checkHeaders[0][0].length);
+  const nextJob = afterCheckHeader.match(/^  [A-Za-z0-9_-]+:\s*$/m);
+  const checkEnd = checkStart + checkHeaders[0][0].length
+    + (nextJob?.index ?? afterCheckHeader.length);
+  return jobsBody.slice(checkStart, checkEnd);
+}
+
 function validateWorkflow(root, data, fsOps) {
   const workflow = readRegularText(root, ".github/workflows/check.yml", fsOps);
+  const blockingJob = extractBlockingJob(workflow);
   const marked = extractMarkedSection(
-    workflow,
+    blockingJob,
     "# compatibility-blocking:start",
     "# compatibility-blocking:end",
   );
@@ -304,20 +326,20 @@ function validateWorkflow(root, data, fsOps) {
       `workflow blocking matrix must be exactly ${expectedEntries.map(({ os, node, canonical }) => `${os}/${node}/canonical=${canonical}`).join(", ")}`,
     );
   }
-  if (!/^    runs-on: \$\{\{ matrix\.os \}\}$/m.test(workflow)) {
+  if (!/^    runs-on: \$\{\{ matrix\.os \}\}$/m.test(blockingJob)) {
     throw invalid("workflow blocking job must run on matrix.os");
   }
-  if (!/^          node-version: \$\{\{ matrix\.node \}\}$/m.test(workflow)) {
+  if (!/^          node-version: \$\{\{ matrix\.node \}\}$/m.test(blockingJob)) {
     throw invalid("workflow setup-node must use matrix.node");
   }
 
-  const tagStep = extractWorkflowStep(workflow, "Validate release tag");
+  const tagStep = extractWorkflowStep(blockingJob, "Validate release tag");
   if (JSON.stringify(tagStep.match(/^        if:.*$/gm)) !== JSON.stringify([
     "        if: matrix.canonical && startsWith(github.ref, 'refs/tags/')",
   ])) {
     throw invalid("workflow tag validation guard must be exact");
   }
-  const auditStep = extractWorkflowStep(workflow, "Audit OpenCode tool dependencies");
+  const auditStep = extractWorkflowStep(blockingJob, "Audit OpenCode tool dependencies");
   if (JSON.stringify(auditStep.match(/^        if:.*$/gm)) !== JSON.stringify([
     "        if: matrix.canonical",
   ])) {
@@ -331,12 +353,12 @@ function validateWorkflow(root, data, fsOps) {
     ["run: npm run typecheck", "token plugin typecheck"],
     ["run: npm run installation-smoke", "installation smoke"],
   ]) {
-    if (!workflow.includes(snippet)) {
+    if (!blockingJob.includes(snippet)) {
       throw invalid(`workflow blocking job must retain ${label}`);
     }
   }
 
-  const evidenceStep = extractWorkflowStep(workflow, "Record runner evidence");
+  const evidenceStep = extractWorkflowStep(blockingJob, "Record runner evidence");
   for (const token of [
     "uname -a || true",
     "node --version",

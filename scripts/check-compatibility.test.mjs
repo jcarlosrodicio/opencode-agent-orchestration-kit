@@ -546,6 +546,40 @@ for (const [label, current, message] of [
   });
 }
 
+test("a sidecar job cannot satisfy a required blocking check step", (t) => {
+  const root = makeFixture(t);
+  const workflow = VALID_WORKFLOW
+    .replace("        run: npm run typecheck", "        run: echo skipped-typecheck")
+    .concat(`
+  sidecar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Typecheck TUI token plugin
+        run: npm run typecheck
+`);
+  writeText(root, ".github/workflows/check.yml", workflow);
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /workflow blocking job must retain token plugin typecheck/,
+  );
+});
+
+for (const [label, workflow] of [
+  ["missing", VALID_WORKFLOW.replace("  check:\n", "  renamed:\n")],
+  ["duplicated", `${VALID_WORKFLOW}\n  check:\n    runs-on: ubuntu-latest\n`],
+  ["ambiguous", `${VALID_WORKFLOW}\njobs:\n  sidecar:\n    runs-on: ubuntu-latest\n`],
+]) {
+  test(`workflow rejects a ${label} jobs.check body`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/check.yml", workflow);
+    assertInvalidCompatibility(
+      () => checkCompatibility(root),
+      /workflow must contain exactly one unambiguous jobs\.check body/,
+    );
+  });
+}
+
 for (const command of [
   "uname -a || true",
   "node --version",
