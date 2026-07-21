@@ -24,6 +24,7 @@ scripts/version.mjs
 scripts/version.test.mjs
 scripts/check-compatibility.mjs
 scripts/check-compatibility.test.mjs
+scripts/opencode-compat-smoke.sh
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
 docs/releases/v${kit_version}.md
@@ -70,7 +71,7 @@ for file in $required_files; do
   test -f "$file" || { echo "Missing required file: $file" >&2; exit 1; }
 done
 
-for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh; do
+for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh scripts/opencode-compat-smoke.sh; do
   test -x "$file" || { echo "Not executable: $file" >&2; exit 1; }
 done
 

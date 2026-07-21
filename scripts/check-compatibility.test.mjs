@@ -3,8 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import { checkCompatibility } from "./check-compatibility.mjs";
+
+const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const VALID_COMPATIBILITY = {
   schema_version: 1,
@@ -637,3 +641,144 @@ test("workflow requires blocking markers in order", (t) => {
     /workflow compatibility blocking markers must be in order/,
   );
 });
+
+function shellQuote(value) {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function writeExecutable(root, relative, contents) {
+  writeText(root, relative, contents);
+  fs.chmodSync(path.join(root, relative), 0o755);
+}
+
+function makeCompatibilitySmokeFixture(t, options = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "oak-compat-smoke-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const sourceScript = path.join(REPOSITORY_ROOT, "scripts/opencode-compat-smoke.sh");
+  if (fs.existsSync(sourceScript)) {
+    fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
+    fs.copyFileSync(sourceScript, path.join(root, "scripts/opencode-compat-smoke.sh"));
+    fs.chmodSync(path.join(root, "scripts/opencode-compat-smoke.sh"), 0o755);
+  }
+
+  writeText(root, "agents/lead.md", "---\nmode: all\n---\n");
+  if (options.packagedLead !== "missing") {
+    writeText(
+      root,
+      "opencode/agents/lead.md",
+      `---\nmode: ${options.packagedLead ?? "primary"}\n---\n`,
+    );
+  }
+  writeJson(root, "opencode/package.json", { name: "fixture", private: true });
+  writeJson(root, "opencode/package-lock.json", {
+    name: "fixture",
+    lockfileVersion: 3,
+    packages: { "": { name: "fixture" } },
+  });
+  writeText(root, "opencode/node_modules/excluded", "must not be copied\n");
+  writeText(root, "opencode/.oak/excluded", "must not be copied\n");
+
+  const quotedRoot = shellQuote(root);
+  writeExecutable(root, "fake-bin/npm", `#!/bin/sh
+set -eu
+smoke_root=\${HOME%/home}
+test "$#" -eq 4
+test "$1" = --prefix
+test "$2" = "$smoke_root/config/opencode"
+test "$3" = ci
+test "$4" = --ignore-scripts
+test "$HOME" = "$smoke_root/home"
+test "$XDG_CONFIG_HOME" = "$smoke_root/config"
+test "$XDG_DATA_HOME" = "$smoke_root/data"
+test "$XDG_CACHE_HOME" = "$smoke_root/cache"
+test "$XDG_STATE_HOME" = "$smoke_root/state"
+test "$npm_config_cache" = "$smoke_root/npm"
+test "$OPENCODE_CONFIG_DIR" = "$smoke_root/config/opencode"
+case "$2" in ${quotedRoot}|${quotedRoot}/*) exit 31;; esac
+case "$OPENCODE_CONFIG_DIR" in ${quotedRoot}|${quotedRoot}/*) exit 32;; esac
+test -f "$2/agents/lead.md"
+test ! -e "$2/opencode"
+test ! -e "$2/node_modules"
+test ! -e "$2/.oak"
+`);
+
+  const version = options.wrongVersion ? "9.9.9" : "1.14.41";
+  const leak = options.leakOriginalPath ? `,\"source\":${JSON.stringify(root)}` : "";
+  writeExecutable(root, "fake-bin/npx", `#!/bin/sh
+set -eu
+if env | grep -q '^FAKE_PROVIDER_TOKEN='; then exit 41; fi
+smoke_root=\${HOME%/home}
+test "$HOME" = "$smoke_root/home"
+test "$XDG_CONFIG_HOME" = "$smoke_root/config"
+test "$XDG_DATA_HOME" = "$smoke_root/data"
+test "$XDG_CACHE_HOME" = "$smoke_root/cache"
+test "$XDG_STATE_HOME" = "$smoke_root/state"
+test "$npm_config_cache" = "$smoke_root/npm"
+test "$OPENCODE_CONFIG_DIR" = "$smoke_root/config/opencode"
+case "$OPENCODE_CONFIG_DIR" in ${quotedRoot}|${quotedRoot}/*) exit 42;; esac
+test "$1" = --yes
+test "$2" = --package
+test "$3" = opencode-ai@1.14.41
+test "$4" = opencode
+shift 4
+case "$1" in
+  --version)
+    test "$#" -eq 1
+    printf '%s\\n' '${version}'
+    ;;
+  debug)
+    test "$#" -eq 4
+    test "$2" = agent
+    test "$3" = lead
+    test "$4" = --pure
+    grep -q '^mode: primary$' "$OPENCODE_CONFIG_DIR/agents/lead.md"
+    printf '%s\\n' '{\"name\":\"lead\",\"mode\":\"primary\"${leak}}'
+    ;;
+  *) exit 43;;
+esac
+`);
+  return root;
+}
+
+function runCompatibilitySmoke(root, args = ["1.14.41"]) {
+  return spawnSync(
+    "bash",
+    [path.join(root, "scripts/opencode-compat-smoke.sh"), ...args],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        PATH: `${path.join(root, "fake-bin")}:${process.env.PATH}`,
+        FAKE_PROVIDER_TOKEN: "must-not-reach-opencode",
+      },
+      encoding: "utf8",
+    },
+  );
+}
+
+test("OpenCode compatibility smoke uses only the packaged isolated config", (t) => {
+  const root = makeCompatibilitySmokeFixture(t);
+  const result = runCompatibilitySmoke(root);
+
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  assert.equal(
+    result.stdout,
+    "opencode compatibility smoke ok: requested=1.14.41 resolved=1.14.41\n",
+  );
+});
+
+for (const [name, options] of [
+  ["a mismatched resolved version", { wrongVersion: true }],
+  ["a missing packaged lead", { packagedLead: "missing" }],
+  ["an incorrect packaged lead mode", { packagedLead: "all" }],
+  ["output that leaks the original repository path", { leakOriginalPath: true }],
+]) {
+  test(`OpenCode compatibility smoke rejects ${name}`, (t) => {
+    const root = makeCompatibilitySmokeFixture(t, options);
+    const result = runCompatibilitySmoke(root);
+
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, "");
+  });
+}
