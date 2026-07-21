@@ -176,11 +176,17 @@ export function extractMarkedSection(text, start, end) {
     if (start.includes("compatibility-matrix")) {
       throw invalid("docs/compatibility.md must contain exactly one start and one end marker");
     }
+    if (start.includes("opencode-boundaries")) {
+      throw invalid("workflow must contain exactly one OpenCode boundary job marker pair");
+    }
     throw invalid("workflow must contain exactly one compatibility blocking marker pair");
   }
   if (last <= first) {
     if (start.includes("compatibility-matrix")) {
       throw invalid("docs/compatibility.md matrix markers must be in order");
+    }
+    if (start.includes("opencode-boundaries")) {
+      throw invalid("workflow OpenCode boundary job markers must be in order");
     }
     throw invalid("workflow compatibility blocking markers must be in order");
   }
@@ -255,7 +261,7 @@ function extractWorkflowStep(workflow, name) {
   return match?.[0] ?? "";
 }
 
-function extractBlockingJob(workflow) {
+function extractJobsBody(workflow) {
   const jobsHeaders = [...workflow.matchAll(/^jobs:\s*$/gm)];
   if (jobsHeaders.length !== 1) {
     throw invalid("workflow must contain exactly one unambiguous jobs.check body");
@@ -263,7 +269,11 @@ function extractBlockingJob(workflow) {
   const jobsStart = jobsHeaders[0].index + jobsHeaders[0][0].length;
   const afterJobs = workflow.slice(jobsStart);
   const nextTopLevel = afterJobs.match(/^\S[^\n]*:\s*$/m);
-  const jobsBody = afterJobs.slice(0, nextTopLevel?.index ?? afterJobs.length);
+  return afterJobs.slice(0, nextTopLevel?.index ?? afterJobs.length);
+}
+
+function extractBlockingJob(workflow) {
+  const jobsBody = extractJobsBody(workflow);
   const checkHeaders = [...jobsBody.matchAll(/^  check:\s*$/gm)];
   if (checkHeaders.length !== 1) {
     throw invalid("workflow must contain exactly one unambiguous jobs.check body");
@@ -274,6 +284,54 @@ function extractBlockingJob(workflow) {
   const checkEnd = checkStart + checkHeaders[0][0].length
     + (nextJob?.index ?? afterCheckHeader.length);
   return jobsBody.slice(checkStart, checkEnd);
+}
+
+function validateOpenCodeBoundaryJob(workflow, data) {
+  const marked = extractMarkedSection(
+    workflow,
+    "# opencode-boundaries:start",
+    "# opencode-boundaries:end",
+  );
+  const versions = [data.opencode.minimum_tested, data.opencode.stable_tested]
+    .sort(compareStableVersions);
+  const expectedJob = [
+    "  opencode-compatibility:",
+    "    runs-on: ubuntu-latest",
+    "    strategy:",
+    "      fail-fast: false",
+    "      matrix:",
+    "        opencode:",
+    ...versions.map((version) => `          - "${version}"`),
+    "    steps:",
+    "      - name: Checkout",
+    "        uses: actions/checkout@v4",
+    "",
+    "      - name: Setup Node",
+    "        uses: actions/setup-node@v4",
+    "        with:",
+    "          node-version: 24",
+    "",
+    "      - name: Smoke OpenCode boundary",
+    '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+  ].join("\n");
+  const actualJob = marked.replace(/^\n/, "").replace(/\n  $/, "");
+
+  if (actualJob !== expectedJob) {
+    throw invalid(
+      `OpenCode boundary job must exactly test ${versions.join(", ")} on Node 24 through the isolated matrix wrapper`,
+    );
+  }
+
+  const jobsBody = extractJobsBody(workflow);
+  const markedBlock = `# opencode-boundaries:start${marked}# opencode-boundaries:end`;
+  if (
+    !jobsBody.includes(markedBlock)
+    || JSON.stringify(jobsBody.match(/^  opencode-compatibility:\s*$/gm)) !== JSON.stringify([
+      "  opencode-compatibility:",
+    ])
+  ) {
+    throw invalid("OpenCode boundary job must be one separate exact job under jobs");
+  }
 }
 
 function validateWorkflow(root, data, fsOps) {
@@ -373,6 +431,8 @@ function validateWorkflow(root, data, fsOps) {
       throw invalid(`workflow runner evidence must include ${token}`);
     }
   }
+
+  validateOpenCodeBoundaryJob(workflow, data);
 
   if (!/^permissions:\n  contents: read$/m.test(workflow) || /^\s*[^#\n]+:\s*(?:write|write-all)\s*$/m.test(workflow)) {
     throw invalid("workflow must use read-only permissions");

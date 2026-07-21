@@ -98,6 +98,18 @@ function isDeclaredNonKitVersion(relative, line) {
       || /opencode\/package\.json must (?:pin|override)/.test(line));
 }
 
+function excludeOpenCodeBoundarySection(relative, contents) {
+  if (relative !== ".github/workflows/check.yml") return contents;
+  const start = "# opencode-boundaries:start";
+  const end = "# opencode-boundaries:end";
+  const startCount = contents.split(start).length - 1;
+  const endCount = contents.split(end).length - 1;
+  const startIndex = contents.indexOf(start);
+  const endIndex = contents.indexOf(end);
+  if (startCount !== 1 || endCount !== 1 || endIndex <= startIndex) return contents;
+  return `${contents.slice(0, startIndex)}${contents.slice(endIndex + end.length)}`;
+}
+
 export function checkVersionContract(options = {}) {
   const repositoryRoot = options.repositoryRoot;
   const fsOps = options.fsOps ?? fs;
@@ -122,11 +134,12 @@ export function checkVersionContract(options = {}) {
 
   for (const relative of OPERATIONAL_VERSION_SURFACES) {
     const contents = readRegularFile(path.join(repositoryRoot, relative), relative, fsOps);
-    const competing = contents.split(/\r?\n/).flatMap((line) => (
-      isDeclaredNonKitVersion(relative, line)
-        ? []
-        : [...line.matchAll(CONCRETE_STABLE_VERSION)].map((match) => match[0])
-    ));
+    const competing = excludeOpenCodeBoundarySection(relative, contents)
+      .split(/\r?\n/).flatMap((line) => (
+        isDeclaredNonKitVersion(relative, line)
+          ? []
+          : [...line.matchAll(CONCRETE_STABLE_VERSION)].map((match) => match[0])
+      ));
     if (competing.length > 0) {
       throw invalid(`${relative} contains a competing stable version declaration`);
     }

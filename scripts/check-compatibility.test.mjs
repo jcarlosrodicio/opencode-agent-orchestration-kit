@@ -75,6 +75,31 @@ Canonical Node engine: \`${VALID_COMPATIBILITY.node.engines}\`.
 
 const README = "See [compatibility details](docs/compatibility.md).\n";
 const INSTALLATION = `- Node.js \`${VALID_COMPATIBILITY.node.engines}\` and npm\n`;
+const PROVIDER_SECRET = ["OPEN", "AI_API_KEY"].join("");
+
+const OPENCODE_BOUNDARY_JOB = `
+  # opencode-boundaries:start
+  opencode-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        opencode:
+          - "1.14.41"
+          - "1.18.4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Smoke OpenCode boundary
+        run: bash scripts/opencode-compat-smoke.sh "\${{ matrix.opencode }}"
+  # opencode-boundaries:end
+`;
 
 const VALID_WORKFLOW = `name: Check
 
@@ -146,7 +171,7 @@ jobs:
 
       - name: Installation smoke
         run: npm run installation-smoke
-`;
+${OPENCODE_BOUNDARY_JOB}`;
 
 const SINGLE_JOB_WORKFLOW = `name: Check
 permissions:
@@ -640,6 +665,129 @@ test("workflow requires blocking markers in order", (t) => {
     () => checkCompatibility(root),
     /workflow compatibility blocking markers must be in order/,
   );
+});
+
+test("OpenCode boundary job accepts the exact blocking matrix", (t) => {
+  const root = makeFixture(t);
+  assert.equal(checkCompatibility(root).schema_version, 1);
+});
+
+for (const [label, mutate] of [
+  ["minimum tested version", (workflow) => workflow.replace('          - "1.14.41"\n', "")],
+  ["stable tested version", (workflow) => workflow.replace('          - "1.18.4"\n', "")],
+  ["Node 24 setup", (workflow) => workflow.replace("          node-version: 24", "          node-version: 22")],
+  [
+    "matrix-version wrapper invocation",
+    (workflow) => workflow.replace(
+      'run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+      "run: bash scripts/opencode-compat-smoke.sh 1.18.4",
+    ),
+  ],
+  [
+    "isolated wrapper instead of the operator binary",
+    (workflow) => workflow.replace(
+      'run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+      "run: opencode --version",
+    ),
+  ],
+  [
+    "blocking failure behavior",
+    (workflow) => workflow.replace(
+      "  opencode-compatibility:\n",
+      "  opencode-compatibility:\n    continue-on-error: true\n",
+    ),
+  ],
+  [
+    "non-publishing behavior",
+    (workflow) => workflow.replace(
+      "  # opencode-boundaries:end",
+      "      - name: Publish\n        run: npm publish\n  # opencode-boundaries:end",
+    ),
+  ],
+  [
+    "credential-free behavior",
+    (workflow) => workflow.replace(
+      "    runs-on: ubuntu-latest\n    strategy:",
+      '    runs-on: ubuntu-latest\n    env:\n      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n    strategy:',
+    ),
+  ],
+  [
+    "provider-secret-free behavior",
+    (workflow) => workflow.replace(
+      "    runs-on: ubuntu-latest\n    strategy:",
+      `    runs-on: ubuntu-latest\n    env:\n      ${PROVIDER_SECRET}: \${{ secrets.${PROVIDER_SECRET} }}\n    strategy:`,
+    ),
+  ],
+  [
+    "checkout-level dependency install",
+    (workflow) => workflow.replace(
+      OPENCODE_BOUNDARY_JOB,
+      OPENCODE_BOUNDARY_JOB.replace(
+        "      - name: Setup Node\n        uses: actions/setup-node@v4",
+        "      - name: Install dependencies\n        run: npm ci\n\n      - name: Setup Node\n        uses: actions/setup-node@v4",
+      ),
+    ),
+  ],
+]) {
+  test(`OpenCode boundary job requires ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/check.yml", mutate(VALID_WORKFLOW));
+    assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
+  });
+}
+
+test("OpenCode boundary job cannot borrow its smoke from another job", (t) => {
+  const root = makeFixture(t);
+  const workflow = VALID_WORKFLOW
+    .replace(
+      '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+      "        run: echo skipped-boundary-smoke",
+    )
+    .concat(`
+  sidecar-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bash scripts/opencode-compat-smoke.sh "\${{ matrix.opencode }}"
+`);
+  writeText(root, ".github/workflows/check.yml", workflow);
+  assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
+});
+
+test("OpenCode boundary job markers must wrap the job inside jobs", (t) => {
+  const root = makeFixture(t);
+  const workflow = VALID_WORKFLOW
+    .replace(OPENCODE_BOUNDARY_JOB, "  opencode-compatibility:\n    runs-on: macos-latest\n")
+    .concat(`
+outside:
+${OPENCODE_BOUNDARY_JOB}`);
+  writeText(root, ".github/workflows/check.yml", workflow);
+  assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
+});
+
+test("OpenCode boundary job requires exactly one marker pair", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    ".github/workflows/check.yml",
+    VALID_WORKFLOW.replace(
+      "  # opencode-boundaries:start",
+      "  # opencode-boundaries:start\n  # opencode-boundaries:start",
+    ),
+  );
+  assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
+});
+
+test("OpenCode boundary job requires markers in order", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    ".github/workflows/check.yml",
+    VALID_WORKFLOW
+      .replace("# opencode-boundaries:start", "# opencode-boundaries:temporary")
+      .replace("# opencode-boundaries:end", "# opencode-boundaries:start")
+      .replace("# opencode-boundaries:temporary", "# opencode-boundaries:end"),
+  );
+  assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
 });
 
 function shellQuote(value) {

@@ -191,5 +191,55 @@ test("[V011] workflow remains non-publishing and scenario IDs are unique", () =>
     .map((relative) => fs.readFileSync(path.join(REPOSITORY_ROOT, relative), "utf8"))
     .join("\n");
   const ids = [...sources.matchAll(/\[V(\d{3})\]/g)].map((match) => Number(match[1]));
-  assert.deepEqual(ids.sort((left, right) => left - right), Array.from({ length: 27 }, (_, index) => index + 1));
+  assert.deepEqual(ids.sort((left, right) => left - right), Array.from({ length: 28 }, (_, index) => index + 1));
+});
+
+test("[V028] only the marked OpenCode boundary section may declare non-kit stable versions", async (t) => {
+  const workflow = `name: Check
+jobs:
+  # opencode-boundaries:start
+  opencode-compatibility:
+    strategy:
+      matrix:
+        opencode:
+          - "1.14.41"
+          - "1.18.4"
+  # opencode-boundaries:end
+`;
+
+  assert.doesNotThrow(() => checkVersionContract({
+    repositoryRoot: makeContractRepository(t, { ".github/workflows/check.yml": workflow }),
+  }));
+
+  for (const [label, contents] of [
+    ["outside the section", `${workflow}env:\n  OTHER_VERSION: "9.8.7"\n`],
+    [
+      "without markers",
+      workflow
+        .replace("  # opencode-boundaries:start\n", "")
+        .replace("  # opencode-boundaries:end\n", ""),
+    ],
+    [
+      "with a duplicated marker",
+      workflow.replace(
+        "  # opencode-boundaries:start",
+        "  # opencode-boundaries:start\n  # opencode-boundaries:start",
+      ),
+    ],
+    [
+      "with markers out of order",
+      workflow
+        .replace("# opencode-boundaries:start", "# opencode-boundaries:temporary")
+        .replace("# opencode-boundaries:end", "# opencode-boundaries:start")
+        .replace("# opencode-boundaries:temporary", "# opencode-boundaries:end"),
+    ],
+  ]) {
+    await t.test(label, (child) => {
+      const root = makeContractRepository(child, { ".github/workflows/check.yml": contents });
+      assert.throws(
+        () => checkVersionContract({ repositoryRoot: root }),
+        /competing stable version declaration/,
+      );
+    });
+  }
 });
