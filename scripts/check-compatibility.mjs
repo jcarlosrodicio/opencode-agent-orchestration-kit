@@ -179,6 +179,9 @@ export function extractMarkedSection(text, start, end) {
     if (start.includes("opencode-boundaries")) {
       throw invalid("workflow must contain exactly one OpenCode boundary job marker pair");
     }
+    if (start.includes("compatibility-canary")) {
+      throw invalid("compatibility canary must contain exactly one marker pair");
+    }
     throw invalid("workflow must contain exactly one compatibility blocking marker pair");
   }
   if (last <= first) {
@@ -187,6 +190,9 @@ export function extractMarkedSection(text, start, end) {
     }
     if (start.includes("opencode-boundaries")) {
       throw invalid("workflow OpenCode boundary job markers must be in order");
+    }
+    if (start.includes("compatibility-canary")) {
+      throw invalid("compatibility canary markers must be in order");
     }
     throw invalid("workflow compatibility blocking markers must be in order");
   }
@@ -261,10 +267,13 @@ function extractWorkflowStep(workflow, name) {
   return match?.[0] ?? "";
 }
 
-function extractJobsBody(workflow) {
+function extractJobsBody(
+  workflow,
+  message = "workflow must contain exactly one unambiguous jobs.check body",
+) {
   const jobsHeaders = [...workflow.matchAll(/^jobs:\s*$/gm)];
   if (jobsHeaders.length !== 1) {
-    throw invalid("workflow must contain exactly one unambiguous jobs.check body");
+    throw invalid(message);
   }
   const jobsStart = jobsHeaders[0].index + jobsHeaders[0][0].length;
   const afterJobs = workflow.slice(jobsStart);
@@ -473,10 +482,92 @@ function validateWorkflow(root, data, fsOps) {
   }
 }
 
+function validateCompatibilityCanary(root, data, fsOps) {
+  const workflow = readRegularText(
+    root,
+    ".github/workflows/compatibility-canary.yml",
+    fsOps,
+  );
+  const jobMessage = "compatibility canary must contain exactly one unambiguous jobs.latest body";
+  const marked = extractMarkedSection(
+    workflow,
+    "# compatibility-canary:start",
+    "# compatibility-canary:end",
+  );
+  const jobsBody = extractJobsBody(workflow, jobMessage);
+  const completeJob = extractUniqueJob(jobsBody, "latest", jobMessage);
+  const expectedJob = [
+    "  latest:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - name: Checkout",
+    "        uses: actions/checkout@v4",
+    "",
+    "      - name: Setup Node",
+    "        uses: actions/setup-node@v4",
+    "        with:",
+    `          node-version: ${data.node.canary_major}`,
+    "",
+    "      - name: Smoke latest OpenCode",
+    `        run: bash scripts/opencode-compat-smoke.sh ${data.opencode.canary}`,
+  ].join("\n");
+  const expectedWorkflow = [
+    "name: Compatibility Canary",
+    "",
+    "on:",
+    "  workflow_dispatch:",
+    "  schedule:",
+    '    - cron: "17 6 * * 1"',
+    "",
+    "permissions:",
+    "  contents: read",
+    "",
+    "jobs:",
+    "  # compatibility-canary:start",
+    expectedJob,
+    "  # compatibility-canary:end",
+    "",
+  ].join("\n");
+  const actualJob = marked.replace(/^\n/, "").replace(/\n  $/, "");
+  const markerPrefix = "  # compatibility-canary:start\n";
+  const expectedCompleteJob = `${expectedJob}\n  # compatibility-canary:end`;
+
+  if (/^    permissions\s*:/m.test(completeJob.body)) {
+    throw invalid("compatibility canary job-level permissions are forbidden");
+  }
+  if (/\bcontinue-on-error\s*:/.test(workflow)) {
+    throw invalid("compatibility canary failures must remain red");
+  }
+  if (/\$\{\{\s*secrets\./.test(workflow) || /\b(?:token|password|credential|api[_-]?key)\b/i.test(workflow)) {
+    throw invalid("compatibility canary must not use secrets or credentials");
+  }
+  if (
+    /\b(?:npm|pnpm|yarn)\s+publish\b/.test(workflow)
+    || /\bgh\s+(?:release|issue)\s+create\b/.test(workflow)
+    || /\bgit\s+(?:tag|push|commit)\b/.test(workflow)
+    || /\b(?:npm|pnpm)\s+(?:ci|install|update)\b/.test(workflow)
+    || /\byarn\s+(?:install|upgrade)\b/.test(workflow)
+    || /actions\/(?:cache|upload-artifact|download-artifact)@/.test(workflow)
+  ) {
+    throw invalid("compatibility canary must not publish, mutate, cache, or use artifacts");
+  }
+  if (
+    actualJob !== expectedJob
+    || !jobsBody.slice(0, completeJob.start).endsWith(markerPrefix)
+    || completeJob.body.trimEnd() !== expectedCompleteJob
+    || workflow !== expectedWorkflow
+  ) {
+    throw invalid(
+      `compatibility canary must exactly smoke ${data.opencode.canary} on Ubuntu Node ${data.node.canary_major} from schedule and workflow_dispatch only`,
+    );
+  }
+}
+
 function validateSurfaces(root, data, fsOps) {
   validatePackages(root, data, fsOps);
   validateDocumentation(root, data, fsOps);
   validateWorkflow(root, data, fsOps);
+  validateCompatibilityCanary(root, data, fsOps);
 }
 
 if (path.resolve(process.argv[1] ?? "") === SCRIPT_PATH) {

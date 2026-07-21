@@ -61,6 +61,7 @@ CONTRIBUTING.md
 .github/PULL_REQUEST_TEMPLATE.md
 .github/CODEOWNERS
 .github/workflows/check.yml
+.github/workflows/compatibility-canary.yml
 .github/ISSUE_TEMPLATE/config.yml
 .github/ISSUE_TEMPLATE/bug_report.yml
 .github/ISSUE_TEMPLATE/feature_request.yml

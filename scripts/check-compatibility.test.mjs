@@ -173,6 +173,34 @@ jobs:
         run: npm run installation-smoke
 ${OPENCODE_BOUNDARY_JOB}`;
 
+const VALID_CANARY_WORKFLOW = `name: Compatibility Canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # compatibility-canary:start
+  latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Smoke latest OpenCode
+        run: bash scripts/opencode-compat-smoke.sh latest
+  # compatibility-canary:end
+`;
+
 const SINGLE_JOB_WORKFLOW = `name: Check
 permissions:
   contents: read
@@ -224,6 +252,7 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   writeText(root, "README.md", README);
   writeText(root, "docs/installation.md", INSTALLATION);
   writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW);
+  writeText(root, ".github/workflows/compatibility-canary.yml", VALID_CANARY_WORKFLOW);
   return root;
 }
 
@@ -841,6 +870,61 @@ test("OpenCode boundary job requires markers in order", (t) => {
   );
   assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
 });
+
+test("compatibility canary accepts the exact scheduled and manual latest smoke", (t) => {
+  const root = makeFixture(t);
+  assert.equal(checkCompatibility(root).schema_version, 1);
+});
+
+for (const [label, mutate] of [
+  ["schedule trigger", (workflow) => workflow.replace('  schedule:\n    - cron: "17 6 * * 1"\n', "")],
+  ["workflow_dispatch trigger", (workflow) => workflow.replace("  workflow_dispatch:\n", "")],
+  ["push trigger", (workflow) => workflow.replace("  workflow_dispatch:\n", "  workflow_dispatch:\n  push:\n")],
+  ["pull_request trigger", (workflow) => workflow.replace("  workflow_dispatch:\n", "  workflow_dispatch:\n  pull_request:\n")],
+  ["canonical canary Node", (workflow) => workflow.replace("          node-version: 26", "          node-version: 24")],
+  ["canonical latest argument", (workflow) => workflow.replace("opencode-compat-smoke.sh latest", "opencode-compat-smoke.sh 1.18.4")],
+  ["read-only permissions", (workflow) => workflow.replace("contents: read", "contents: write")],
+  ["blocking failure behavior", (workflow) => workflow.replace("    runs-on: ubuntu-latest", "    continue-on-error: true\n    runs-on: ubuntu-latest")],
+  ["credential-free behavior", (workflow) => workflow.replace("    runs-on: ubuntu-latest", '    env:\n      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n    runs-on: ubuntu-latest')],
+  ["npm publish ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: npm publish\n\n      - name: Smoke latest OpenCode")],
+  ["tag creation ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: git tag canary\n\n      - name: Smoke latest OpenCode")],
+  ["issue creation ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: gh issue create --title canary\n\n      - name: Smoke latest OpenCode")],
+  ["dependency update ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: npm update\n\n      - name: Smoke latest OpenCode")],
+  ["npm ci ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: npm ci\n\n      - name: Smoke latest OpenCode")],
+  ["checkout cache ban", (workflow) => workflow.replace("        uses: actions/checkout@v4", "        uses: actions/checkout@v4\n        with:\n          cache: npm")],
+  ["cache action ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - uses: actions/cache@v4\n\n      - name: Smoke latest OpenCode")],
+  ["artifact action ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - uses: actions/upload-artifact@v4\n\n      - name: Smoke latest OpenCode")],
+  ["repository mutation ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: git push origin HEAD\n\n      - name: Smoke latest OpenCode")],
+]) {
+  test(`compatibility canary requires ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/compatibility-canary.yml", mutate(VALID_CANARY_WORKFLOW));
+    assertInvalidCompatibility(() => checkCompatibility(root), /compatibility canary/i);
+  });
+}
+
+for (const [label, workflow] of [
+  ["missing latest job", VALID_CANARY_WORKFLOW.replace("  latest:\n", "  renamed:\n")],
+  ["duplicate latest job", `${VALID_CANARY_WORKFLOW}\n  latest:\n    runs-on: ubuntu-latest\n`],
+  ["duplicate jobs mapping", `${VALID_CANARY_WORKFLOW}\njobs:\n  sidecar:\n    runs-on: ubuntu-latest\n`],
+  ["duplicate start marker", VALID_CANARY_WORKFLOW.replace("  # compatibility-canary:start", "  # compatibility-canary:start\n  # compatibility-canary:start")],
+  ["duplicate end marker", VALID_CANARY_WORKFLOW.replace("  # compatibility-canary:end", "  # compatibility-canary:end\n  # compatibility-canary:end")],
+  [
+    "reversed markers",
+    VALID_CANARY_WORKFLOW
+      .replace("# compatibility-canary:start", "# compatibility-canary:temporary")
+      .replace("# compatibility-canary:end", "# compatibility-canary:start")
+      .replace("# compatibility-canary:temporary", "# compatibility-canary:end"),
+  ],
+  ["trailing job key", VALID_CANARY_WORKFLOW.replace("  # compatibility-canary:end", "  # compatibility-canary:end\n    timeout-minutes: 5")],
+  ["trailing steps key", VALID_CANARY_WORKFLOW.replace("  # compatibility-canary:end", "  # compatibility-canary:end\n    steps:\n      - run: echo bypass")],
+]) {
+  test(`compatibility canary rejects ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/compatibility-canary.yml", workflow);
+    assertInvalidCompatibility(() => checkCompatibility(root), /compatibility canary/i);
+  });
+}
 
 function shellQuote(value) {
   return `'${value.replaceAll("'", `'\\''`)}'`;

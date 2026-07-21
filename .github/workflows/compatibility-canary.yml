@@ -1,0 +1,26 @@
+name: Compatibility Canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # compatibility-canary:start
+  latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Smoke latest OpenCode
+        run: bash scripts/opencode-compat-smoke.sh latest
+  # compatibility-canary:end
