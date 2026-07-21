@@ -332,3 +332,52 @@ test("installation must declare the canonical Node engine", (t) => {
     /docs\/installation\.md must declare the canonical Node engine/,
   );
 });
+
+test("documentation cannot escape the repository through a symlinked directory", (t) => {
+  const root = makeFixture(t);
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), "oak-compat-external-"));
+  t.after(() => fs.rmSync(external, { recursive: true, force: true }));
+  writeText(external, "compatibility.md", COMPATIBILITY_MATRIX);
+  writeText(external, "installation.md", INSTALLATION);
+  fs.rmSync(path.join(root, "docs"), { recursive: true });
+  fs.symlinkSync(external, path.join(root, "docs"), "dir");
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /docs\/compatibility\.md must be a safe regular file|escape/,
+  );
+});
+
+test("documentation requires exactly one start marker", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    "docs/compatibility.md",
+    COMPATIBILITY_MATRIX.replace(
+      "<!-- compatibility-matrix:start -->",
+      "<!-- compatibility-matrix:start -->\n<!-- compatibility-matrix:start -->",
+    ),
+  );
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /docs\/compatibility\.md must contain exactly one start and one end marker/,
+  );
+});
+
+test("documentation rejects a duplicated surface before status resolution", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    "docs/compatibility.md",
+    COMPATIBILITY_MATRIX.replace(
+      "| Node.js 22 | supported |",
+      "| Node.js 22 | unsupported | duplicate |\n| Node.js 22 | supported |",
+    ),
+  );
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /docs\/compatibility\.md must not duplicate surface Node\.js 22/,
+  );
+});

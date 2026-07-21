@@ -56,6 +56,16 @@ function assertExactKeys(value, expected, label) {
 
 function readRegularText(root, relative, fsOps = fs) {
   const full = path.join(root, relative);
+  const realRoot = fsOps.realpathSync(root);
+  const realFull = fsOps.realpathSync(full);
+  const resolvedRelative = path.relative(realRoot, realFull);
+  if (
+    resolvedRelative === ".." ||
+    resolvedRelative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(resolvedRelative)
+  ) {
+    throw invalid(`${relative} must be a safe regular file`);
+  }
   const stat = fsOps.lstatSync(full);
   if (stat.isSymbolicLink() || !stat.isFile()) {
     throw invalid(`${relative} must be a safe regular file`);
@@ -160,10 +170,15 @@ function validatePackages(root, data, fsOps) {
 function extractMarkedMatrix(text) {
   const start = "<!-- compatibility-matrix:start -->";
   const end = "<!-- compatibility-matrix:end -->";
+  const startCount = text.split(start).length - 1;
+  const endCount = text.split(end).length - 1;
   const first = text.indexOf(start);
   const last = text.indexOf(end);
-  if (first < 0 || last <= first) {
-    throw invalid("docs/compatibility.md matrix markers are missing");
+  if (startCount !== 1 || endCount !== 1) {
+    throw invalid("docs/compatibility.md must contain exactly one start and one end marker");
+  }
+  if (last <= first) {
+    throw invalid("docs/compatibility.md matrix markers must be in order");
   }
   return text.slice(first + start.length, last);
 }
@@ -181,7 +196,13 @@ function validateDocumentation(root, data, fsOps) {
     if (cells.length >= 2 && !STATUS_TERMS.has(cells[1])) {
       throw invalid(`unknown compatibility status: ${cells[1]}`);
     }
-    if (cells.length >= 3) rows.set(cells[0].replaceAll("`", ""), cells[1]);
+    if (cells.length >= 3) {
+      const surface = cells[0].replaceAll("`", "");
+      if (rows.has(surface)) {
+        throw invalid(`docs/compatibility.md must not duplicate surface ${surface}`);
+      }
+      rows.set(surface, cells[1]);
+    }
   }
 
   for (const [surface, expectedStatus] of EXPECTED_MATRIX_STATUSES) {
