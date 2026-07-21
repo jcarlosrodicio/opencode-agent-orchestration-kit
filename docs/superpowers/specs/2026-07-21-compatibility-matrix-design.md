@@ -149,18 +149,18 @@ include the exact version and environment emitted by CI; broad families remain
 | Node.js 24 | supported | major 24; blocking CI |
 | Node.js 26 | experimental | non-blocking canary only |
 | Node.js 20 and EOL/odd lines | unsupported | no release guarantee |
-| OpenCode 1.14.41 | tested boundary | minimum blocking core smoke |
-| OpenCode 1.18.4 | tested boundary | pinned stable blocking core smoke |
+| OpenCode 1.14.41 | tested | minimum boundary in the blocking core smoke |
+| OpenCode 1.18.4 | tested | pinned stable boundary in the blocking core smoke |
 | OpenCode >=1.14.41 <2.0.0 | supported | boundary-tested compatibility promise |
 | OpenCode <1.14.41 or >=2.0.0 | unsupported | requires a reviewed policy change |
-| `@opencode-ai/plugin` 1.14.41 | tested pin | install, import, and typecheck evidence |
-| OpenTUI core/solid 0.2.5 | tested pins | install, import, and typecheck evidence |
+| `@opencode-ai/plugin` 1.14.41 | tested | exact pin with install, import, and typecheck evidence |
+| OpenTUI core/solid 0.2.5 | tested | exact pins with install, import, and typecheck evidence |
 | Ubuntu GitHub runner | tested | blocking Node 22 and 24 jobs |
 | macOS GitHub runner | tested | blocking Node 24 job; runner details recorded |
 | Other mainstream Linux/macOS environments | supported | Bash, Node, and OpenCode must support the host |
 | WSL2 | experimental | recommended upstream path, no kit-owned runner |
 | Native Windows | unsupported | Bash lifecycle wrappers have no native contract |
-| Token usage plugin | experimental runtime | compile/import is tested; session-tree behavior is not stable API evidence |
+| Token usage plugin | experimental | compile/import is tested; runtime session-tree behavior is not stable API evidence |
 | Open Design Docker adapter | experimental | optional pinned image inputs, no blocking integration smoke |
 | Superpowers | experimental | optional upstream Git plugin, not part of core smoke |
 | Impeccable | experimental | optional externally installed skill |
@@ -202,21 +202,41 @@ SDK, and OpenTUI versions used. Documentation may cite a combination as
 The core smoke will run on Ubuntu/Node 24 for the two declared OpenCode
 boundaries. It will install the requested CLI version in an isolated temporary
 environment and must not use the operator's global config, credentials, cache,
-or state.
+state, or inherited provider environment.
 
 For each boundary it will verify:
 
 ```text
 opencode --version
-opencode debug config --pure
 opencode debug agent lead --pure
 ```
 
-The shipped `opencode/` directory will be selected through
-`OPENCODE_CONFIG_DIR`. OpenCode's `--pure` flag disables external plugins, so
-the core smoke does not fetch Superpowers, contact Open Design, or require a
-model provider. The smoke must assert the exact CLI version and the presence of
-the shipped `lead` agent; a zero exit alone is insufficient.
+The smoke will invoke OpenCode through an environment allowlist rather than
+inheriting the caller's environment. It will preserve only the executable
+`PATH` plus these temporary or explicit values:
+
+```text
+HOME
+XDG_CONFIG_HOME
+XDG_DATA_HOME
+XDG_CACHE_HOME
+XDG_STATE_HOME
+npm_config_cache
+OPENCODE_CONFIG_DIR
+```
+
+Every home, XDG, and npm cache path will live under one fresh temporary root;
+`OPENCODE_CONFIG_DIR` alone will point at the shipped `opencode/` tree. The
+script must clear inherited provider/API variables by constructing this
+allowlisted environment, clean the temporary root on exit, and reject output
+containing the caller's original home path.
+
+OpenCode's `--pure` flag disables external plugins, so the core smoke does not
+fetch Superpowers, contact Open Design, or require a model provider. The smoke
+deliberately avoids `debug config` because resolved configuration output is
+unnecessary for the acceptance criteria and creates avoidable disclosure risk.
+It must assert the exact CLI version and the presence of the shipped `lead`
+agent; a zero exit alone is insufficient.
 
 The core smoke does not prove the token-usage plugin runtime contract because
 `--pure` intentionally excludes plugin execution. Token plugin install,
@@ -226,12 +246,14 @@ experimental.
 ## Canary design
 
 A separate scheduled and manually dispatchable workflow will run
-`opencode-ai@latest` with the same isolated pure core smoke on Ubuntu/Node 24.
+`opencode-ai@latest` with the same isolated pure core smoke on Ubuntu/Node 26.
 
 The canary will:
 
 - use `continue-on-error` or an equivalent job-level non-blocking contract;
 - print the resolved OpenCode version;
+- read Node 26 from `compatibility.json.node.canary_major` through the same
+  checked workflow contract used by the blocking matrix;
 - never modify `compatibility.json`;
 - never update dependencies, open issues, publish packages, or create tags;
 - fail visibly in its own workflow while leaving branch and release checks
@@ -253,6 +275,7 @@ It will reject:
 - dependency-pin drift from the canonical SDK fields;
 - missing or extra blocking Node majors;
 - missing OpenCode boundary jobs;
+- a canary Node version that differs from `node.canary_major`;
 - a canary that is release-blocking or uses a fixed version instead of the
   declared moving tag;
 - README or compatibility documentation that omits the supported OpenCode
