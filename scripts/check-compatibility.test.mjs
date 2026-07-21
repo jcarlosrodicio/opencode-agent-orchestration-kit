@@ -903,6 +903,23 @@ for (const [label, mutate] of [
   });
 }
 
+test("compatibility canary latest job must inherit top-level permissions", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    ".github/workflows/compatibility-canary.yml",
+    VALID_CANARY_WORKFLOW.replace(
+      "  latest:\n",
+      "  latest:\n    permissions:\n      contents: read\n",
+    ),
+  );
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /compatibility canary job-level permissions are forbidden/,
+  );
+});
+
 for (const [label, workflow] of [
   ["missing latest job", VALID_CANARY_WORKFLOW.replace("  latest:\n", "  renamed:\n")],
   ["duplicate latest job", `${VALID_CANARY_WORKFLOW}\n  latest:\n    runs-on: ubuntu-latest\n`],
