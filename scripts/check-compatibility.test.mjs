@@ -709,11 +709,15 @@ test ! -e "$2/.oak"
 
   const request = options.request ?? "1.14.41";
   const version = options.resolvedVersion ?? (options.wrongVersion ? "9.9.9" : request);
-  const leak = options.leakOriginalPath ? `,\"source\":${JSON.stringify(root)}` : "";
+  const stdoutLeakPath = options.stdoutLeak === "root" ? root : options.stdoutLeak;
+  const leak = stdoutLeakPath ? `,\"source\":${JSON.stringify(stdoutLeakPath)}` : "";
   const stderrLeakPath = options.stderrLeak === "root" ? root : options.stderrLeak;
-  const stderrLeak = stderrLeakPath
-    ? `printf '%s\\n' ${shellQuote(stderrLeakPath)} >&2`
-    : ":";
+  let stderrLeak = ":";
+  if (stderrLeakPath === "smoke") {
+    stderrLeak = `printf '%s\\n' "$smoke_root/SMOKE_TEMP_MARKER" >&2`;
+  } else if (stderrLeakPath) {
+    stderrLeak = `printf '%s\\n' ${shellQuote(stderrLeakPath)} >&2`;
+  }
   writeExecutable(root, "fake-bin/npx", `#!/bin/sh
 set -eu
 touch ${shellQuote(path.join(root, "npx-called"))}
@@ -747,7 +751,7 @@ case "$1" in
     test "$3" = lead
     test "$4" = --pure
     grep -q '^mode: primary$' "$OPENCODE_CONFIG_DIR/agents/lead.md"
-    printf '%s\\n' '{\"name\":\"lead\",\"mode\":\"primary\"${leak}}'
+    printf '{\"name\":\"lead\",\"mode\":\"primary\",\"config\":\"%s\"${leak}}\\n' "$OPENCODE_CONFIG_DIR"
     ;;
   *) exit 43;;
 esac
@@ -780,6 +784,18 @@ test("OpenCode compatibility smoke uses only the packaged isolated config", (t) 
     result.stdout,
     "opencode compatibility smoke ok: requested=1.14.41 resolved=1.14.41\n",
   );
+});
+
+test("OpenCode compatibility smoke suppresses temporary stderr paths without failing", (t) => {
+  const root = makeCompatibilitySmokeFixture(t, { stderrLeak: "smoke" });
+  const result = runCompatibilitySmoke(root);
+
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  assert.equal(
+    result.stdout,
+    "opencode compatibility smoke ok: requested=1.14.41 resolved=1.14.41\n",
+  );
+  assert.equal(result.stderr.includes("SMOKE_TEMP_MARKER"), false);
 });
 
 test("OpenCode compatibility smoke rejects a non-canonical explicit version before tools run", (t) => {
@@ -823,11 +839,25 @@ for (const [label, leakPath] of [
   });
 }
 
+for (const [label, leakPath] of [
+  ["original repository", "root"],
+  ["original home", process.env.HOME],
+]) {
+  if (!leakPath && label === "original home") continue;
+
+  test(`OpenCode compatibility smoke rejects an ${label} path leaked on stdout`, (t) => {
+    const root = makeCompatibilitySmokeFixture(t, { stdoutLeak: leakPath });
+    const result = runCompatibilitySmoke(root);
+
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, "");
+  });
+}
+
 for (const [name, options] of [
   ["a mismatched resolved version", { wrongVersion: true }],
   ["a missing packaged lead", { packagedLead: "missing" }],
   ["an incorrect packaged lead mode", { packagedLead: "all" }],
-  ["output that leaks the original repository path", { leakOriginalPath: true }],
 ]) {
   test(`OpenCode compatibility smoke rejects ${name}`, (t) => {
     const root = makeCompatibilitySmokeFixture(t, options);

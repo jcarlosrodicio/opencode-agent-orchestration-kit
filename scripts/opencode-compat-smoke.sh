@@ -92,12 +92,21 @@ run_opencode() {
 contains_forbidden_path() {
   local output="$1"
   local forbidden
-  for forbidden in "$original_home" "$root" "$smoke_root"; do
+  for forbidden in "$original_home" "$root"; do
     if [[ -n "$forbidden" && "$output" == *"$forbidden"* ]]; then
       return 0
     fi
   done
   return 1
+}
+
+emit_safe_diagnostics() {
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" != *"$smoke_root"* ]]; then
+      printf '%s\n' "$line" >&2
+    fi
+  done <"$diagnostics_file"
 }
 
 fail_with_diagnostics() {
@@ -107,7 +116,7 @@ fail_with_diagnostics() {
   if contains_forbidden_path "$diagnostics"; then
     echo "captured diagnostics contained a private path" >&2
   else
-    cat "$diagnostics_file" >&2
+    emit_safe_diagnostics
     echo "$message" >&2
   fi
   exit 1
@@ -161,5 +170,5 @@ if contains_forbidden_path "$diagnostics"; then
   echo "captured diagnostics contained a private path" >&2
   exit 1
 fi
-cat "$diagnostics_file" >&2
+emit_safe_diagnostics
 printf 'opencode compatibility smoke ok: requested=%s resolved=%s\n' "$request" "$actual"
