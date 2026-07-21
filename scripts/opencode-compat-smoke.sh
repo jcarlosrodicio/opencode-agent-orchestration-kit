@@ -34,6 +34,9 @@ mkdir -p \
   "$smoke_root/cache" \
   "$smoke_root/state" \
   "$smoke_root/npm"
+diagnostics_file="$smoke_root/diagnostics"
+: >"$diagnostics_file"
+test -f "$diagnostics_file" && test ! -L "$diagnostics_file"
 
 source_config="$root/opencode"
 target_config="$smoke_root/config/opencode"
@@ -68,7 +71,8 @@ if [[ ! -f "$target_config/agents/lead.md" || -e "$target_config/opencode" ]]; t
   exit 1
 fi
 
-run_isolated() {
+run_isolated() (
+  cd "$smoke_root/home"
   env -i \
     PATH="$PATH" \
     HOME="$smoke_root/home" \
@@ -79,35 +83,59 @@ run_isolated() {
     npm_config_cache="$smoke_root/npm" \
     OPENCODE_CONFIG_DIR="$target_config" \
     "$@"
-}
+)
 
 run_opencode() {
   run_isolated npx --yes --package "opencode-ai@$request" opencode "$@"
 }
 
-run_isolated npm --prefix "$target_config" ci --ignore-scripts >/dev/null
+contains_forbidden_path() {
+  local output="$1"
+  local forbidden
+  for forbidden in "$original_home" "$root" "$smoke_root"; do
+    if [[ -n "$forbidden" && "$output" == *"$forbidden"* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
 
-actual="$(run_opencode --version)"
-if [[ "$request" == "latest" ]]; then
-  if [[ ! "$actual" =~ $canonical_version_re ]]; then
-    echo "latest OpenCode did not resolve to a canonical version" >&2
-    exit 1
+fail_with_diagnostics() {
+  local message="$1"
+  local diagnostics
+  diagnostics="$(<"$diagnostics_file")"
+  if contains_forbidden_path "$diagnostics"; then
+    echo "captured diagnostics contained a private path" >&2
+  else
+    cat "$diagnostics_file" >&2
+    echo "$message" >&2
   fi
-elif [[ "$actual" != "$request" ]]; then
-  echo "resolved OpenCode version did not match the request" >&2
   exit 1
+}
+
+if ! run_isolated npm --prefix "$target_config" ci --ignore-scripts \
+  >/dev/null 2>>"$diagnostics_file"; then
+  fail_with_diagnostics "isolated npm install failed"
 fi
 
-agent_json="$(run_opencode debug agent lead --pure)"
+if ! actual="$(run_opencode --version 2>>"$diagnostics_file")"; then
+  fail_with_diagnostics "OpenCode version command failed"
+fi
+if [[ "$request" == "latest" ]]; then
+  if [[ ! "$actual" =~ $canonical_version_re ]]; then
+    fail_with_diagnostics "latest OpenCode did not resolve to a canonical version"
+  fi
+elif [[ "$actual" != "$request" ]]; then
+  fail_with_diagnostics "resolved OpenCode version did not match the request"
+fi
+
+if ! agent_json="$(run_opencode debug agent lead --pure 2>>"$diagnostics_file")"; then
+  fail_with_diagnostics "OpenCode lead debug command failed"
+fi
 
 for output in "$actual" "$agent_json"; do
-  if [[ -n "$original_home" && "$output" == *"$original_home"* ]]; then
-    echo "OpenCode output exposed the original home path" >&2
-    exit 1
-  fi
-  if [[ -n "$root" && "$output" == *"$root"* ]]; then
-    echo "OpenCode output exposed the original repository path" >&2
-    exit 1
+  if contains_forbidden_path "$output"; then
+    fail_with_diagnostics "OpenCode output contained a private path"
   fi
 done
 
@@ -125,8 +153,13 @@ if ! printf '%s' "$agent_json" | node -e '
     if (agent?.name !== "lead" || agent?.mode !== "primary") process.exit(1);
   });
 '; then
-  echo "packaged lead did not resolve as a primary agent" >&2
-  exit 1
+  fail_with_diagnostics "packaged lead did not resolve as a primary agent"
 fi
 
+diagnostics="$(<"$diagnostics_file")"
+if contains_forbidden_path "$diagnostics"; then
+  echo "captured diagnostics contained a private path" >&2
+  exit 1
+fi
+cat "$diagnostics_file" >&2
 printf 'opencode compatibility smoke ok: requested=%s resolved=%s\n' "$request" "$actual"

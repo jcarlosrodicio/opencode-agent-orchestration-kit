@@ -684,6 +684,9 @@ function makeCompatibilitySmokeFixture(t, options = {}) {
 set -eu
 touch ${shellQuote(path.join(root, "npm-called"))}
 smoke_root=\${HOME%/home}
+smoke_home="$(CDPATH= cd "$HOME" && pwd -P)"
+test "$(pwd -P)" = "$smoke_home"
+test "\${PWD-}" = "$smoke_home"
 test "$#" -eq 4
 test "$1" = --prefix
 test "$2" = "$smoke_root/config/opencode"
@@ -707,11 +710,18 @@ test ! -e "$2/.oak"
   const request = options.request ?? "1.14.41";
   const version = options.resolvedVersion ?? (options.wrongVersion ? "9.9.9" : request);
   const leak = options.leakOriginalPath ? `,\"source\":${JSON.stringify(root)}` : "";
+  const stderrLeakPath = options.stderrLeak === "root" ? root : options.stderrLeak;
+  const stderrLeak = stderrLeakPath
+    ? `printf '%s\\n' ${shellQuote(stderrLeakPath)} >&2`
+    : ":";
   writeExecutable(root, "fake-bin/npx", `#!/bin/sh
 set -eu
 touch ${shellQuote(path.join(root, "npx-called"))}
 if env | grep -q '^FAKE_PROVIDER_TOKEN='; then exit 41; fi
 smoke_root=\${HOME%/home}
+smoke_home="$(CDPATH= cd "$HOME" && pwd -P)"
+test "$(pwd -P)" = "$smoke_home"
+test "\${PWD-}" = "$smoke_home"
 test "$HOME" = "$smoke_root/home"
 test "$XDG_CONFIG_HOME" = "$smoke_root/config"
 test "$XDG_DATA_HOME" = "$smoke_root/data"
@@ -728,6 +738,7 @@ shift 4
 case "$1" in
   --version)
     test "$#" -eq 1
+    ${stderrLeak}
     printf '%s\\n' '${version}'
     ;;
   debug)
@@ -792,6 +803,25 @@ test("OpenCode compatibility smoke rejects a non-canonical latest resolution", (
   assert.equal(result.stdout, "");
   assert.equal(fs.existsSync(path.join(root, "npx-called")), true);
 });
+
+for (const [label, leakPath] of [
+  ["original repository", "root"],
+  ["original home", process.env.HOME],
+]) {
+  if (!leakPath && label === "original home") continue;
+
+  test(`OpenCode compatibility smoke suppresses an ${label} path leaked on stderr`, (t) => {
+    const root = makeCompatibilitySmokeFixture(t, {
+      stderrLeak: leakPath,
+    });
+    const forbiddenPath = leakPath === "root" ? root : leakPath;
+    const result = runCompatibilitySmoke(root);
+
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr.includes(forbiddenPath), false);
+  });
+}
 
 for (const [name, options] of [
   ["a mismatched resolved version", { wrongVersion: true }],
