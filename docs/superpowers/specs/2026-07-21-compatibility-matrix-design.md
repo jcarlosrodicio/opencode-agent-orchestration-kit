@@ -225,11 +225,18 @@ npm_config_cache
 OPENCODE_CONFIG_DIR
 ```
 
-Every home, XDG, and npm cache path will live under one fresh temporary root;
-`OPENCODE_CONFIG_DIR` alone will point at the shipped `opencode/` tree. The
-script must clear inherited provider/API variables by constructing this
+Every home, XDG, npm cache, and config path will live under one fresh temporary
+root. Before invoking OpenCode, the smoke will copy the shipped `opencode/`
+tree into that root while excluding generated or mutable directories such as
+`node_modules` and `.oak`; `OPENCODE_CONFIG_DIR` will point at this isolated
+copy. The copy must come from the working tree so local pre-commit validation
+exercises the implementation being reviewed rather than `HEAD`.
+
+The script must clear inherited provider/API variables by constructing this
 allowlisted environment, clean the temporary root on exit, and reject output
-containing the caller's original home path.
+containing the caller's original home or repository path. The smoke must not
+use a symlink back to the checkout because OpenCode resolves skill locations
+to absolute paths in `debug agent` output.
 
 OpenCode's `--pure` flag disables external plugins, so the core smoke does not
 fetch Superpowers, contact Open Design, or require a model provider. The smoke
