@@ -190,6 +190,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -897,6 +899,30 @@ for (const [label, mutate] of [
   ["repository mutation ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: git push origin HEAD\n\n      - name: Smoke latest OpenCode")],
 ]) {
   test(`compatibility canary requires ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/compatibility-canary.yml", mutate(VALID_CANARY_WORKFLOW));
+    assertInvalidCompatibility(() => checkCompatibility(root), /compatibility canary/i);
+  });
+}
+
+for (const [label, mutate] of [
+  [
+    "missing persist-credentials",
+    (workflow) => workflow.replace("        with:\n          persist-credentials: false\n", ""),
+  ],
+  [
+    "persist-credentials true",
+    (workflow) => workflow.replace("persist-credentials: false", "persist-credentials: true"),
+  ],
+  [
+    "duplicate persist-credentials",
+    (workflow) => workflow.replace(
+      "          persist-credentials: false",
+      "          persist-credentials: false\n          persist-credentials: false",
+    ),
+  ],
+]) {
+  test(`compatibility canary rejects ${label}`, (t) => {
     const root = makeFixture(t);
     writeText(root, ".github/workflows/compatibility-canary.yml", mutate(VALID_CANARY_WORKFLOW));
     assertInvalidCompatibility(() => checkCompatibility(root), /compatibility canary/i);

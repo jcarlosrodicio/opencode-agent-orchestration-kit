@@ -502,6 +502,8 @@ function validateCompatibilityCanary(root, data, fsOps) {
     "    steps:",
     "      - name: Checkout",
     "        uses: actions/checkout@v4",
+    "        with:",
+    "          persist-credentials: false",
     "",
     "      - name: Setup Node",
     "        uses: actions/setup-node@v4",
