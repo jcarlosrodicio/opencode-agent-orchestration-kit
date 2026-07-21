@@ -19,8 +19,11 @@ upgrade.sh
 doctor.sh
 rollback.sh
 package.json
+compatibility.json
 scripts/version.mjs
 scripts/version.test.mjs
+scripts/check-compatibility.mjs
+scripts/check-compatibility.test.mjs
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
 docs/releases/v${kit_version}.md
@@ -72,6 +75,7 @@ for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/che
 done
 
 node scripts/version.mjs --check
+node scripts/check-compatibility.mjs
 
 node -e "JSON.parse(require('fs').readFileSync('opencode/opencode.json','utf8')); JSON.parse(require('fs').readFileSync('docker/open-design/opencode-od/opencode.json','utf8')); console.log('json ok')"
 (cd opencode && node scripts/check-harness.mjs)

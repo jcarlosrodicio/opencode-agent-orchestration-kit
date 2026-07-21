@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "node": {
+    "engines": "^22.9.0 || ^24.0.0",
+    "blocking_majors": [22, 24],
+    "canary_major": 26
+  },
+  "opencode": {
+    "supported_range": ">=1.14.41 <2.0.0",
+    "minimum_tested": "1.14.41",
+    "stable_tested": "1.18.4",
+    "canary": "latest"
+  },
+  "sdk": {
+    "opencode_plugin": "1.14.41",
+    "opentui_core": "0.2.5",
+    "opentui_solid": "0.2.5"
+  }
+}
