@@ -632,6 +632,32 @@ test("workflow rejects write permissions", (t) => {
   assertInvalidCompatibility(() => checkCompatibility(root), /read-only permissions/);
 });
 
+for (const [job, workflow] of [
+  [
+    "check",
+    VALID_WORKFLOW.replace(
+      "  check:\n",
+      "  check:\n    permissions:\n      contents: read\n",
+    ),
+  ],
+  [
+    "opencode-compatibility",
+    VALID_WORKFLOW.replace(
+      "  opencode-compatibility:\n",
+      "  opencode-compatibility:\n    permissions:\n      contents: read\n",
+    ),
+  ],
+]) {
+  test(`workflow requires jobs.${job} to inherit top-level permissions`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/check.yml", workflow);
+    assertInvalidCompatibility(
+      () => checkCompatibility(root),
+      /job-level permissions are forbidden/,
+    );
+  });
+}
+
 test("workflow rejects publish commands", (t) => {
   const root = makeFixture(t);
   writeText(root, ".github/workflows/check.yml", `${VALID_WORKFLOW}      - run: npm publish\n`);

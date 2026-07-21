@@ -286,6 +286,12 @@ function extractBlockingJob(workflow) {
   return jobsBody.slice(checkStart, checkEnd);
 }
 
+function rejectJobLevelPermissions(job) {
+  if (/^    permissions\s*:/m.test(job)) {
+    throw invalid("workflow job-level permissions are forbidden; jobs must inherit top-level permissions");
+  }
+}
+
 function validateOpenCodeBoundaryJob(workflow, data) {
   const marked = extractMarkedSection(
     workflow,
@@ -315,6 +321,7 @@ function validateOpenCodeBoundaryJob(workflow, data) {
     '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
   ].join("\n");
   const actualJob = marked.replace(/^\n/, "").replace(/\n  $/, "");
+  rejectJobLevelPermissions(actualJob);
 
   if (actualJob !== expectedJob) {
     throw invalid(
@@ -337,6 +344,7 @@ function validateOpenCodeBoundaryJob(workflow, data) {
 function validateWorkflow(root, data, fsOps) {
   const workflow = readRegularText(root, ".github/workflows/check.yml", fsOps);
   const blockingJob = extractBlockingJob(workflow);
+  rejectJobLevelPermissions(blockingJob);
   const marked = extractMarkedSection(
     blockingJob,
     "# compatibility-blocking:start",
