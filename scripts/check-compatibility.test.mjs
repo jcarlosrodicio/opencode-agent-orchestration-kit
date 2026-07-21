@@ -26,6 +26,20 @@ const VALID_COMPATIBILITY = {
   },
 };
 
+const ROOT_PACKAGE = {
+  name: "opencode-agent-orchestration-kit",
+  engines: { node: VALID_COMPATIBILITY.node.engines },
+};
+
+const PACKAGED_PACKAGE = {
+  engines: { node: VALID_COMPATIBILITY.node.engines },
+  dependencies: {
+    "@opencode-ai/plugin": VALID_COMPATIBILITY.sdk.opencode_plugin,
+    "@opentui/core": VALID_COMPATIBILITY.sdk.opentui_core,
+    "@opentui/solid": VALID_COMPATIBILITY.sdk.opentui_solid,
+  },
+};
+
 function writeJson(root, relative, value) {
   const full = path.join(root, relative);
   fs.mkdirSync(path.dirname(full), { recursive: true });
@@ -36,7 +50,17 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "oak-compat-test-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   writeJson(root, "compatibility.json", compatibility);
+  writeJson(root, "package.json", ROOT_PACKAGE);
+  writeJson(root, "opencode/package.json", PACKAGED_PACKAGE);
   return root;
+}
+
+function assertInvalidCompatibility(action, message) {
+  assert.throws(action, (error) => {
+    assert.equal(error.code, "INVALID_COMPATIBILITY");
+    assert.match(error.message, message);
+    return true;
+  });
 }
 
 test("valid canonical compatibility schema is accepted", (t) => {
@@ -106,3 +130,77 @@ for (const [field, value] of [
     );
   });
 }
+
+test("root Node engine drift names the root package surface", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "package.json", {
+    ...ROOT_PACKAGE,
+    engines: { node: ">=22" },
+  });
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /package\.json engines\.node must match compatibility\.json node\.engines/,
+  );
+});
+
+test("packaged Node engine drift names the packaged surface", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "opencode/package.json", {
+    ...PACKAGED_PACKAGE,
+    engines: { node: ">=22" },
+  });
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /opencode\/package\.json engines\.node must match compatibility\.json node\.engines/,
+  );
+});
+
+test("packaged SDK plugin pin drift names the plugin dependency surface", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "opencode/package.json", {
+    ...PACKAGED_PACKAGE,
+    dependencies: {
+      ...PACKAGED_PACKAGE.dependencies,
+      "@opencode-ai/plugin": "1.14.42",
+    },
+  });
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /opencode\/package\.json dependency @opencode-ai\/plugin must match compatibility\.json sdk\.opencode_plugin/,
+  );
+});
+
+test("packaged OpenTUI core pin drift names the core dependency surface", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "opencode/package.json", {
+    ...PACKAGED_PACKAGE,
+    dependencies: {
+      ...PACKAGED_PACKAGE.dependencies,
+      "@opentui/core": "0.2.6",
+    },
+  });
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /opencode\/package\.json dependency @opentui\/core must match compatibility\.json sdk\.opentui_core/,
+  );
+});
+
+test("packaged OpenTUI solid pin drift names the solid dependency surface", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "opencode/package.json", {
+    ...PACKAGED_PACKAGE,
+    dependencies: {
+      ...PACKAGED_PACKAGE.dependencies,
+      "@opentui/solid": "0.2.6",
+    },
+  });
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /opencode\/package\.json dependency @opentui\/solid must match compatibility\.json sdk\.opentui_solid/,
+  );
+});

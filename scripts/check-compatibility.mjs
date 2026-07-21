@@ -111,7 +111,32 @@ export function checkCompatibility(
   return data;
 }
 
-function validateSurfaces() {
+function validatePackages(root, data, fsOps) {
+  const rootPackage = readJson(root, "package.json", fsOps);
+  if (rootPackage.engines?.node !== data.node.engines) {
+    throw invalid("package.json engines.node must match compatibility.json node.engines");
+  }
+
+  const packagedPackage = readJson(root, "opencode/package.json", fsOps);
+  if (packagedPackage.engines?.node !== data.node.engines) {
+    throw invalid("opencode/package.json engines.node must match compatibility.json node.engines");
+  }
+
+  for (const [dependency, sdkField] of [
+    ["@opencode-ai/plugin", "opencode_plugin"],
+    ["@opentui/core", "opentui_core"],
+    ["@opentui/solid", "opentui_solid"],
+  ]) {
+    if (packagedPackage.dependencies?.[dependency] !== data.sdk[sdkField]) {
+      throw invalid(
+        `opencode/package.json dependency ${dependency} must match compatibility.json sdk.${sdkField}`,
+      );
+    }
+  }
+}
+
+function validateSurfaces(root, data, fsOps) {
+  validatePackages(root, data, fsOps);
   // Added incrementally by Tasks 2-7. The default CLI always calls this path.
 }
 

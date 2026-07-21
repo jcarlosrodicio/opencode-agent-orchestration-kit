@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": "^22.9.0 || ^24.0.0"
+  },
   "dependencies": {
     "@opencode-ai/plugin": "1.14.41",
     "@opentui/core": "0.2.5",
