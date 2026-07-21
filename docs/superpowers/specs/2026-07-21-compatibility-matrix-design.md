@@ -1,8 +1,8 @@
 # Slice 1.4 Compatibility Matrix Design
 
-**Status:** Draft for review  
-**Date:** 2026-07-21  
-**Repository:** `opencode-agent-orchestration-kit`  
+**Status:** Draft for review
+**Date:** 2026-07-21
+**Repository:** `opencode-agent-orchestration-kit`
 **Predecessors:** Slice 1.1 CI coverage, Slice 1.2 safe lifecycle, Slice 1.3 canonical release identity
 
 ## Summary
