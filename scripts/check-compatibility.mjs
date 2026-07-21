@@ -14,6 +14,28 @@ const EXACT_KEYS = {
   opencode: ["supported_range", "minimum_tested", "stable_tested", "canary"],
   sdk: ["opencode_plugin", "opentui_core", "opentui_solid"],
 };
+const STATUS_TERMS = new Set(["tested", "supported", "experimental", "unsupported"]);
+const EXPECTED_MATRIX_STATUSES = new Map([
+  ["Node.js 22", "supported"],
+  ["Node.js 24", "supported"],
+  ["Node.js 26", "experimental"],
+  ["Node.js 20 and EOL/odd lines", "unsupported"],
+  ["OpenCode 1.14.41", "tested"],
+  ["OpenCode 1.18.4", "tested"],
+  ["OpenCode >=1.14.41 <2.0.0", "supported"],
+  ["OpenCode <1.14.41 or >=2.0.0", "unsupported"],
+  ["@opencode-ai/plugin 1.14.41", "tested"],
+  ["OpenTUI core/solid 0.2.5", "tested"],
+  ["Ubuntu GitHub runner", "tested"],
+  ["macOS GitHub runner", "tested"],
+  ["Other mainstream Linux/macOS environments", "supported"],
+  ["WSL2", "experimental"],
+  ["Native Windows", "unsupported"],
+  ["Token usage plugin", "experimental"],
+  ["Open Design Docker adapter", "experimental"],
+  ["Superpowers", "experimental"],
+  ["Impeccable", "experimental"],
+]);
 
 function invalid(message) {
   const error = new Error(message);
@@ -135,9 +157,70 @@ function validatePackages(root, data, fsOps) {
   }
 }
 
+function extractMarkedMatrix(text) {
+  const start = "<!-- compatibility-matrix:start -->";
+  const end = "<!-- compatibility-matrix:end -->";
+  const first = text.indexOf(start);
+  const last = text.indexOf(end);
+  if (first < 0 || last <= first) {
+    throw invalid("docs/compatibility.md matrix markers are missing");
+  }
+  return text.slice(first + start.length, last);
+}
+
+function validateDocumentation(root, data, fsOps) {
+  const docs = readRegularText(root, "docs/compatibility.md", fsOps);
+  const readme = readRegularText(root, "README.md", fsOps);
+  const installation = readRegularText(root, "docs/installation.md", fsOps);
+  const matrix = extractMarkedMatrix(docs);
+  const rows = new Map();
+
+  for (const line of matrix.split("\n")) {
+    if (!line.startsWith("|") || line.includes("---") || line.includes("Status")) continue;
+    const cells = line.split("|").map((cell) => cell.trim()).filter(Boolean);
+    if (cells.length >= 2 && !STATUS_TERMS.has(cells[1])) {
+      throw invalid(`unknown compatibility status: ${cells[1]}`);
+    }
+    if (cells.length >= 3) rows.set(cells[0].replaceAll("`", ""), cells[1]);
+  }
+
+  for (const [surface, expectedStatus] of EXPECTED_MATRIX_STATUSES) {
+    if (rows.get(surface) !== expectedStatus) {
+      throw invalid(`docs/compatibility.md must classify ${surface} as ${expectedStatus}`);
+    }
+  }
+
+  for (const token of [
+    data.node.engines,
+    data.opencode.supported_range,
+    data.opencode.minimum_tested,
+    data.opencode.stable_tested,
+    "Node.js 22",
+    "Node.js 24",
+    "Node.js 26",
+    "WSL2",
+    "Native Windows",
+    "Token usage plugin",
+    "Open Design Docker adapter",
+    "Superpowers",
+    "Impeccable",
+  ]) {
+    if (!matrix.includes(token) && !docs.includes(token)) {
+      throw invalid(`docs/compatibility.md must declare ${token}`);
+    }
+  }
+
+  if (!readme.includes("docs/compatibility.md")) {
+    throw invalid("README.md must link docs/compatibility.md");
+  }
+  if (!installation.includes(data.node.engines)) {
+    throw invalid("docs/installation.md must declare the canonical Node engine");
+  }
+}
+
 function validateSurfaces(root, data, fsOps) {
   validatePackages(root, data, fsOps);
-  // Added incrementally by Tasks 2-7. The default CLI always calls this path.
+  validateDocumentation(root, data, fsOps);
 }
 
 if (path.resolve(process.argv[1] ?? "") === SCRIPT_PATH) {

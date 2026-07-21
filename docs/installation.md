@@ -1,5 +1,9 @@
 # Installation lifecycle
 
+Prerequisites include Node.js `^22.9.0 || ^24.0.0` and npm. See the
+[compatibility matrix](compatibility.md) for supported OpenCode versions,
+platform status, exact integration pins, and evidence.
+
 ## Test without a global install
 
 ```bash

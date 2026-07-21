@@ -233,7 +233,7 @@ The safest way to try the kit is to load it from the repository directory withou
 - Git
 - Bash
 - OpenCode installed and available on your `PATH`
-- Node.js and npm
+- Node.js `^22.9.0 || ^24.0.0` and npm
 - An OpenCode-compatible model provider configured through `opencode auth login`
 
 ### 1. Clone the repository
@@ -757,10 +757,13 @@ Detailed guides are available in [`docs/`](docs/):
 
 ## Compatibility and scope
 
-- The core kit requires OpenCode.
-- Open Design, Superpowers, Impeccable, Docker, and token-usage plugins are optional.
-- Integrations are maintained as adapters around upstream projects and may require updates when upstream APIs or plugin formats change.
-- The project intentionally favors local, inspectable configuration over hosted orchestration services.
+- Node.js 22 and 24 are supported; the exact engine is `^22.9.0 || ^24.0.0`.
+- OpenCode `>=1.14.41 <2.0.0` is supported through tested boundary versions.
+- WSL2 is experimental. Native Windows is unsupported because lifecycle wrappers require Bash.
+- Open Design, Superpowers, Impeccable, Docker, and token-usage plugins remain optional.
+
+See the [complete compatibility matrix](docs/compatibility.md) for status
+definitions, exact pins, evidence, and scope.
 
 ## Contributing
 
