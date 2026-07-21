@@ -30,6 +30,26 @@ const VALID_COMPATIBILITY = {
   },
 };
 
+const REVISED_COMPATIBILITY = {
+  schema_version: 1,
+  node: {
+    engines: "^22.10.0 || ^25.0.0",
+    blocking_majors: [22, 25],
+    canary_major: 27,
+  },
+  opencode: {
+    supported_range: ">=1.15.0 <2.0.0",
+    minimum_tested: "1.15.0",
+    stable_tested: "1.19.0",
+    canary: "latest",
+  },
+  sdk: {
+    opencode_plugin: "1.15.0",
+    opentui_core: "0.3.0",
+    opentui_solid: "0.3.0",
+  },
+};
+
 const ROOT_PACKAGE = {
   name: "opencode-agent-orchestration-kit",
   engines: { node: VALID_COMPATIBILITY.node.engines },
@@ -41,6 +61,16 @@ const PACKAGED_PACKAGE = {
     "@opencode-ai/plugin": VALID_COMPATIBILITY.sdk.opencode_plugin,
     "@opentui/core": VALID_COMPATIBILITY.sdk.opentui_core,
     "@opentui/solid": VALID_COMPATIBILITY.sdk.opentui_solid,
+  },
+};
+
+const PACKAGED_LOCK = {
+  lockfileVersion: 3,
+  packages: {
+    "": {
+      engines: { node: VALID_COMPATIBILITY.node.engines },
+      dependencies: { ...PACKAGED_PACKAGE.dependencies },
+    },
   },
 };
 
@@ -250,6 +280,7 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   writeJson(root, "compatibility.json", compatibility);
   writeJson(root, "package.json", ROOT_PACKAGE);
   writeJson(root, "opencode/package.json", PACKAGED_PACKAGE);
+  writeJson(root, "opencode/package-lock.json", PACKAGED_LOCK);
   writeText(root, "docs/compatibility.md", COMPATIBILITY_MATRIX);
   writeText(root, "README.md", README);
   writeText(root, "docs/installation.md", INSTALLATION);
@@ -271,6 +302,11 @@ test("valid canonical compatibility schema is accepted", (t) => {
   assert.equal(checkCompatibility(root, { surfaces: false }).schema_version, 1);
 });
 
+test("a coherent revised compatibility contract is accepted without surfaces", (t) => {
+  const root = makeFixture(t, REVISED_COMPATIBILITY);
+  assert.deepEqual(checkCompatibility(root, { surfaces: false }), REVISED_COMPATIBILITY);
+});
+
 test("unknown compatibility schema versions are rejected", (t) => {
   const root = makeFixture(t, { ...VALID_COMPATIBILITY, schema_version: 2 });
   assert.throws(
@@ -290,22 +326,6 @@ test("non-canonical OpenCode boundaries are rejected", (t) => {
   );
 });
 
-for (const [field, value, overrides] of [
-  ["minimum_tested", "1.14.42", { supported_range: ">=1.14.42 <2.0.0" }],
-  ["stable_tested", "1.18.5", {}],
-]) {
-  test(`alternative OpenCode ${field} is rejected`, (t) => {
-    const root = makeFixture(t, {
-      ...VALID_COMPATIBILITY,
-      opencode: { ...VALID_COMPATIBILITY.opencode, [field]: value, ...overrides },
-    });
-    assert.throws(
-      () => checkCompatibility(root, { surfaces: false }),
-      new RegExp(`${field} must be`),
-    );
-  });
-}
-
 test("alternative supported OpenCode range is rejected", (t) => {
   const root = makeFixture(t, {
     ...VALID_COMPATIBILITY,
@@ -317,19 +337,20 @@ test("alternative supported OpenCode range is rejected", (t) => {
   );
 });
 
-for (const [field, value] of [
-  ["opencode_plugin", "1.14.42"],
-  ["opentui_core", "0.2.6"],
-  ["opentui_solid", "0.2.6"],
+for (const [label, node, message] of [
+  ["non-caret engine", { engines: ">=22", blocking_majors: [22], canary_major: 26 }, /node\.engines/],
+  ["engine major drift", { engines: "^22.10.0 || ^25.0.0", blocking_majors: [22, 24], canary_major: 27 }, /blocking_majors/],
+  ["duplicate blocking major", { engines: "^22.10.0 || ^22.11.0", blocking_majors: [22, 22], canary_major: 27 }, /blocking_majors/],
+  ["blocking canary major", { engines: "^22.10.0 || ^25.0.0", blocking_majors: [22, 25], canary_major: 25 }, /canary_major/],
 ]) {
-  test(`alternative SDK ${field} pin is rejected`, (t) => {
+  test(`Node compatibility rejects ${label}`, (t) => {
     const root = makeFixture(t, {
       ...VALID_COMPATIBILITY,
-      sdk: { ...VALID_COMPATIBILITY.sdk, [field]: value },
+      node,
     });
-    assert.throws(
+    assertInvalidCompatibility(
       () => checkCompatibility(root, { surfaces: false }),
-      new RegExp(`sdk\\.${field} must be`),
+      message,
     );
   });
 }
@@ -408,6 +429,48 @@ test("packaged OpenTUI solid pin drift names the solid dependency surface", (t) 
   );
 });
 
+test("lockfile Node engine drift names the lock surface", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "opencode/package-lock.json", {
+    ...PACKAGED_LOCK,
+    packages: {
+      "": { ...PACKAGED_LOCK.packages[""], engines: { node: ">=22" } },
+    },
+  });
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /opencode\/package-lock\.json engines\.node must match compatibility\.json node\.engines/,
+  );
+});
+
+for (const [dependency, sdkField, driftedVersion] of [
+  ["@opencode-ai/plugin", "opencode_plugin", "1.14.42"],
+  ["@opentui/core", "opentui_core", "0.2.6"],
+  ["@opentui/solid", "opentui_solid", "0.2.6"],
+]) {
+  test(`lockfile drift names the ${dependency} dependency surface`, (t) => {
+    const root = makeFixture(t);
+    writeJson(root, "opencode/package-lock.json", {
+      ...PACKAGED_LOCK,
+      packages: {
+        "": {
+          ...PACKAGED_LOCK.packages[""],
+          dependencies: {
+            ...PACKAGED_LOCK.packages[""].dependencies,
+            [dependency]: driftedVersion,
+          },
+        },
+      },
+    });
+
+    assertInvalidCompatibility(
+      () => checkCompatibility(root),
+      new RegExp(`opencode/package-lock\\.json dependency ${dependency.replaceAll("/", "\\/")} must match compatibility\\.json sdk\\.${sdkField}`),
+    );
+  });
+}
+
 test("documentation rejects an unknown matrix status", (t) => {
   const root = makeFixture(t);
   writeText(
@@ -420,6 +483,18 @@ test("documentation rejects an unknown matrix status", (t) => {
     () => checkCompatibility(root),
     /unknown compatibility status: supported boundary/,
   );
+});
+
+test("documentation and boundary workflow follow a promoted stable OpenCode version", (t) => {
+  const compatibility = {
+    ...VALID_COMPATIBILITY,
+    opencode: { ...VALID_COMPATIBILITY.opencode, stable_tested: "1.19.0" },
+  };
+  const root = makeFixture(t, compatibility);
+  writeText(root, "docs/compatibility.md", COMPATIBILITY_MATRIX.replaceAll("1.18.4", "1.19.0"));
+  writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW.replaceAll("1.18.4", "1.19.0"));
+
+  assert.equal(checkCompatibility(root).opencode.stable_tested, "1.19.0");
 });
 
 for (const [surface, currentStatus, replacement, expectedStatus] of [

@@ -15,17 +15,8 @@ const EXACT_KEYS = {
   sdk: ["opencode_plugin", "opentui_core", "opentui_solid"],
 };
 const STATUS_TERMS = new Set(["tested", "supported", "experimental", "unsupported"]);
-const EXPECTED_MATRIX_STATUSES = new Map([
-  ["Node.js 22", "supported"],
-  ["Node.js 24", "supported"],
-  ["Node.js 26", "experimental"],
+const STATIC_MATRIX_STATUSES = [
   ["Node.js 20 and EOL/odd lines", "unsupported"],
-  ["OpenCode 1.14.41", "tested"],
-  ["OpenCode 1.18.4", "tested"],
-  ["OpenCode >=1.14.41 <2.0.0", "supported"],
-  ["OpenCode <1.14.41 or >=2.0.0", "unsupported"],
-  ["@opencode-ai/plugin 1.14.41", "tested"],
-  ["OpenTUI core/solid 0.2.5", "tested"],
   ["Ubuntu GitHub runner", "tested"],
   ["macOS GitHub runner", "tested"],
   ["Other mainstream Linux/macOS environments", "supported"],
@@ -35,7 +26,7 @@ const EXPECTED_MATRIX_STATUSES = new Map([
   ["Open Design Docker adapter", "experimental"],
   ["Superpowers", "experimental"],
   ["Impeccable", "experimental"],
-]);
+];
 
 function invalid(message) {
   const error = new Error(message);
@@ -52,6 +43,38 @@ function assertExactKeys(value, expected, label) {
   if (JSON.stringify(actual) !== JSON.stringify(wanted)) {
     throw invalid(`${label} keys must be exactly: ${wanted.join(", ")}`);
   }
+}
+
+function parseNodeEngineMajors(value) {
+  if (typeof value !== "string") {
+    throw invalid("node.engines must list caret stable versions separated by ||");
+  }
+  const ranges = value.split(" || ");
+  if (ranges.length === 0 || ranges.some((range) => !range.startsWith("^"))) {
+    throw invalid("node.engines must list caret stable versions separated by ||");
+  }
+  try {
+    return ranges.map((range) => parseStableVersion(range.slice(1)).major);
+  } catch {
+    throw invalid("node.engines must list caret MAJOR.MINOR.PATCH versions separated by ||");
+  }
+}
+
+function expectedMatrixStatuses(data) {
+  const openTuiSurface = data.sdk.opentui_core === data.sdk.opentui_solid
+    ? `OpenTUI core/solid ${data.sdk.opentui_core}`
+    : `OpenTUI core ${data.sdk.opentui_core} / solid ${data.sdk.opentui_solid}`;
+  return new Map([
+    ...data.node.blocking_majors.map((major) => [`Node.js ${major}`, "supported"]),
+    [`Node.js ${data.node.canary_major}`, "experimental"],
+    [`OpenCode ${data.opencode.minimum_tested}`, "tested"],
+    [`OpenCode ${data.opencode.stable_tested}`, "tested"],
+    [`OpenCode ${data.opencode.supported_range}`, "supported"],
+    [`OpenCode <${data.opencode.minimum_tested} or >=2.0.0`, "unsupported"],
+    [`@opencode-ai/plugin ${data.sdk.opencode_plugin}`, "tested"],
+    [openTuiSurface, "tested"],
+    ...STATIC_MATRIX_STATUSES,
+  ]);
 }
 
 function readRegularText(root, relative, fsOps = fs) {
@@ -88,13 +111,24 @@ function validateCanonicalData(data) {
   assertExactKeys(data.opencode, EXACT_KEYS.opencode, "opencode");
   assertExactKeys(data.sdk, EXACT_KEYS.sdk, "sdk");
   if (data.schema_version !== 1) throw invalid("schema_version must be 1");
-  if (data.node.engines !== "^22.9.0 || ^24.0.0") {
-    throw invalid("node.engines must be ^22.9.0 || ^24.0.0");
+  const engineMajors = parseNodeEngineMajors(data.node.engines);
+  if (
+    !Array.isArray(data.node.blocking_majors)
+    || data.node.blocking_majors.length === 0
+    || data.node.blocking_majors.some((major) => !Number.isSafeInteger(major) || major < 1)
+    || new Set(data.node.blocking_majors).size !== data.node.blocking_majors.length
+  ) {
+    throw invalid("node.blocking_majors must contain unique positive integers");
   }
-  if (JSON.stringify(data.node.blocking_majors) !== JSON.stringify([22, 24])) {
-    throw invalid("node.blocking_majors must be [22,24]");
+  if (JSON.stringify(engineMajors) !== JSON.stringify(data.node.blocking_majors)) {
+    throw invalid("node.blocking_majors must match node.engines majors in order");
   }
-  if (data.node.canary_major !== 26) throw invalid("node.canary_major must be 26");
+  if (
+    !Number.isSafeInteger(data.node.canary_major)
+    || data.node.canary_major <= Math.max(...data.node.blocking_majors)
+  ) {
+    throw invalid("node.canary_major must be an integer greater than every blocking major");
+  }
   for (const field of ["minimum_tested", "stable_tested"]) {
     try {
       parseStableVersion(data.opencode[field]);
@@ -105,13 +139,7 @@ function validateCanonicalData(data) {
   if (compareStableVersions(data.opencode.minimum_tested, data.opencode.stable_tested) >= 0) {
     throw invalid("minimum_tested must be older than stable_tested");
   }
-  if (data.opencode.minimum_tested !== "1.14.41") {
-    throw invalid("minimum_tested must be 1.14.41");
-  }
-  if (data.opencode.stable_tested !== "1.18.4") {
-    throw invalid("stable_tested must be 1.18.4");
-  }
-  if (data.opencode.supported_range !== ">=1.14.41 <2.0.0") {
+  if (data.opencode.supported_range !== `>=${data.opencode.minimum_tested} <2.0.0`) {
     throw invalid("supported_range must begin at minimum_tested and end before 2.0.0");
   }
   if (data.opencode.canary !== "latest") throw invalid("opencode.canary must be latest");
@@ -121,15 +149,6 @@ function validateCanonicalData(data) {
     } catch {
       throw invalid(`sdk.${field} must use MAJOR.MINOR.PATCH`);
     }
-  }
-  if (data.sdk.opencode_plugin !== "1.14.41") {
-    throw invalid("sdk.opencode_plugin must be 1.14.41");
-  }
-  if (data.sdk.opentui_core !== "0.2.5") {
-    throw invalid("sdk.opentui_core must be 0.2.5");
-  }
-  if (data.sdk.opentui_solid !== "0.2.5") {
-    throw invalid("sdk.opentui_solid must be 0.2.5");
   }
   return data;
 }
@@ -162,6 +181,26 @@ function validatePackages(root, data, fsOps) {
     if (packagedPackage.dependencies?.[dependency] !== data.sdk[sdkField]) {
       throw invalid(
         `opencode/package.json dependency ${dependency} must match compatibility.json sdk.${sdkField}`,
+      );
+    }
+  }
+
+  const packagedLock = readJson(root, "opencode/package-lock.json", fsOps);
+  const lockRoot = packagedLock.packages?.[""];
+  if (!lockRoot || typeof lockRoot !== "object" || Array.isArray(lockRoot)) {
+    throw invalid("opencode/package-lock.json packages[''] must be an object");
+  }
+  if (lockRoot.engines?.node !== data.node.engines) {
+    throw invalid("opencode/package-lock.json engines.node must match compatibility.json node.engines");
+  }
+  for (const [dependency, sdkField] of [
+    ["@opencode-ai/plugin", "opencode_plugin"],
+    ["@opentui/core", "opentui_core"],
+    ["@opentui/solid", "opentui_solid"],
+  ]) {
+    if (lockRoot.dependencies?.[dependency] !== data.sdk[sdkField]) {
+      throw invalid(
+        `opencode/package-lock.json dependency ${dependency} must match compatibility.json sdk.${sdkField}`,
       );
     }
   }
@@ -225,7 +264,7 @@ function validateDocumentation(root, data, fsOps) {
     }
   }
 
-  for (const [surface, expectedStatus] of EXPECTED_MATRIX_STATUSES) {
+  for (const [surface, expectedStatus] of expectedMatrixStatuses(data)) {
     if (rows.get(surface) !== expectedStatus) {
       throw invalid(`docs/compatibility.md must classify ${surface} as ${expectedStatus}`);
     }
@@ -236,9 +275,8 @@ function validateDocumentation(root, data, fsOps) {
     data.opencode.supported_range,
     data.opencode.minimum_tested,
     data.opencode.stable_tested,
-    "Node.js 22",
-    "Node.js 24",
-    "Node.js 26",
+    ...data.node.blocking_majors.map((major) => `Node.js ${major}`),
+    `Node.js ${data.node.canary_major}`,
     "WSL2",
     "Native Windows",
     "Token usage plugin",
