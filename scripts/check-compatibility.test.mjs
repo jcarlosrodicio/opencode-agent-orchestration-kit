@@ -72,6 +72,107 @@ Canonical Node engine: \`${VALID_COMPATIBILITY.node.engines}\`.
 const README = "See [compatibility details](docs/compatibility.md).\n";
 const INSTALLATION = `- Node.js \`${VALID_COMPATIBILITY.node.engines}\` and npm\n`;
 
+const VALID_WORKFLOW = `name: Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # compatibility-blocking:start
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22
+            canonical: false
+          - os: ubuntu-latest
+            node: 24
+            canonical: true
+          - os: macos-latest
+            node: 24
+            canonical: false
+    # compatibility-blocking:end
+    runs-on: \${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: \${{ matrix.node }}
+
+      - name: Record runner evidence
+        run: |
+          uname -a || true
+          node --version
+          npm --version
+          node -e 'const p=require("./opencode/package.json"); console.log(JSON.stringify({arch:process.arch,platform:process.platform,plugin:p.dependencies["@opencode-ai/plugin"],opentuiCore:p.dependencies["@opentui/core"],opentuiSolid:p.dependencies["@opentui/solid"]}))'
+
+      - name: Validate release tag
+        if: matrix.canonical && startsWith(github.ref, 'refs/tags/')
+        run: node scripts/version.mjs --check-tag "$GITHUB_REF_NAME"
+
+      - name: Contract check
+        run: npm run contract-check
+
+      - name: Unit and script tests
+        run: npm run unit-and-script-tests
+
+      - name: Install OpenCode tool dependencies
+        working-directory: opencode
+        run: npm ci
+
+      - name: Audit OpenCode tool dependencies
+        if: matrix.canonical
+        run: npm run dependency-audit
+
+      - name: Typecheck TUI token plugin
+        run: npm run typecheck
+
+      - name: Installation smoke
+        run: npm run installation-smoke
+`;
+
+const SINGLE_JOB_WORKFLOW = `name: Check
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: node scripts/version.mjs --check-tag "$GITHUB_REF_NAME"
+      - name: Contract check
+        run: npm run contract-check
+      - name: Unit and script tests
+        run: npm run unit-and-script-tests
+      - name: Install OpenCode tool dependencies
+        working-directory: opencode
+        run: npm ci
+      - name: Audit OpenCode tool dependencies
+        run: npm run dependency-audit
+      - name: Typecheck TUI token plugin
+        run: npm run typecheck
+      - name: Installation smoke
+        run: npm run installation-smoke
+`;
+
 function writeJson(root, relative, value) {
   const full = path.join(root, relative);
   fs.mkdirSync(path.dirname(full), { recursive: true });
@@ -93,6 +194,7 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   writeText(root, "docs/compatibility.md", COMPATIBILITY_MATRIX);
   writeText(root, "README.md", README);
   writeText(root, "docs/installation.md", INSTALLATION);
+  writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW);
   return root;
 }
 
@@ -379,5 +481,125 @@ test("documentation rejects a duplicated surface before status resolution", (t) 
   assertInvalidCompatibility(
     () => checkCompatibility(root),
     /docs\/compatibility\.md must not duplicate surface Node\.js 22/,
+  );
+});
+
+test("blocking workflow accepts exactly the supported Node and OS matrix", (t) => {
+  const root = makeFixture(t);
+  assert.equal(checkCompatibility(root).schema_version, 1);
+});
+
+test("the previous single Ubuntu Node 24 job is rejected", (t) => {
+  const root = makeFixture(t);
+  writeText(root, ".github/workflows/check.yml", SINGLE_JOB_WORKFLOW);
+
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /workflow must contain exactly one compatibility blocking marker pair/,
+  );
+});
+
+for (const [label, mutate] of [
+  ["missing Ubuntu Node 22 entry", (workflow) => workflow.replace("          - os: ubuntu-latest\n            node: 22\n            canonical: false\n", "")],
+  ["missing Ubuntu Node 24 entry", (workflow) => workflow.replace("          - os: ubuntu-latest\n            node: 24\n            canonical: true\n", "")],
+  ["missing macOS Node 24 entry", (workflow) => workflow.replace("          - os: macos-latest\n            node: 24\n            canonical: false\n", "")],
+  ["extra entry", (workflow) => workflow.replace("    # compatibility-blocking:end", "          - os: ubuntu-latest\n            node: 26\n            canonical: false\n    # compatibility-blocking:end")],
+  ["duplicated entry", (workflow) => workflow.replace("    # compatibility-blocking:end", "          - os: ubuntu-latest\n            node: 24\n            canonical: true\n    # compatibility-blocking:end")],
+]) {
+  test(`blocking workflow rejects a ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/check.yml", mutate(VALID_WORKFLOW));
+    assertInvalidCompatibility(() => checkCompatibility(root), /workflow blocking matrix must be exactly/);
+  });
+}
+
+test("blocking workflow requires fail-fast false", (t) => {
+  const root = makeFixture(t);
+  writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW.replace("fail-fast: false", "fail-fast: true"));
+  assertInvalidCompatibility(() => checkCompatibility(root), /workflow strategy must set fail-fast to false/);
+});
+
+for (const [label, current, replacement, message] of [
+  ["tag validation", "if: matrix.canonical && startsWith(github.ref, 'refs/tags/')", "if: startsWith(github.ref, 'refs/tags/')", /tag validation guard/],
+  ["dependency audit", "if: matrix.canonical\n        run: npm run dependency-audit", "if: success()\n        run: npm run dependency-audit", /dependency audit guard/],
+]) {
+  test(`blocking workflow requires the exact ${label} guard`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW.replace(current, replacement));
+    assertInvalidCompatibility(() => checkCompatibility(root), message);
+  });
+}
+
+for (const [label, current, message] of [
+  ["matrix runner", "runs-on: ${{ matrix.os }}", /matrix\.os/],
+  ["matrix Node setup", "node-version: ${{ matrix.node }}", /matrix\.node/],
+  ["dependency installation", "working-directory: opencode\n        run: npm ci", /install OpenCode tool dependencies/],
+  ["contract check", "run: npm run contract-check", /contract check/],
+  ["unit and script tests", "run: npm run unit-and-script-tests", /unit and script tests/],
+  ["token plugin typecheck", "run: npm run typecheck", /token plugin typecheck/],
+  ["installation smoke", "run: npm run installation-smoke", /installation smoke/],
+]) {
+  test(`every blocking matrix job retains ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW.replace(current, "# removed by test"));
+    assertInvalidCompatibility(() => checkCompatibility(root), message);
+  });
+}
+
+for (const command of [
+  "uname -a || true",
+  "node --version",
+  "npm --version",
+  "arch:process.arch",
+  "platform:process.platform",
+  'p.dependencies["@opencode-ai/plugin"]',
+  'p.dependencies["@opentui/core"]',
+  'p.dependencies["@opentui/solid"]',
+]) {
+  test(`runner evidence requires ${command}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW.replace(command, "removed-by-test"));
+    assertInvalidCompatibility(() => checkCompatibility(root), /runner evidence/);
+  });
+}
+
+test("workflow rejects write permissions", (t) => {
+  const root = makeFixture(t);
+  writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW.replace("contents: read", "contents: write"));
+  assertInvalidCompatibility(() => checkCompatibility(root), /read-only permissions/);
+});
+
+test("workflow rejects publish commands", (t) => {
+  const root = makeFixture(t);
+  writeText(root, ".github/workflows/check.yml", `${VALID_WORKFLOW}      - run: npm publish\n`);
+  assertInvalidCompatibility(() => checkCompatibility(root), /must not publish/);
+});
+
+test("workflow requires exactly one ordered blocking marker pair", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    ".github/workflows/check.yml",
+    VALID_WORKFLOW.replace("# compatibility-blocking:start", "# compatibility-blocking:start\n    # compatibility-blocking:start"),
+  );
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /workflow must contain exactly one compatibility blocking marker pair/,
+  );
+});
+
+test("workflow requires blocking markers in order", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    ".github/workflows/check.yml",
+    VALID_WORKFLOW
+      .replace("# compatibility-blocking:start", "# compatibility-blocking:temporary")
+      .replace("# compatibility-blocking:end", "# compatibility-blocking:start")
+      .replace("# compatibility-blocking:temporary", "# compatibility-blocking:end"),
+  );
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /workflow compatibility blocking markers must be in order/,
   );
 });

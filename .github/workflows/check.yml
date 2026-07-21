@@ -13,7 +13,22 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # compatibility-blocking:start
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22
+            canonical: false
+          - os: ubuntu-latest
+            node: 24
+            canonical: true
+          - os: macos-latest
+            node: 24
+            canonical: false
+    # compatibility-blocking:end
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,10 +36,17 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
+
+      - name: Record runner evidence
+        run: |
+          uname -a || true
+          node --version
+          npm --version
+          node -e 'const p=require("./opencode/package.json"); console.log(JSON.stringify({arch:process.arch,platform:process.platform,plugin:p.dependencies["@opencode-ai/plugin"],opentuiCore:p.dependencies["@opentui/core"],opentuiSolid:p.dependencies["@opentui/solid"]}))'
 
       - name: Validate release tag
-        if: startsWith(github.ref, 'refs/tags/')
+        if: matrix.canonical && startsWith(github.ref, 'refs/tags/')
         run: node scripts/version.mjs --check-tag "$GITHUB_REF_NAME"
 
       - name: Contract check
@@ -38,6 +60,7 @@ jobs:
         run: npm ci
 
       - name: Audit OpenCode tool dependencies
+        if: matrix.canonical
         run: npm run dependency-audit
 
       - name: Typecheck TUI token plugin

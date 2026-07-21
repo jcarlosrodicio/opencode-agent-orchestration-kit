@@ -167,18 +167,22 @@ function validatePackages(root, data, fsOps) {
   }
 }
 
-function extractMarkedMatrix(text) {
-  const start = "<!-- compatibility-matrix:start -->";
-  const end = "<!-- compatibility-matrix:end -->";
+export function extractMarkedSection(text, start, end) {
   const startCount = text.split(start).length - 1;
   const endCount = text.split(end).length - 1;
   const first = text.indexOf(start);
   const last = text.indexOf(end);
   if (startCount !== 1 || endCount !== 1) {
-    throw invalid("docs/compatibility.md must contain exactly one start and one end marker");
+    if (start.includes("compatibility-matrix")) {
+      throw invalid("docs/compatibility.md must contain exactly one start and one end marker");
+    }
+    throw invalid("workflow must contain exactly one compatibility blocking marker pair");
   }
   if (last <= first) {
-    throw invalid("docs/compatibility.md matrix markers must be in order");
+    if (start.includes("compatibility-matrix")) {
+      throw invalid("docs/compatibility.md matrix markers must be in order");
+    }
+    throw invalid("workflow compatibility blocking markers must be in order");
   }
   return text.slice(first + start.length, last);
 }
@@ -187,7 +191,11 @@ function validateDocumentation(root, data, fsOps) {
   const docs = readRegularText(root, "docs/compatibility.md", fsOps);
   const readme = readRegularText(root, "README.md", fsOps);
   const installation = readRegularText(root, "docs/installation.md", fsOps);
-  const matrix = extractMarkedMatrix(docs);
+  const matrix = extractMarkedSection(
+    docs,
+    "<!-- compatibility-matrix:start -->",
+    "<!-- compatibility-matrix:end -->",
+  );
   const rows = new Map();
 
   for (const line of matrix.split("\n")) {
@@ -239,9 +247,123 @@ function validateDocumentation(root, data, fsOps) {
   }
 }
 
+function extractWorkflowStep(workflow, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = workflow.match(
+    new RegExp(`^      - name: ${escaped}\\n([\\s\\S]*?)(?=^      - name: |(?![\\s\\S]))`, "m"),
+  );
+  return match?.[0] ?? "";
+}
+
+function validateWorkflow(root, data, fsOps) {
+  const workflow = readRegularText(root, ".github/workflows/check.yml", fsOps);
+  const marked = extractMarkedSection(
+    workflow,
+    "# compatibility-blocking:start",
+    "# compatibility-blocking:end",
+  );
+  const section = marked
+    .replace(/^\n/, "")
+    .replace(/\n    $/, "")
+    .split("\n")
+    .map((line) => line.replace(/^    /, ""))
+    .join("\n");
+  const canonicalMajor = Math.max(...data.node.blocking_majors);
+  const expectedEntries = [
+    ...data.node.blocking_majors.map((node) => ({
+      os: "ubuntu-latest",
+      node,
+      canonical: node === canonicalMajor,
+    })),
+    { os: "macos-latest", node: canonicalMajor, canonical: false },
+  ];
+  const expectedSection = [
+    "strategy:",
+    "  fail-fast: false",
+    "  matrix:",
+    "    include:",
+    ...expectedEntries.flatMap(({ os, node, canonical }) => [
+      `      - os: ${os}`,
+      `        node: ${node}`,
+      `        canonical: ${canonical}`,
+    ]),
+  ].join("\n");
+  const entries = [...section.matchAll(
+    /^      - os: (ubuntu-latest|macos-latest)\n        node: (\d+)\n        canonical: (true|false)$/gm,
+  )].map((match) => ({
+    os: match[1],
+    node: Number(match[2]),
+    canonical: match[3] === "true",
+  }));
+
+  if (!section.includes("  fail-fast: false")) {
+    throw invalid("workflow strategy must set fail-fast to false");
+  }
+  if (section !== expectedSection || JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
+    throw invalid(
+      `workflow blocking matrix must be exactly ${expectedEntries.map(({ os, node, canonical }) => `${os}/${node}/canonical=${canonical}`).join(", ")}`,
+    );
+  }
+  if (!/^    runs-on: \$\{\{ matrix\.os \}\}$/m.test(workflow)) {
+    throw invalid("workflow blocking job must run on matrix.os");
+  }
+  if (!/^          node-version: \$\{\{ matrix\.node \}\}$/m.test(workflow)) {
+    throw invalid("workflow setup-node must use matrix.node");
+  }
+
+  const tagStep = extractWorkflowStep(workflow, "Validate release tag");
+  if (JSON.stringify(tagStep.match(/^        if:.*$/gm)) !== JSON.stringify([
+    "        if: matrix.canonical && startsWith(github.ref, 'refs/tags/')",
+  ])) {
+    throw invalid("workflow tag validation guard must be exact");
+  }
+  const auditStep = extractWorkflowStep(workflow, "Audit OpenCode tool dependencies");
+  if (JSON.stringify(auditStep.match(/^        if:.*$/gm)) !== JSON.stringify([
+    "        if: matrix.canonical",
+  ])) {
+    throw invalid("workflow dependency audit guard must be exact");
+  }
+
+  for (const [snippet, label] of [
+    ["working-directory: opencode\n        run: npm ci", "install OpenCode tool dependencies"],
+    ["run: npm run contract-check", "contract check"],
+    ["run: npm run unit-and-script-tests", "unit and script tests"],
+    ["run: npm run typecheck", "token plugin typecheck"],
+    ["run: npm run installation-smoke", "installation smoke"],
+  ]) {
+    if (!workflow.includes(snippet)) {
+      throw invalid(`workflow blocking job must retain ${label}`);
+    }
+  }
+
+  const evidenceStep = extractWorkflowStep(workflow, "Record runner evidence");
+  for (const token of [
+    "uname -a || true",
+    "node --version",
+    "npm --version",
+    "arch:process.arch",
+    "platform:process.platform",
+    'p.dependencies["@opencode-ai/plugin"]',
+    'p.dependencies["@opentui/core"]',
+    'p.dependencies["@opentui/solid"]',
+  ]) {
+    if (!evidenceStep.includes(token)) {
+      throw invalid(`workflow runner evidence must include ${token}`);
+    }
+  }
+
+  if (!/^permissions:\n  contents: read$/m.test(workflow) || /^\s*[^#\n]+:\s*(?:write|write-all)\s*$/m.test(workflow)) {
+    throw invalid("workflow must use read-only permissions");
+  }
+  if (/^\s*(?:run:\s*)?.*\b(?:npm|pnpm|yarn)\s+publish\b/m.test(workflow) || /\bgh\s+release\s+create\b/.test(workflow)) {
+    throw invalid("workflow must not publish");
+  }
+}
+
 function validateSurfaces(root, data, fsOps) {
   validatePackages(root, data, fsOps);
   validateDocumentation(root, data, fsOps);
+  validateWorkflow(root, data, fsOps);
 }
 
 if (path.resolve(process.argv[1] ?? "") === SCRIPT_PATH) {
