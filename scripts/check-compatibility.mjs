@@ -272,23 +272,45 @@ function extractJobsBody(workflow) {
   return afterJobs.slice(0, nextTopLevel?.index ?? afterJobs.length);
 }
 
+function extractUniqueJob(jobsBody, name, message) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const headers = [...jobsBody.matchAll(new RegExp(`^  ${escaped}:\\s*$`, "gm"))];
+  if (headers.length !== 1) throw invalid(message);
+  const jobStart = headers[0].index;
+  const afterHeader = jobsBody.slice(jobStart + headers[0][0].length);
+  const nextJob = afterHeader.match(/^  [A-Za-z0-9_-]+:\s*$/m);
+  const jobEnd = jobStart + headers[0][0].length
+    + (nextJob?.index ?? afterHeader.length);
+  return { body: jobsBody.slice(jobStart, jobEnd), start: jobStart };
+}
+
 function extractBlockingJob(workflow) {
-  const jobsBody = extractJobsBody(workflow);
-  const checkHeaders = [...jobsBody.matchAll(/^  check:\s*$/gm)];
-  if (checkHeaders.length !== 1) {
-    throw invalid("workflow must contain exactly one unambiguous jobs.check body");
-  }
-  const checkStart = checkHeaders[0].index;
-  const afterCheckHeader = jobsBody.slice(checkStart + checkHeaders[0][0].length);
-  const nextJob = afterCheckHeader.match(/^  [A-Za-z0-9_-]+:\s*$/m);
-  const checkEnd = checkStart + checkHeaders[0][0].length
-    + (nextJob?.index ?? afterCheckHeader.length);
-  return jobsBody.slice(checkStart, checkEnd);
+  return extractUniqueJob(
+    extractJobsBody(workflow),
+    "check",
+    "workflow must contain exactly one unambiguous jobs.check body",
+  ).body;
 }
 
 function rejectJobLevelPermissions(job) {
   if (/^    permissions\s*:/m.test(job)) {
     throw invalid("workflow job-level permissions are forbidden; jobs must inherit top-level permissions");
+  }
+}
+
+function rejectOpenCodeBoundaryHazards(job) {
+  rejectJobLevelPermissions(job);
+  if (/^    continue-on-error\s*:/m.test(job)) {
+    throw invalid("OpenCode boundary job must remain blocking");
+  }
+  if (/\$\{\{\s*secrets\./.test(job)) {
+    throw invalid("OpenCode boundary job must not use secrets");
+  }
+  if (
+    /^\s*(?:run:\s*)?.*\b(?:npm|pnpm|yarn)\s+publish\b/m.test(job)
+    || /\bgh\s+release\s+create\b/.test(job)
+  ) {
+    throw invalid("OpenCode boundary job must not publish");
   }
 }
 
@@ -321,23 +343,24 @@ function validateOpenCodeBoundaryJob(workflow, data) {
     '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
   ].join("\n");
   const actualJob = marked.replace(/^\n/, "").replace(/\n  $/, "");
-  rejectJobLevelPermissions(actualJob);
+  const jobsBody = extractJobsBody(workflow);
+  const completeJob = extractUniqueJob(
+    jobsBody,
+    "opencode-compatibility",
+    "OpenCode boundary job must be one separate exact job under jobs",
+  );
+  const expectedCompleteJob = `${expectedJob}\n  # opencode-boundaries:end`;
+  const markerPrefix = "  # opencode-boundaries:start\n";
+  rejectOpenCodeBoundaryHazards(completeJob.body);
 
-  if (actualJob !== expectedJob) {
+  if (
+    actualJob !== expectedJob
+    || !jobsBody.slice(0, completeJob.start).endsWith(markerPrefix)
+    || completeJob.body.trimEnd() !== expectedCompleteJob
+  ) {
     throw invalid(
       `OpenCode boundary job must exactly test ${versions.join(", ")} on Node 24 through the isolated matrix wrapper`,
     );
-  }
-
-  const jobsBody = extractJobsBody(workflow);
-  const markedBlock = `# opencode-boundaries:start${marked}# opencode-boundaries:end`;
-  if (
-    !jobsBody.includes(markedBlock)
-    || JSON.stringify(jobsBody.match(/^  opencode-compatibility:\s*$/gm)) !== JSON.stringify([
-      "  opencode-compatibility:",
-    ])
-  ) {
-    throw invalid("OpenCode boundary job must be one separate exact job under jobs");
   }
 }
 

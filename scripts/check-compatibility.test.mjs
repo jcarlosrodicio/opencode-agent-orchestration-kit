@@ -790,6 +790,32 @@ ${OPENCODE_BOUNDARY_JOB}`);
   assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
 });
 
+for (const [label, trailingYaml] of [
+  ["trailing continue-on-error", "    continue-on-error: true\n"],
+  [
+    "trailing provider secret",
+    '    env:\n      TEST_TOKEN: ${{ secrets.TEST_TOKEN }}\n',
+  ],
+  ["trailing job key", "    timeout-minutes: 5\n"],
+  [
+    "trailing steps key",
+    "    steps:\n      - name: Bypass\n        run: echo bypass\n",
+  ],
+]) {
+  test(`OpenCode boundary job rejects ${label} after its end marker`, (t) => {
+    const root = makeFixture(t);
+    writeText(
+      root,
+      ".github/workflows/check.yml",
+      VALID_WORKFLOW.replace(
+        "  # opencode-boundaries:end\n",
+        `  # opencode-boundaries:end\n${trailingYaml}`,
+      ),
+    );
+    assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
+  });
+}
+
 test("OpenCode boundary job requires exactly one marker pair", (t) => {
   const root = makeFixture(t);
   writeText(
