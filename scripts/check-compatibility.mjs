@@ -73,7 +73,13 @@ function validateCanonicalData(data) {
   if (compareStableVersions(data.opencode.minimum_tested, data.opencode.stable_tested) >= 0) {
     throw invalid("minimum_tested must be older than stable_tested");
   }
-  if (data.opencode.supported_range !== `>=${data.opencode.minimum_tested} <2.0.0`) {
+  if (data.opencode.minimum_tested !== "1.14.41") {
+    throw invalid("minimum_tested must be 1.14.41");
+  }
+  if (data.opencode.stable_tested !== "1.18.4") {
+    throw invalid("stable_tested must be 1.18.4");
+  }
+  if (data.opencode.supported_range !== ">=1.14.41 <2.0.0") {
     throw invalid("supported_range must begin at minimum_tested and end before 2.0.0");
   }
   if (data.opencode.canary !== "latest") throw invalid("opencode.canary must be latest");
@@ -83,6 +89,15 @@ function validateCanonicalData(data) {
     } catch {
       throw invalid(`sdk.${field} must use MAJOR.MINOR.PATCH`);
     }
+  }
+  if (data.sdk.opencode_plugin !== "1.14.41") {
+    throw invalid("sdk.opencode_plugin must be 1.14.41");
+  }
+  if (data.sdk.opentui_core !== "0.2.5") {
+    throw invalid("sdk.opentui_core must be 0.2.5");
+  }
+  if (data.sdk.opentui_solid !== "0.2.5") {
+    throw invalid("sdk.opentui_solid must be 0.2.5");
   }
   return data;
 }

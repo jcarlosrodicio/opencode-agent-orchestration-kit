@@ -62,3 +62,47 @@ test("non-canonical OpenCode boundaries are rejected", (t) => {
     /minimum_tested must use MAJOR.MINOR.PATCH/,
   );
 });
+
+for (const [field, value, overrides] of [
+  ["minimum_tested", "1.14.42", { supported_range: ">=1.14.42 <2.0.0" }],
+  ["stable_tested", "1.18.5", {}],
+]) {
+  test(`alternative OpenCode ${field} is rejected`, (t) => {
+    const root = makeFixture(t, {
+      ...VALID_COMPATIBILITY,
+      opencode: { ...VALID_COMPATIBILITY.opencode, [field]: value, ...overrides },
+    });
+    assert.throws(
+      () => checkCompatibility(root, { surfaces: false }),
+      new RegExp(`${field} must be`),
+    );
+  });
+}
+
+test("alternative supported OpenCode range is rejected", (t) => {
+  const root = makeFixture(t, {
+    ...VALID_COMPATIBILITY,
+    opencode: { ...VALID_COMPATIBILITY.opencode, supported_range: ">=1.14.41 <3.0.0" },
+  });
+  assert.throws(
+    () => checkCompatibility(root, { surfaces: false }),
+    /supported_range must begin at minimum_tested and end before 2.0.0/,
+  );
+});
+
+for (const [field, value] of [
+  ["opencode_plugin", "1.14.42"],
+  ["opentui_core", "0.2.6"],
+  ["opentui_solid", "0.2.6"],
+]) {
+  test(`alternative SDK ${field} pin is rejected`, (t) => {
+    const root = makeFixture(t, {
+      ...VALID_COMPATIBILITY,
+      sdk: { ...VALID_COMPATIBILITY.sdk, [field]: value },
+    });
+    assert.throws(
+      () => checkCompatibility(root, { surfaces: false }),
+      new RegExp(`sdk\\.${field} must be`),
+    );
+  });
+}
