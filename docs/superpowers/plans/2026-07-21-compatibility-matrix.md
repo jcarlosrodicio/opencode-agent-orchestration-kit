@@ -40,6 +40,48 @@
 | `.github/workflows/check.yml` | Blocking OS/Node matrix and blocking OpenCode boundary job |
 | `.github/workflows/compatibility-canary.yml` | Scheduled/manual Node 26 + OpenCode latest observation only |
 
+## Task 0: Capture immutable pre-implementation baselines
+
+**Files:**
+
+- Modify: none; the baseline artifact lives inside the public checkout's local
+  Git directory and cannot be staged.
+
+- [ ] **Step 1: Require the private-checkout input and verify both trees**
+
+Run from the public repository root:
+
+```bash
+: "${OAK_PRIVATE_CHECKOUT:?Set OAK_PRIVATE_CHECKOUT to the active private checkout}"
+git status --short --branch
+git -C "$OAK_PRIVATE_CHECKOUT" status --short --branch
+```
+
+Expected: the public tree is clean and ahead only by the already approved local
+commits; the private tree is clean. Stop rather than overwrite or hide any
+unexpected dirty state.
+
+- [ ] **Step 2: Persist the exact private SHA outside the working tree**
+
+```bash
+private_baseline_file="$(git rev-parse --git-path oak-slice-1-4-private-baseline)"
+git -C "$OAK_PRIVATE_CHECKOUT" rev-parse HEAD | tee "$private_baseline_file"
+test -s "$private_baseline_file"
+```
+
+Expected: one full 40-character commit SHA is stored under `.git/`, never in a
+tracked file. Every later private-checkout gate reads this exact artifact.
+
+- [ ] **Step 3: Record the public baseline without changing it**
+
+```bash
+git rev-parse HEAD
+git log --oneline origin/master..HEAD
+```
+
+Expected: HEAD is the approved plan commit and the local-only commit list is
+understood before implementation begins.
+
 ## Task 1: Add canonical compatibility data and schema validation
 
 **Files:**
@@ -492,12 +534,15 @@ Add tests that:
 
 1. replace `supported` with `supported boundary` and expect an unknown-status
    failure;
-2. remove the OpenCode supported range and expect a missing-range failure;
-3. remove Node 22 or Node 24 and expect a missing-supported-line failure;
-4. remove `WSL2`, `Native Windows`, or any optional integration and expect the
+2. change Node 26 to `tested`, Native Windows to `supported`, WSL2 to
+   `supported`, and each optional integration to `supported`; every mutation
+   must fail with the expected status for that exact surface;
+3. remove the OpenCode supported range and expect a missing-range failure;
+4. remove Node 22 or Node 24 and expect a missing-supported-line failure;
+5. remove `WSL2`, `Native Windows`, or any optional integration and expect the
    corresponding missing-boundary failure;
-5. remove the README link to `docs/compatibility.md` and expect failure;
-6. restore the unversioned installation text `Node.js and npm` and expect
+6. remove the README link to `docs/compatibility.md` and expect failure;
+7. restore the unversioned installation text `Node.js and npm` and expect
    failure.
 
 - [ ] **Step 2: Run the documentation tests red**
@@ -516,6 +561,27 @@ Add:
 
 ```js
 const STATUS_TERMS = new Set(["tested", "supported", "experimental", "unsupported"]);
+const EXPECTED_MATRIX_STATUSES = new Map([
+  ["Node.js 22", "supported"],
+  ["Node.js 24", "supported"],
+  ["Node.js 26", "experimental"],
+  ["Node.js 20 and EOL/odd lines", "unsupported"],
+  ["OpenCode 1.14.41", "tested"],
+  ["OpenCode 1.18.4", "tested"],
+  ["OpenCode >=1.14.41 <2.0.0", "supported"],
+  ["OpenCode <1.14.41 or >=2.0.0", "unsupported"],
+  ["@opencode-ai/plugin 1.14.41", "tested"],
+  ["OpenTUI core/solid 0.2.5", "tested"],
+  ["Ubuntu GitHub runner", "tested"],
+  ["macOS GitHub runner", "tested"],
+  ["Other mainstream Linux/macOS environments", "supported"],
+  ["WSL2", "experimental"],
+  ["Native Windows", "unsupported"],
+  ["Token usage plugin", "experimental"],
+  ["Open Design Docker adapter", "experimental"],
+  ["Superpowers", "experimental"],
+  ["Impeccable", "experimental"],
+]);
 
 function extractMarkedMatrix(text) {
   const start = "<!-- compatibility-matrix:start -->";
@@ -531,11 +597,18 @@ function validateDocumentation(root, data, fsOps) {
   const readme = readRegularText(root, "README.md", fsOps);
   const installation = readRegularText(root, "docs/installation.md", fsOps);
   const matrix = extractMarkedMatrix(docs);
+  const rows = new Map();
   for (const line of matrix.split("\n")) {
     if (!line.startsWith("|") || line.includes("---") || line.includes("Status")) continue;
     const cells = line.split("|").map((cell) => cell.trim()).filter(Boolean);
     if (cells.length >= 2 && !STATUS_TERMS.has(cells[1])) {
       throw invalid(`unknown compatibility status: ${cells[1]}`);
+    }
+    if (cells.length >= 3) rows.set(cells[0].replaceAll("`", ""), cells[1]);
+  }
+  for (const [surface, expectedStatus] of EXPECTED_MATRIX_STATUSES) {
+    if (rows.get(surface) !== expectedStatus) {
+      throw invalid(`docs/compatibility.md must classify ${surface} as ${expectedStatus}`);
     }
   }
   const requiredDocs = [
@@ -757,21 +830,28 @@ git commit -m "ci: test supported Node and OS matrix"
 
 - [ ] **Step 1: Write a fake-CLI isolation test**
 
-Extend the test fixture with a minimal `opencode/agents/lead.md` and a fake
-`npx` placed first in `PATH`. The fake executable must:
+Extend the test fixture with a decoy root `agents/lead.md` using `mode: all`, a
+packaged `opencode/agents/lead.md` using `mode: primary`, and fake `npm`/`npx`
+executables placed first in `PATH`. The fake `npm` must verify the isolated
+HOME/XDG/npm-cache values and accept only `ci --ignore-scripts` for the copied
+config. The fake `npx` must:
 
 - fail if a test-only inherited provider-token sentinel is present;
 - fail if HOME or any XDG/npm cache path is outside one shared temp root;
 - return the requested version for `opencode --version`;
 - return `{"name":"lead","mode":"primary"}` for
-  `opencode debug agent lead --pure`.
+  `opencode debug agent lead --pure`, but only when
+  `$OPENCODE_CONFIG_DIR/agents/lead.md` is the packaged primary agent.
 
 The test invokes the real shell script with an inherited fake secret and
 asserts success. Add independent negative tests where the fake CLI returns the
 wrong version, omits the lead agent, or prints the original repository path.
 
 Use the working-tree copy behavior as an oracle: after running, the fake CLI's
-`OPENCODE_CONFIG_DIR` must not equal or resolve under the fixture checkout.
+`OPENCODE_CONFIG_DIR` must not equal or resolve under the fixture checkout, the
+packaged lead must exist directly below it, and a nested
+`OPENCODE_CONFIG_DIR/opencode/agents/lead.md` must not exist. This negative
+decoy proves the script copies `root/opencode`, not the repository root.
 
 - [ ] **Step 2: Run the smoke-wrapper tests red**
 
@@ -812,15 +892,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for dir in home config data cache state npm config/opencode; do
+for dir in home config data cache state npm; do
   mkdir -p "$smoke_root/$dir"
 done
 ```
 
-Copy the working tree with an inline Node script. Reject symlinks and skip any
-path component named `node_modules` or `.oak`:
+Copy exactly `"$root/opencode"` to the initially absent
+`"$smoke_root/config/opencode"` with an inline Node script. Never pass `$root`
+as the source. Reject symlinks and skip any path component named `node_modules`
+or `.oak`:
 
-```js
+```bash
+node --input-type=module - "$root/opencode" "$smoke_root/config/opencode" <<'NODE'
 import fs from "node:fs";
 import path from "node:path";
 const [source, target] = process.argv.slice(2);
@@ -833,12 +916,17 @@ fs.cpSync(source, target, {
     return true;
   },
 });
+NODE
+
+test -f "$smoke_root/config/opencode/agents/lead.md"
+test ! -e "$smoke_root/config/opencode/opencode"
 ```
 
-Run every CLI call through exactly this allowlist:
+Run the temporary dependency install and every CLI call through exactly this
+allowlist:
 
 ```bash
-run_opencode() {
+run_isolated() {
   env -i \
     PATH="$PATH" \
     HOME="$smoke_root/home" \
@@ -848,9 +936,20 @@ run_opencode() {
     XDG_STATE_HOME="$smoke_root/state" \
     npm_config_cache="$smoke_root/npm" \
     OPENCODE_CONFIG_DIR="$smoke_root/config/opencode" \
-    npx --yes --package "opencode-ai@$version" opencode "$@"
+    "$@"
+}
+
+run_isolated npm --prefix "$smoke_root/config/opencode" ci --ignore-scripts >/dev/null
+
+run_opencode() {
+  run_isolated npx --yes --package "opencode-ai@$version" opencode "$@"
 }
 ```
+
+The temp `npm ci` is required because the shipped tools import
+`@opencode-ai/plugin` while OpenCode resolves the agent. It must install only
+inside the copied config and use the isolated npm cache; neither the source
+checkout nor the operator's npm config may be modified or read.
 
 Capture `run_opencode --version`, require an exact match for a concrete version
 and canonical `MAJOR.MINOR.PATCH` for `latest`. Capture
@@ -943,10 +1042,12 @@ Parse the marker-scoped job and require:
 
 - [ ] **Step 4: Add the blocking job**
 
-The job needs only checkout, setup-node 24, and the smoke call. It must not run
-`npm ci`; the smoke owns an isolated npm cache and installs only the requested
-CLI package. Add a version-report step only if it does not duplicate or expose
-the captured agent output.
+The job needs only checkout, setup-node 24, and the smoke call. Do not add a
+checkout-level `npm ci`: the smoke itself must run `npm ci --ignore-scripts`
+inside its temporary copy to install the harness package dependencies, then
+install the requested CLI through the same isolated npm cache. Add a
+version-report step only if it does not duplicate or expose the captured agent
+output.
 
 - [ ] **Step 5: Run local checks and commit**
 
@@ -1138,14 +1239,18 @@ with a broad exclude.
 
 ```bash
 : "${OAK_PRIVATE_CHECKOUT:?Set OAK_PRIVATE_CHECKOUT to the active private checkout}"
+private_baseline_file="$(git rev-parse --git-path oak-slice-1-4-private-baseline)"
+test -s "$private_baseline_file"
+expected_private_sha="$(cat "$private_baseline_file")"
+actual_private_sha="$(git -C "$OAK_PRIVATE_CHECKOUT" rev-parse HEAD)"
+test "$actual_private_sha" = "$expected_private_sha"
 git -C "$OAK_PRIVATE_CHECKOUT" status --short --branch
-git -C "$OAK_PRIVATE_CHECKOUT" rev-parse HEAD
 node "$OAK_PRIVATE_CHECKOUT/scripts/check-harness.mjs"
 ```
 
-Expected: clean `master`, the recorded pre-implementation private commit, and a
-passing checker. The machine-local checkout value must not be copied into
-public files or commits.
+Expected: exact equality with the SHA captured by Task 0, clean `master`, and a
+passing checker. The machine-local checkout value and baseline artifact must
+not be copied into public files or commits.
 
 - [ ] **Step 6: Request independent implementation review**
 
