@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 ]] || [[ "$1" != "latest" && ! "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+canonical_version_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+
+if [[ $# -ne 1 ]] || [[ "$1" != "latest" && ! "$1" =~ $canonical_version_re ]]; then
   echo "usage: $0 MAJOR.MINOR.PATCH|latest" >&2
   exit 2
 fi
@@ -87,7 +89,7 @@ run_isolated npm --prefix "$target_config" ci --ignore-scripts >/dev/null
 
 actual="$(run_opencode --version)"
 if [[ "$request" == "latest" ]]; then
-  if [[ ! "$actual" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  if [[ ! "$actual" =~ $canonical_version_re ]]; then
     echo "latest OpenCode did not resolve to a canonical version" >&2
     exit 1
   fi

@@ -682,6 +682,7 @@ function makeCompatibilitySmokeFixture(t, options = {}) {
   const quotedRoot = shellQuote(root);
   writeExecutable(root, "fake-bin/npm", `#!/bin/sh
 set -eu
+touch ${shellQuote(path.join(root, "npm-called"))}
 smoke_root=\${HOME%/home}
 test "$#" -eq 4
 test "$1" = --prefix
@@ -703,10 +704,12 @@ test ! -e "$2/node_modules"
 test ! -e "$2/.oak"
 `);
 
-  const version = options.wrongVersion ? "9.9.9" : "1.14.41";
+  const request = options.request ?? "1.14.41";
+  const version = options.resolvedVersion ?? (options.wrongVersion ? "9.9.9" : request);
   const leak = options.leakOriginalPath ? `,\"source\":${JSON.stringify(root)}` : "";
   writeExecutable(root, "fake-bin/npx", `#!/bin/sh
 set -eu
+touch ${shellQuote(path.join(root, "npx-called"))}
 if env | grep -q '^FAKE_PROVIDER_TOKEN='; then exit 41; fi
 smoke_root=\${HOME%/home}
 test "$HOME" = "$smoke_root/home"
@@ -719,7 +722,7 @@ test "$OPENCODE_CONFIG_DIR" = "$smoke_root/config/opencode"
 case "$OPENCODE_CONFIG_DIR" in ${quotedRoot}|${quotedRoot}/*) exit 42;; esac
 test "$1" = --yes
 test "$2" = --package
-test "$3" = opencode-ai@1.14.41
+test "$3" = opencode-ai@${request}
 test "$4" = opencode
 shift 4
 case "$1" in
@@ -766,6 +769,28 @@ test("OpenCode compatibility smoke uses only the packaged isolated config", (t) 
     result.stdout,
     "opencode compatibility smoke ok: requested=1.14.41 resolved=1.14.41\n",
   );
+});
+
+test("OpenCode compatibility smoke rejects a non-canonical explicit version before tools run", (t) => {
+  const root = makeCompatibilitySmokeFixture(t, { request: "01.14.41" });
+  const result = runCompatibilitySmoke(root, ["01.14.41"]);
+
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, "");
+  assert.equal(fs.existsSync(path.join(root, "npm-called")), false);
+  assert.equal(fs.existsSync(path.join(root, "npx-called")), false);
+});
+
+test("OpenCode compatibility smoke rejects a non-canonical latest resolution", (t) => {
+  const root = makeCompatibilitySmokeFixture(t, {
+    request: "latest",
+    resolvedVersion: "01.18.4",
+  });
+  const result = runCompatibilitySmoke(root, ["latest"]);
+
+  assert.notEqual(result.status, 0);
+  assert.equal(result.stdout, "");
+  assert.equal(fs.existsSync(path.join(root, "npx-called")), true);
 });
 
 for (const [name, options] of [
