@@ -72,7 +72,7 @@ Use these read-only checks from the repository root:
 ```bash
 node scripts/version.mjs
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.27
+node scripts/version.mjs --check-tag v1.0.28
 ```
 
 The tag check validates only the supplied value. It does not inspect the

@@ -108,7 +108,7 @@ test("[V004] direct version entrypoints are exact and mutation-free", (t) => {
   for (const args of [["scripts/version.mjs"], ["scripts/manage-installation.mjs", "--version"]]) {
     const result = run(process.execPath, args, { HOME: home });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, "opencode-agent-orchestration-kit 1.0.27\n");
+    assert.equal(result.stdout, "opencode-agent-orchestration-kit 1.0.28\n");
     assert.equal(fs.existsSync(target), false);
   }
 });
@@ -117,7 +117,7 @@ test("[V005] all lifecycle wrappers expose the canonical version", () => {
   for (const wrapper of ["install.sh", "upgrade.sh", "doctor.sh", "uninstall.sh", "rollback.sh"]) {
     const result = run(path.join(REPOSITORY_ROOT, wrapper), ["--version"]);
     assert.equal(result.status, 0, `${wrapper}: ${result.stderr}`);
-    assert.equal(result.stdout, "opencode-agent-orchestration-kit 1.0.27\n", wrapper);
+    assert.equal(result.stdout, "opencode-agent-orchestration-kit 1.0.28\n", wrapper);
   }
 });
 
