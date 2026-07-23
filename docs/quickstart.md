@@ -73,5 +73,5 @@ Release upload require separate authorization and follow
 [the supply-chain runbook](supply-chain.md).
 
 For an explicitly planned release tag, validate it locally with
-`node scripts/version.mjs --check-tag v1.0.28`. This check does not create,
+`node scripts/version.mjs --check-tag v1.0.29`. This check does not create,
 push, or publish the tag or a hosted release.
