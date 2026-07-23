@@ -40,6 +40,13 @@ while `supported` describes the maintained promise derived from that evidence.
 | Impeccable | experimental | optional externally installed skill |
 <!-- compatibility-matrix:end -->
 
+The default-config smoke checks the exact reviewed Superpowers commit because
+the starter enables it. This does not change any integration status: Open
+Design, Superpowers, Impeccable, and the token plugin remain experimental. The
+smaller supported core contract excludes all four. Current immutable external
+identifiers and their release labels live in
+[the supply-chain policy](supply-chain.md).
+
 ## Exact dependency pins
 
 | Dependency | Exact pin |
@@ -48,7 +55,7 @@ while `supported` describes the maintained promise derived from that evidence.
 | `@opentui/core` | `0.2.5` |
 | `@opentui/solid` | `0.2.5` |
 
-## Evidence as of 2026-07-21
+## Evidence as of 2026-07-22
 
 ### Local evidence
 
@@ -60,15 +67,28 @@ not evidence that every remote runner combination passed.
 ### Blocking CI policy
 
 The release-blocking policy requires Ubuntu jobs on Node.js 22 and 24, a macOS
-job on Node.js 24, and core OpenCode smokes at both `1.14.41` and `1.18.4`.
-Those combinations remain policy statements until their remote jobs record
+job on Node.js 24, core OpenCode smokes at both `1.14.41` and `1.18.4`, and a
+default-config smoke at `1.18.4`. Core evidence loads the working-tree harness
+from an isolated copy with its external plugin list empty and its local token
+plugin absent. It therefore covers the maintained OpenCode boundary without
+Superpowers, Open Design service access, Impeccable, or the token plugin.
+
+The default-config smoke instead packs the npm artifact, extracts that local
+tarball, installs its frozen dependencies, and loads the unmodified starter
+configuration. It proves that the exact pinned Superpowers commit and bundled
+token plugin can load at the stable boundary. This release-blocking default
+check preserves the shipped starter behavior; it does not promote
+Superpowers or the token plugin from `experimental` and does not extend the
+core compatibility promise to either integration.
+
+These combinations remain policy statements until their remote jobs record
 results. This document does not claim that the remote matrix has passed.
 
-Node.js 26 and OpenCode `latest` are non-blocking canaries. A failed canary is
-an early warning, not proof that the supported range has failed and not a
-release blocker by itself. Maintainers must inspect the failure and decide
-whether to fix the kit, revise this contract through review, or wait for an
-upstream correction.
+Node.js 26 and OpenCode `latest` run in core mode as non-blocking canaries. A
+failed canary is an early warning, not proof that the supported range has
+failed and not a release blocker by itself. Maintainers must inspect the
+failure and decide whether to fix the kit, revise this contract through review,
+or wait for an upstream correction.
 
 ## Promoting a stable boundary
 

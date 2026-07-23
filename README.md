@@ -273,7 +273,7 @@ You can use one model for every role or assign different models depending on cos
 ### 3. Install local plugin dependencies
 
 ```bash
-(cd opencode && npm install)
+(cd opencode && npm ci --ignore-scripts)
 ```
 
 ### 4. Load the kit without global installation
@@ -352,8 +352,13 @@ It never authorizes directory or symlink replacement, unsafe paths, state repair
 After global installation, install the OpenCode config dependencies:
 
 ```bash
-(cd "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}" && npm install)
+(cd "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}" && npm ci --ignore-scripts)
 ```
+
+Use that frozen command only when the installed `package.json` and
+`package-lock.json` still match the shipped manifests. If installation
+preserved differing manifests, review and merge the required dependencies
+first, then choose the install command for that user-owned dependency graph.
 
 ## Upgrade, diagnose, uninstall, and rollback
 
@@ -510,17 +515,18 @@ When plugins are supported and network access is available, the kit can referenc
 ```json
 {
   "plugin": [
-    "superpowers@git+https://github.com/obra/superpowers.git"
+    "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99"
   ]
 }
 ```
 
-For reproducibility, pin a version:
+The human-readable upstream release is `v6.1.1`; the configuration uses the
+full reviewed commit because the label alone is not immutable:
 
 ```json
 {
   "plugin": [
-    "superpowers@git+https://github.com/obra/superpowers.git#v5.0.5"
+    "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99"
   ]
 }
 ```
@@ -563,8 +569,10 @@ npm run check
 This runs the fast contract checker and every bundled `node:test` suite. For a
 fast structural check while editing documentation or contracts, use
 `npm run check:quick`. Before a release, use `npm run check:release`; it performs
-a clean dependency install and also runs typechecking, the dependency audit, and
-an installation smoke test.
+a frozen dependency install and also runs typechecking, dependency integrity,
+audit/signature checks, installation smoke, and the exact package smoke.
+Publication remains separately authorized; follow the reviewed artifact and
+checksum procedure in [the supply-chain policy](docs/supply-chain.md).
 
 Validate only the canonical identity and current release note with:
 
@@ -719,7 +727,9 @@ Restart OpenCode and verify that the Superpowers plugin entry is present in `ope
 Verify:
 
 1. `tui.json` contains the bundled plugin entry.
-2. `npm install` was run in the OpenCode config directory.
+2. `npm ci --ignore-scripts` was run in the OpenCode config directory while
+   its shipped manifests were intact (or preserved manifests were reviewed and
+   merged before selecting another install command).
 3. OpenCode was restarted.
 4. The current OpenCode TUI exposes child-session information to plugins.
 

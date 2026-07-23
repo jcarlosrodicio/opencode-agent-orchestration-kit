@@ -11,7 +11,7 @@ git clone https://github.com/<owner>/opencode-agent-orchestration-kit.git
 cd opencode-agent-orchestration-kit
 export OPENCODE_CONFIG_DIR="$PWD/opencode"
 source env.example
-(cd opencode && npm install)
+(cd opencode && npm ci --ignore-scripts)
 opencode
 ```
 
@@ -172,9 +172,15 @@ you intentionally want the kit to own.
 ## After installation
 
 ```bash
-(cd "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}" && npm install)
+(cd "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}" && npm ci --ignore-scripts)
 opencode auth login
 opencode models openai --refresh
 ```
+
+Use `npm ci --ignore-scripts` only when the target's shipped `package.json` and
+`package-lock.json` remain intact. If either protected manifest was preserved
+because it differs, review and merge required dependencies into the user-owned
+manifests before choosing an install command; the kit lockfile does not control
+that target.
 
 If a protected `opencode.json` or `tui.json` was preserved, merge the relevant plugin entries manually and use `doctor --accept-preserved` only after reviewing the complete tuple.

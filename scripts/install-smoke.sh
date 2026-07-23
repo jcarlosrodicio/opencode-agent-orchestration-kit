@@ -103,7 +103,7 @@ fi
 
 (
   cd "$target"
-  npm ci
+  npm ci --ignore-scripts
   node scripts/check-harness.mjs
   node --input-type=module -e "import('@opencode-ai/plugin').then(() => console.log('installed plugin import ok'))"
 )

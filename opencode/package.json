@@ -9,6 +9,7 @@
     "solid-js": "1.9.12"
   },
   "overrides": {
-    "uuid": "^14.0.0"
+    "@babel/core": "7.29.7",
+    "uuid": "14.0.0"
   }
 }

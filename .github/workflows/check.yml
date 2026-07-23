@@ -31,10 +31,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ matrix.node }}
 
@@ -57,11 +57,15 @@ jobs:
 
       - name: Install OpenCode tool dependencies
         working-directory: opencode
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Audit OpenCode tool dependencies
         if: matrix.canonical
         run: npm run dependency-audit
+
+      - name: Verify dependency signatures
+        if: matrix.canonical
+        run: npm run dependency-signature-audit
 
       - name: Typecheck TUI token plugin
         run: npm run typecheck
@@ -69,24 +73,32 @@ jobs:
       - name: Installation smoke
         run: npm run installation-smoke
 
+      - name: Smoke npm package
+        if: matrix.canonical
+        run: npm run package-smoke
+
   # opencode-boundaries:start
   opencode-compatibility:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        opencode:
-          - "1.14.41"
-          - "1.18.4"
+        include:
+          - mode: core
+            opencode: "1.14.41"
+          - mode: core
+            opencode: "1.18.4"
+          - mode: default
+            opencode: "1.18.4"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
 
       - name: Smoke OpenCode boundary
-        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"
+        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.mode }}" "${{ matrix.opencode }}"
   # opencode-boundaries:end

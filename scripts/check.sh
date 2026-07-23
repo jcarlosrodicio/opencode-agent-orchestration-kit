@@ -20,10 +20,16 @@ doctor.sh
 rollback.sh
 package.json
 compatibility.json
+supply-chain.json
 scripts/version.mjs
 scripts/version.test.mjs
 scripts/check-compatibility.mjs
 scripts/check-compatibility.test.mjs
+scripts/check-supply-chain.mjs
+scripts/check-supply-chain.test.mjs
+scripts/package-smoke.sh
+scripts/package-smoke.mjs
+scripts/package-smoke.test.mjs
 scripts/opencode-compat-smoke.sh
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
@@ -56,6 +62,7 @@ docker/open-design/Dockerfile
 docker/open-design/docker-compose.yml
 docker/open-design/.env.example
 docker/open-design/opencode-od/opencode.json
+docs/supply-chain.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 .github/PULL_REQUEST_TEMPLATE.md
@@ -72,12 +79,13 @@ for file in $required_files; do
   test -f "$file" || { echo "Missing required file: $file" >&2; exit 1; }
 done
 
-for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh scripts/opencode-compat-smoke.sh; do
+for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh scripts/opencode-compat-smoke.sh scripts/package-smoke.sh; do
   test -x "$file" || { echo "Not executable: $file" >&2; exit 1; }
 done
 
 node scripts/version.mjs --check
 node scripts/check-compatibility.mjs
+node scripts/check-supply-chain.mjs
 
 node -e "JSON.parse(require('fs').readFileSync('opencode/opencode.json','utf8')); JSON.parse(require('fs').readFileSync('docker/open-design/opencode-od/opencode.json','utf8')); console.log('json ok')"
 (cd opencode && node scripts/check-harness.mjs)
@@ -96,7 +104,6 @@ for (const dir of ['opencode/agents', 'opencode/commands', ...fs.readdirSync('op
 console.log('frontmatter ok')
 NODE
 
-grep -q 'superpowers@git+https://github.com/obra/superpowers.git' opencode/opencode.json
 grep -q '"default_agent": "lead"' opencode/opencode.json
 grep -q './plugins/token-tree-usage.tsx' opencode/tui.json
 
@@ -160,9 +167,6 @@ if (opencodePackage.dependencies?.['@opentui/solid'] !== '0.2.5') {
 }
 if (opencodePackage.dependencies?.['solid-js'] !== '1.9.12') {
   throw new Error('opencode/package.json must pin solid-js to 1.9.12')
-}
-if (opencodePackage.overrides?.uuid !== '^14.0.0') {
-  throw new Error('opencode/package.json must override uuid to ^14.0.0')
 }
 NODE
 

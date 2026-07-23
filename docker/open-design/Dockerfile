@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends git curl ca-certificates python3 make g++ \
@@ -17,7 +17,7 @@ WORKDIR /app/open-design
 
 RUN corepack enable \
   && corepack prepare pnpm@10.33.2 --activate \
-  && pnpm install --frozen-lockfile=false \
+  && pnpm install --frozen-lockfile \
   && npm install -g "opencode-ai@$OPENCODE_AI_VERSION"
 
 # Make the daemon listen on OD_HOST when upstream exposes host/port constants.

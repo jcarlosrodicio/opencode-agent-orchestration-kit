@@ -167,6 +167,21 @@ function validatePackages(root, data, fsOps) {
   if (rootPackage.engines?.node !== data.node.engines) {
     throw invalid("package.json engines.node must match compatibility.json node.engines");
   }
+  const expectedReleaseGate = [
+    "npm --prefix opencode ci --ignore-scripts",
+    "npm run check",
+    "npm run typecheck",
+    "npm run dependency-audit",
+    "npm run dependency-signature-audit",
+    "npm run installation-smoke",
+    "npm run package-smoke",
+  ].join(" && ");
+  if (rootPackage.scripts?.["check:release"] !== expectedReleaseGate) {
+    throw invalid("package.json check:release must use the exact reproducible artifact command order");
+  }
+  if (rootPackage.scripts?.["check:supply-chain"] !== "node scripts/check-supply-chain.mjs") {
+    throw invalid("package.json check:supply-chain must be exactly node scripts/check-supply-chain.mjs");
+  }
 
   const packagedPackage = readJson(root, "opencode/package.json", fsOps);
   if (packagedPackage.engines?.node !== data.node.engines) {
@@ -369,25 +384,33 @@ function validateOpenCodeBoundaryJob(workflow, data) {
   );
   const versions = [data.opencode.minimum_tested, data.opencode.stable_tested]
     .sort(compareStableVersions);
+  const smokeMatrix = [
+    { mode: "core", opencode: versions[0] },
+    { mode: "core", opencode: versions[1] },
+    { mode: "default", opencode: versions[1] },
+  ];
   const expectedJob = [
     "  opencode-compatibility:",
     "    runs-on: ubuntu-latest",
     "    strategy:",
     "      fail-fast: false",
     "      matrix:",
-    "        opencode:",
-    ...versions.map((version) => `          - "${version}"`),
+    "        include:",
+    ...smokeMatrix.flatMap(({ mode, opencode }) => [
+      `          - mode: ${mode}`,
+      `            opencode: "${opencode}"`,
+    ]),
     "    steps:",
     "      - name: Checkout",
-    "        uses: actions/checkout@v4",
+    "        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6",
     "",
     "      - name: Setup Node",
-    "        uses: actions/setup-node@v4",
+    "        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6",
     "        with:",
     "          node-version: 24",
     "",
     "      - name: Smoke OpenCode boundary",
-    '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+    '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.mode }}" "${{ matrix.opencode }}"',
   ].join("\n");
   const actualJob = marked.replace(/^\n/, "").replace(/\n  $/, "");
   const jobsBody = extractJobsBody(workflow);
@@ -406,7 +429,7 @@ function validateOpenCodeBoundaryJob(workflow, data) {
     || completeJob.body.trimEnd() !== expectedCompleteJob
   ) {
     throw invalid(
-      `OpenCode boundary job must exactly test ${versions.join(", ")} on Node 24 through the isolated matrix wrapper`,
+      `OpenCode boundary job must exactly test core/${versions[0]}, core/${versions[1]}, default/${versions[1]} on Node 24 through the isolated matrix wrapper`,
     );
   }
 }
@@ -481,9 +504,21 @@ function validateWorkflow(root, data, fsOps) {
   ])) {
     throw invalid("workflow dependency audit guard must be exact");
   }
+  const signatureStep = extractWorkflowStep(blockingJob, "Verify dependency signatures");
+  if (JSON.stringify(signatureStep.match(/^        if:.*$/gm)) !== JSON.stringify([
+    "        if: matrix.canonical",
+  ]) || !signatureStep.includes("run: npm run dependency-signature-audit")) {
+    throw invalid("workflow dependency signature audit guard must be exact");
+  }
+  const packageSmokeStep = extractWorkflowStep(blockingJob, "Smoke npm package");
+  if (JSON.stringify(packageSmokeStep.match(/^        if:.*$/gm)) !== JSON.stringify([
+    "        if: matrix.canonical",
+  ]) || !packageSmokeStep.includes("run: npm run package-smoke")) {
+    throw invalid("workflow package smoke guard must be exact");
+  }
 
   for (const [snippet, label] of [
-    ["working-directory: opencode\n        run: npm ci", "install OpenCode tool dependencies"],
+    ["working-directory: opencode\n        run: npm ci --ignore-scripts", "install OpenCode tool dependencies"],
     ["run: npm run contract-check", "contract check"],
     ["run: npm run unit-and-script-tests", "unit and script tests"],
     ["run: npm run typecheck", "token plugin typecheck"],
@@ -515,9 +550,23 @@ function validateWorkflow(root, data, fsOps) {
   if (!/^permissions:\n  contents: read$/m.test(workflow) || /^\s*[^#\n]+:\s*(?:write|write-all)\s*$/m.test(workflow)) {
     throw invalid("workflow must use read-only permissions");
   }
-  if (/^\s*(?:run:\s*)?.*\b(?:npm|pnpm|yarn)\s+publish\b/m.test(workflow) || /\bgh\s+release\s+create\b/.test(workflow)) {
-    throw invalid("workflow must not publish");
+  const activeWorkflow = workflow
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .join("\n");
+  if (
+    /^\s*(?:run:\s*)?.*\b(?:npm|pnpm|yarn)\s+publish\b/m.test(activeWorkflow)
+    || /\bgh\s+release\s+(?:create|edit|delete|upload)\b/.test(activeWorkflow)
+    || /\bgh\s+api\b[^\n]*(?:(?:-X)(?:=|\s*)|--method(?:=|\s+))(?:POST|PUT|PATCH|DELETE)\b/i.test(activeWorkflow)
+    || /\bnpm\s+(?:unpublish|deprecate)\b/.test(activeWorkflow)
+    || /\bnpm\s+dist-tag\s+(?:add|rm)\b/.test(activeWorkflow)
+    || /\bgit\s+(?:tag|push|commit)\b/.test(activeWorkflow)
+    || /actions\/(?:cache|upload-artifact|download-artifact)@/.test(activeWorkflow)
+    || /^\s*cache:\s*/m.test(activeWorkflow)
+  ) {
+    throw invalid("workflow must not publish, release, upload, mutate, cache, or use artifacts");
   }
+
 }
 
 function validateCompatibilityCanary(root, data, fsOps) {
@@ -539,17 +588,17 @@ function validateCompatibilityCanary(root, data, fsOps) {
     "    runs-on: ubuntu-latest",
     "    steps:",
     "      - name: Checkout",
-    "        uses: actions/checkout@v4",
+    "        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6",
     "        with:",
     "          persist-credentials: false",
     "",
     "      - name: Setup Node",
-    "        uses: actions/setup-node@v4",
+    "        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6",
     "        with:",
     `          node-version: ${data.node.canary_major}`,
     "",
     "      - name: Smoke latest OpenCode",
-    `        run: bash scripts/opencode-compat-smoke.sh ${data.opencode.canary}`,
+    `        run: bash scripts/opencode-compat-smoke.sh core ${data.opencode.canary}`,
   ].join("\n");
   const expectedWorkflow = [
     "name: Compatibility Canary",
@@ -608,6 +657,10 @@ function validateSurfaces(root, data, fsOps) {
   validateDocumentation(root, data, fsOps);
   validateWorkflow(root, data, fsOps);
   validateCompatibilityCanary(root, data, fsOps);
+  const installSmoke = readRegularText(root, "scripts/install-smoke.sh", fsOps);
+  if (!/^\s*npm ci --ignore-scripts\s*$/m.test(installSmoke)) {
+    throw invalid("installation smoke must use npm ci --ignore-scripts");
+  }
 }
 
 if (path.resolve(process.argv[1] ?? "") === SCRIPT_PATH) {

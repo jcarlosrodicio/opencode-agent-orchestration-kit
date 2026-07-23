@@ -36,6 +36,21 @@ Designer reads product/design docs, optionally uses Impeccable, then creates or 
 
 Only for improving the harness itself.
 
+## Core and default release evidence
+
+The release-blocking core smoke loads an isolated configuration without
+Superpowers, the token plugin, an Open Design service, or Impeccable at both
+supported OpenCode boundaries. A separate default-config smoke loads the
+packed starter at the stable boundary with the full reviewed Superpowers
+commit. The latter proves the default can load; it does not make optional
+integrations part of the supported core contract or promote them from
+experimental.
+
+Release readiness prepares and checks the package artifact but does not
+publish it. Exact checksum, publication, and post-publication verification
+steps are in [the supply-chain runbook](supply-chain.md), and every remote
+mutation requires separate authorization.
+
 Harness-evolution evidence is classified in `opencode/docs/ai/harness/evidence.md`:
 
 - `static_contract`: file and contract inspection.

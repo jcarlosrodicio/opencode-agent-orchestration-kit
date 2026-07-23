@@ -9,6 +9,7 @@ logs/
 docker/open-design/data/
 docker/open-design/opencode-auth/
 node_modules/
+.worktrees/
 dist/
 build/
 .DS_Store

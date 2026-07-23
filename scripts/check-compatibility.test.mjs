@@ -53,6 +53,14 @@ const REVISED_COMPATIBILITY = {
 const ROOT_PACKAGE = {
   name: "opencode-agent-orchestration-kit",
   engines: { node: VALID_COMPATIBILITY.node.engines },
+  scripts: {
+    "check:supply-chain": "node scripts/check-supply-chain.mjs",
+    "dependency-audit": "npm --prefix opencode audit --omit=dev --audit-level=low",
+    "dependency-signature-audit": "npm --prefix opencode audit signatures",
+    "installation-smoke": "bash scripts/install-smoke.sh",
+    "package-smoke": "bash scripts/package-smoke.sh",
+    "check:release": "npm --prefix opencode ci --ignore-scripts && npm run check && npm run typecheck && npm run dependency-audit && npm run dependency-signature-audit && npm run installation-smoke && npm run package-smoke",
+  },
 };
 
 const PACKAGED_PACKAGE = {
@@ -114,20 +122,24 @@ const OPENCODE_BOUNDARY_JOB = `
     strategy:
       fail-fast: false
       matrix:
-        opencode:
-          - "1.14.41"
-          - "1.18.4"
+        include:
+          - mode: core
+            opencode: "1.14.41"
+          - mode: core
+            opencode: "1.18.4"
+          - mode: default
+            opencode: "1.18.4"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
 
       - name: Smoke OpenCode boundary
-        run: bash scripts/opencode-compat-smoke.sh "\${{ matrix.opencode }}"
+        run: bash scripts/opencode-compat-smoke.sh "\${{ matrix.mode }}" "\${{ matrix.opencode }}"
   # opencode-boundaries:end
 `;
 
@@ -164,10 +176,10 @@ jobs:
     runs-on: \${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: \${{ matrix.node }}
 
@@ -190,17 +202,25 @@ jobs:
 
       - name: Install OpenCode tool dependencies
         working-directory: opencode
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Audit OpenCode tool dependencies
         if: matrix.canonical
         run: npm run dependency-audit
+
+      - name: Verify dependency signatures
+        if: matrix.canonical
+        run: npm run dependency-signature-audit
 
       - name: Typecheck TUI token plugin
         run: npm run typecheck
 
       - name: Installation smoke
         run: npm run installation-smoke
+
+      - name: Smoke npm package
+        if: matrix.canonical
+        run: npm run package-smoke
 ${OPENCODE_BOUNDARY_JOB}`;
 
 const VALID_CANARY_WORKFLOW = `name: Compatibility Canary
@@ -219,17 +239,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 26
 
       - name: Smoke latest OpenCode
-        run: bash scripts/opencode-compat-smoke.sh latest
+        run: bash scripts/opencode-compat-smoke.sh core latest
   # compatibility-canary:end
 `;
 
@@ -241,7 +261,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
       - name: Validate release tag
@@ -253,7 +273,7 @@ jobs:
         run: npm run unit-and-script-tests
       - name: Install OpenCode tool dependencies
         working-directory: opencode
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Audit OpenCode tool dependencies
         run: npm run dependency-audit
       - name: Typecheck TUI token plugin
@@ -286,6 +306,7 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   writeText(root, "docs/installation.md", INSTALLATION);
   writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW);
   writeText(root, ".github/workflows/compatibility-canary.yml", VALID_CANARY_WORKFLOW);
+  writeText(root, "scripts/install-smoke.sh", "#!/usr/bin/env bash\nnpm ci --ignore-scripts\n");
   return root;
 }
 
@@ -624,6 +645,19 @@ test("blocking workflow accepts exactly the supported Node and OS matrix", (t) =
   assert.equal(checkCompatibility(root).schema_version, 1);
 });
 
+test("blocking workflow rejects mutable Action major tags", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    ".github/workflows/check.yml",
+    VALID_WORKFLOW.replaceAll(
+      "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6",
+      "actions/checkout@v6",
+    ),
+  );
+  assertInvalidCompatibility(() => checkCompatibility(root), /workflow|OpenCode boundary job/);
+});
+
 test("the previous single Ubuntu Node 24 job is rejected", (t) => {
   const root = makeFixture(t);
   writeText(root, ".github/workflows/check.yml", SINGLE_JOB_WORKFLOW);
@@ -654,9 +688,30 @@ test("blocking workflow requires fail-fast false", (t) => {
   assertInvalidCompatibility(() => checkCompatibility(root), /workflow strategy must set fail-fast to false/);
 });
 
+test("release gate requires the exact reproducible artifact command order", (t) => {
+  const root = makeFixture(t);
+  const packageData = { ...ROOT_PACKAGE, scripts: { ...ROOT_PACKAGE.scripts } };
+  packageData.scripts["check:release"] = packageData.scripts["check:release"].replace(
+    "npm run dependency-signature-audit && ",
+    "",
+  );
+  writeJson(root, "package.json", packageData);
+  assertInvalidCompatibility(() => checkCompatibility(root), /check:release.*exact/i);
+});
+
+test("release scripts require the supply-chain checker", (t) => {
+  const root = makeFixture(t);
+  const packageData = { ...ROOT_PACKAGE, scripts: { ...ROOT_PACKAGE.scripts } };
+  delete packageData.scripts["check:supply-chain"];
+  writeJson(root, "package.json", packageData);
+  assertInvalidCompatibility(() => checkCompatibility(root), /check:supply-chain.*exact/i);
+});
+
 for (const [label, current, replacement, message] of [
   ["tag validation", "if: matrix.canonical && startsWith(github.ref, 'refs/tags/')", "if: startsWith(github.ref, 'refs/tags/')", /tag validation guard/],
   ["dependency audit", "if: matrix.canonical\n        run: npm run dependency-audit", "if: success()\n        run: npm run dependency-audit", /dependency audit guard/],
+  ["dependency signature audit", "if: matrix.canonical\n        run: npm run dependency-signature-audit", "if: success()\n        run: npm run dependency-signature-audit", /dependency signature audit guard/],
+  ["package smoke", "if: matrix.canonical\n        run: npm run package-smoke", "if: success()\n        run: npm run package-smoke", /package smoke guard/],
 ]) {
   test(`blocking workflow requires the exact ${label} guard`, (t) => {
     const root = makeFixture(t);
@@ -668,7 +723,7 @@ for (const [label, current, replacement, message] of [
 for (const [label, current, message] of [
   ["matrix runner", "runs-on: ${{ matrix.os }}", /matrix\.os/],
   ["matrix Node setup", "node-version: ${{ matrix.node }}", /matrix\.node/],
-  ["dependency installation", "working-directory: opencode\n        run: npm ci", /install OpenCode tool dependencies/],
+  ["dependency installation", "working-directory: opencode\n        run: npm ci --ignore-scripts", /install OpenCode tool dependencies/],
   ["contract check", "run: npm run contract-check", /contract check/],
   ["unit and script tests", "run: npm run unit-and-script-tests", /unit and script tests/],
   ["token plugin typecheck", "run: npm run typecheck", /token plugin typecheck/],
@@ -680,6 +735,15 @@ for (const [label, current, message] of [
     assertInvalidCompatibility(() => checkCompatibility(root), message);
   });
 }
+
+test("installation smoke requires the frozen npm ci command", (t) => {
+  const root = makeFixture(t);
+  writeText(root, "scripts/install-smoke.sh", "#!/usr/bin/env bash\nnpm ci\n");
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /installation smoke must use npm ci --ignore-scripts/,
+  );
+});
 
 test("a sidecar job cannot satisfy a required blocking check step", (t) => {
   const root = makeFixture(t);
@@ -770,6 +834,53 @@ test("workflow rejects publish commands", (t) => {
   assertInvalidCompatibility(() => checkCompatibility(root), /must not publish/);
 });
 
+for (const [label, command] of [
+  ["GitHub release upload", "gh release upload v1 artifact.tgz"],
+  ["GitHub release edit", "gh release edit v1 --draft=false"],
+  ["GitHub release delete", "gh release delete v1 --yes"],
+  ["GitHub API PATCH", "gh api repos/example/project/releases/1 -X PATCH -f draft=false"],
+  ["GitHub API DELETE", "gh api --method=DELETE repos/example/project/releases/1"],
+  ["npm dist-tag add", "npm dist-tag add pkg@1 latest"],
+  ["npm dist-tag rm", "npm dist-tag rm pkg latest"],
+  ["npm unpublish", "npm unpublish pkg@1"],
+  ["npm deprecate", "npm deprecate pkg@1 obsolete"],
+  ["repository push", "git push origin HEAD"],
+  ["cache action", "uses: actions/cache@v4"],
+  ["artifact action", "uses: actions/upload-artifact@v4"],
+]) {
+  test(`workflow rejects ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(
+      root,
+      ".github/workflows/check.yml",
+      VALID_WORKFLOW.replace(
+        "  # opencode-boundaries:start",
+        `      - run: ${command}\n\n  # opencode-boundaries:start`,
+      ),
+    );
+    assertInvalidCompatibility(() => checkCompatibility(root), /must not publish, release, upload, mutate, cache, or use artifacts/);
+  });
+}
+
+for (const [label, command] of [
+  ["GitHub release view", "gh release view v1"],
+  ["GitHub API GET", "gh api repos/example/project/releases/1"],
+  ["npm view", "npm view pkg@1 dist.integrity"],
+]) {
+  test(`workflow accepts read-only ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(
+      root,
+      ".github/workflows/check.yml",
+      VALID_WORKFLOW.replace(
+        "  # opencode-boundaries:start",
+        `      - run: ${command}\n\n  # opencode-boundaries:start`,
+      ),
+    );
+    assert.equal(checkCompatibility(root).schema_version, 1);
+  });
+}
+
 test("workflow requires exactly one ordered blocking marker pair", (t) => {
   const root = makeFixture(t);
   writeText(
@@ -805,20 +916,21 @@ test("OpenCode boundary job accepts the exact blocking matrix", (t) => {
 });
 
 for (const [label, mutate] of [
-  ["minimum tested version", (workflow) => workflow.replace('          - "1.14.41"\n', "")],
-  ["stable tested version", (workflow) => workflow.replace('          - "1.18.4"\n', "")],
+  ["minimum core tested version", (workflow) => workflow.replace('          - mode: core\n            opencode: "1.14.41"\n', "")],
+  ["stable core tested version", (workflow) => workflow.replace('          - mode: core\n            opencode: "1.18.4"\n', "")],
+  ["stable default tested version", (workflow) => workflow.replace('          - mode: default\n            opencode: "1.18.4"\n', "")],
   ["Node 24 setup", (workflow) => workflow.replace("          node-version: 24", "          node-version: 22")],
   [
     "matrix-version wrapper invocation",
     (workflow) => workflow.replace(
-      'run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+      'run: bash scripts/opencode-compat-smoke.sh "${{ matrix.mode }}" "${{ matrix.opencode }}"',
       "run: bash scripts/opencode-compat-smoke.sh 1.18.4",
     ),
   ],
   [
     "isolated wrapper instead of the operator binary",
     (workflow) => workflow.replace(
-      'run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+      'run: bash scripts/opencode-compat-smoke.sh "${{ matrix.mode }}" "${{ matrix.opencode }}"',
       "run: opencode --version",
     ),
   ],
@@ -855,8 +967,8 @@ for (const [label, mutate] of [
     (workflow) => workflow.replace(
       OPENCODE_BOUNDARY_JOB,
       OPENCODE_BOUNDARY_JOB.replace(
-        "      - name: Setup Node\n        uses: actions/setup-node@v4",
-        "      - name: Install dependencies\n        run: npm ci\n\n      - name: Setup Node\n        uses: actions/setup-node@v4",
+        "      - name: Setup Node\n        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6",
+        "      - name: Install dependencies\n        run: npm ci\n\n      - name: Setup Node\n        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6",
       ),
     ),
   ],
@@ -872,14 +984,14 @@ test("OpenCode boundary job cannot borrow its smoke from another job", (t) => {
   const root = makeFixture(t);
   const workflow = VALID_WORKFLOW
     .replace(
-      '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.opencode }}"',
+      '        run: bash scripts/opencode-compat-smoke.sh "${{ matrix.mode }}" "${{ matrix.opencode }}"',
       "        run: echo skipped-boundary-smoke",
     )
     .concat(`
   sidecar-smoke:
     runs-on: ubuntu-latest
     steps:
-      - run: bash scripts/opencode-compat-smoke.sh "\${{ matrix.opencode }}"
+      - run: bash scripts/opencode-compat-smoke.sh "\${{ matrix.mode }}" "\${{ matrix.opencode }}"
 `);
   writeText(root, ".github/workflows/check.yml", workflow);
   assertInvalidCompatibility(() => checkCompatibility(root), /OpenCode boundary job/);
@@ -953,13 +1065,26 @@ test("compatibility canary accepts the exact scheduled and manual latest smoke",
   assert.equal(checkCompatibility(root).schema_version, 1);
 });
 
+test("compatibility canary rejects mutable Action major tags", (t) => {
+  const root = makeFixture(t);
+  writeText(
+    root,
+    ".github/workflows/compatibility-canary.yml",
+    VALID_CANARY_WORKFLOW.replace(
+      "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6",
+      "actions/setup-node@v6",
+    ),
+  );
+  assertInvalidCompatibility(() => checkCompatibility(root), /compatibility canary/i);
+});
+
 for (const [label, mutate] of [
   ["schedule trigger", (workflow) => workflow.replace('  schedule:\n    - cron: "17 6 * * 1"\n', "")],
   ["workflow_dispatch trigger", (workflow) => workflow.replace("  workflow_dispatch:\n", "")],
   ["push trigger", (workflow) => workflow.replace("  workflow_dispatch:\n", "  workflow_dispatch:\n  push:\n")],
   ["pull_request trigger", (workflow) => workflow.replace("  workflow_dispatch:\n", "  workflow_dispatch:\n  pull_request:\n")],
   ["canonical canary Node", (workflow) => workflow.replace("          node-version: 26", "          node-version: 24")],
-  ["canonical latest argument", (workflow) => workflow.replace("opencode-compat-smoke.sh latest", "opencode-compat-smoke.sh 1.18.4")],
+  ["canonical latest argument", (workflow) => workflow.replace("opencode-compat-smoke.sh core latest", "opencode-compat-smoke.sh core 1.18.4")],
   ["read-only permissions", (workflow) => workflow.replace("contents: read", "contents: write")],
   ["blocking failure behavior", (workflow) => workflow.replace("    runs-on: ubuntu-latest", "    continue-on-error: true\n    runs-on: ubuntu-latest")],
   ["credential-free behavior", (workflow) => workflow.replace("    runs-on: ubuntu-latest", '    env:\n      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n    runs-on: ubuntu-latest')],
@@ -968,7 +1093,7 @@ for (const [label, mutate] of [
   ["issue creation ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: gh issue create --title canary\n\n      - name: Smoke latest OpenCode")],
   ["dependency update ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: npm update\n\n      - name: Smoke latest OpenCode")],
   ["npm ci ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: npm ci\n\n      - name: Smoke latest OpenCode")],
-  ["checkout cache ban", (workflow) => workflow.replace("        uses: actions/checkout@v4", "        uses: actions/checkout@v4\n        with:\n          cache: npm")],
+  ["checkout cache ban", (workflow) => workflow.replace("        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6", "        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6\n        with:\n          cache: npm")],
   ["cache action ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - uses: actions/cache@v4\n\n      - name: Smoke latest OpenCode")],
   ["artifact action ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - uses: actions/upload-artifact@v4\n\n      - name: Smoke latest OpenCode")],
   ["repository mutation ban", (workflow) => workflow.replace("      - name: Smoke latest OpenCode", "      - run: git push origin HEAD\n\n      - name: Smoke latest OpenCode")],
@@ -1064,6 +1189,11 @@ function makeCompatibilitySmokeFixture(t, options = {}) {
     fs.chmodSync(path.join(root, "scripts/opencode-compat-smoke.sh"), 0o755);
   }
 
+  writeJson(root, "package.json", {
+    name: "compat-smoke-fixture",
+    version: "1.0.0",
+    files: ["opencode"],
+  });
   writeText(root, "agents/lead.md", "---\nmode: all\n---\n");
   if (options.packagedLead !== "missing") {
     writeText(
@@ -1080,11 +1210,23 @@ function makeCompatibilitySmokeFixture(t, options = {}) {
   });
   writeText(root, "opencode/node_modules/excluded", "must not be copied\n");
   writeText(root, "opencode/.oak/excluded", "must not be copied\n");
+  writeText(root, "opencode/plugins/token-tree-usage.tsx", "export default {};\n");
+  writeJson(root, "opencode/opencode.json", {
+    default_agent: "lead",
+    plugin: [
+      "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99",
+    ],
+  });
 
   const quotedRoot = shellQuote(root);
+  const realNpm = spawnSync("which", ["npm"], { encoding: "utf8" }).stdout.trim();
   writeExecutable(root, "fake-bin/npm", `#!/bin/sh
 set -eu
-touch ${shellQuote(path.join(root, "npm-called"))}
+if [ "\${1-}" = pack ]; then
+  touch ${shellQuote(path.join(root, "npm-pack-called"))}
+  ${options.packFailure ? "exit 51" : `exec ${shellQuote(realNpm)} "$@"`}
+fi
+touch ${shellQuote(path.join(root, "npm-ci-called"))}
 smoke_root=\${HOME%/home}
 smoke_home="$(CDPATH= cd "$HOME" && pwd -P)"
 test "$(pwd -P)" = "$smoke_home"
@@ -1107,6 +1249,16 @@ test -f "$2/agents/lead.md"
 test ! -e "$2/opencode"
 test ! -e "$2/node_modules"
 test ! -e "$2/.oak"
+case "${options.mode ?? "core"}" in
+  core)
+    test ! -e "$2/plugins"
+    node -e 'const c=require(process.argv[1]); if (!Array.isArray(c.plugin) || c.plugin.length !== 0) process.exit(1)' "$2/opencode.json"
+    ;;
+  default)
+    test -f "$2/plugins/token-tree-usage.tsx"
+    node -e 'const c=require(process.argv[1]); const p=c.plugin; if (!Array.isArray(p) || p.length !== 1 || p[0] !== "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99") process.exit(1)' "$2/opencode.json"
+    ;;
+esac
 `);
 
   const request = options.request ?? "1.14.41";
@@ -1161,7 +1313,7 @@ esac
   return root;
 }
 
-function runCompatibilitySmoke(root, args = ["1.14.41"]) {
+function runCompatibilitySmoke(root, args = ["core", "1.14.41"]) {
   return spawnSync(
     "bash",
     [path.join(root, "scripts/opencode-compat-smoke.sh"), ...args],
@@ -1177,15 +1329,41 @@ function runCompatibilitySmoke(root, args = ["1.14.41"]) {
   );
 }
 
-test("OpenCode compatibility smoke uses only the packaged isolated config", (t) => {
+test("core OpenCode compatibility smoke strips optional plugins from the working-tree copy", (t) => {
   const root = makeCompatibilitySmokeFixture(t);
   const result = runCompatibilitySmoke(root);
 
   assert.equal(result.status, 0, result.stderr || result.error?.message);
   assert.equal(
     result.stdout,
-    "opencode compatibility smoke ok: requested=1.14.41 resolved=1.14.41\n",
+    "opencode compatibility smoke ok: mode=core requested=1.14.41 resolved=1.14.41\n",
   );
+});
+
+test("default OpenCode compatibility smoke packs and loads the unmodified package config", (t) => {
+  const root = makeCompatibilitySmokeFixture(t, { mode: "default", request: "1.18.4" });
+  const result = runCompatibilitySmoke(root, ["default", "1.18.4"]);
+
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  assert.equal(fs.existsSync(path.join(root, "npm-pack-called")), true);
+  assert.equal(
+    result.stdout,
+    "opencode compatibility smoke ok: mode=default requested=1.18.4 resolved=1.18.4\n",
+  );
+});
+
+test("default OpenCode compatibility smoke does not fall back when npm pack fails", (t) => {
+  const root = makeCompatibilitySmokeFixture(t, {
+    mode: "default",
+    request: "1.18.4",
+    packFailure: true,
+  });
+  const result = runCompatibilitySmoke(root, ["default", "1.18.4"]);
+
+  assert.notEqual(result.status, 0);
+  assert.equal(fs.existsSync(path.join(root, "npm-pack-called")), true);
+  assert.equal(fs.existsSync(path.join(root, "npm-ci-called")), false);
+  assert.equal(fs.existsSync(path.join(root, "npx-called")), false);
 });
 
 test("OpenCode compatibility smoke suppresses temporary stderr paths without failing", (t) => {
@@ -1195,14 +1373,14 @@ test("OpenCode compatibility smoke suppresses temporary stderr paths without fai
   assert.equal(result.status, 0, result.stderr || result.error?.message);
   assert.equal(
     result.stdout,
-    "opencode compatibility smoke ok: requested=1.14.41 resolved=1.14.41\n",
+    "opencode compatibility smoke ok: mode=core requested=1.14.41 resolved=1.14.41\n",
   );
   assert.equal(result.stderr.includes("SMOKE_TEMP_MARKER"), false);
 });
 
 test("OpenCode compatibility smoke rejects a non-canonical explicit version before tools run", (t) => {
   const root = makeCompatibilitySmokeFixture(t, { request: "01.14.41" });
-  const result = runCompatibilitySmoke(root, ["01.14.41"]);
+  const result = runCompatibilitySmoke(root, ["core", "01.14.41"]);
 
   assert.equal(result.status, 2);
   assert.equal(result.stdout, "");
@@ -1215,7 +1393,7 @@ test("OpenCode compatibility smoke rejects a non-canonical latest resolution", (
     request: "latest",
     resolvedVersion: "01.18.4",
   });
-  const result = runCompatibilitySmoke(root, ["latest"]);
+  const result = runCompatibilitySmoke(root, ["core", "latest"]);
 
   assert.notEqual(result.status, 0);
   assert.equal(result.stdout, "");
@@ -1238,6 +1416,24 @@ for (const [label, leakPath] of [
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, "");
     assert.equal(result.stderr.includes(forbiddenPath), false);
+  });
+}
+
+for (const args of [
+  [],
+  ["core"],
+  ["unknown", "1.14.41"],
+  ["default", "latest"],
+  ["core", "1.14.41", "extra"],
+]) {
+  test(`OpenCode compatibility smoke rejects invalid interface: ${JSON.stringify(args)}`, (t) => {
+    const root = makeCompatibilitySmokeFixture(t);
+    const result = runCompatibilitySmoke(root, args);
+
+    assert.equal(result.status, 2);
+    assert.equal(fs.existsSync(path.join(root, "npm-pack-called")), false);
+    assert.equal(fs.existsSync(path.join(root, "npm-ci-called")), false);
+    assert.equal(fs.existsSync(path.join(root, "npx-called")), false);
   });
 }
 
