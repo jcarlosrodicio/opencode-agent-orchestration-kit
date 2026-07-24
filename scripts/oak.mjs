@@ -59,6 +59,13 @@ const HELP = {
   rollback: "Usage: oak rollback [--dry-run] [--target PATH]",
   version: "Usage: oak version",
 };
+const LIFECYCLE_COMMANDS = new Set([
+  "install",
+  "upgrade",
+  "doctor",
+  "uninstall",
+  "rollback",
+]);
 
 export function renderOakHelp(command) {
   if (command) return `${HELP[command]}\n`;
@@ -121,6 +128,14 @@ export function dispatchOak(argv, deps = {}) {
     return 0;
   }
   if (command === "version") return invalid(runtime.stderr, "version accepts no arguments");
+  if (LIFECYCLE_COMMANDS.has(command)) {
+    return runNode(
+      OAK_ENTRYPOINTS.manager,
+      [command, ...rest],
+      { cwd: runtime.cwd, env: runtime.env, label: command },
+      runtime,
+    );
+  }
   return invalid(runtime.stderr, `${command} is not implemented`);
 }
 

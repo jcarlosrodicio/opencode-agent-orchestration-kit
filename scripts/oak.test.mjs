@@ -84,3 +84,34 @@ test("[O004] version forms delegate to the canonical version entrypoint", () => 
     assert.equal(calls[0].options.stdio, "inherit");
   }
 });
+
+test("[O005] lifecycle commands delegate exact argv and exit state", () => {
+  const cases = [
+    ["install", ["--dry-run", "--target", "/tmp/oak-target"]],
+    ["upgrade", ["--dry-run"]],
+    ["doctor", ["--target", "/tmp/oak-target"]],
+    ["uninstall", ["--dry-run", "--yes"]],
+    ["rollback", ["--dry-run"]],
+  ];
+  for (const [command, args] of cases) {
+    const calls = [];
+    const deps = runnerDeps(calls);
+    assert.equal(dispatchOak([command, ...args], deps), 0);
+    assert.deepEqual(calls[0].args, [OAK_ENTRYPOINTS.manager, command, ...args]);
+    assert.equal(calls[0].options.shell, false);
+    assert.equal(calls[0].options.stdio, "inherit");
+  }
+
+  for (const status of [1, 2]) {
+    const deps = runnerDeps([], { status, signal: null, error: null });
+    assert.equal(dispatchOak(["doctor"], deps), status);
+  }
+  assert.equal(dispatchOak(
+    ["install"],
+    runnerDeps([], { status: null, signal: null, error: new Error("spawn") }),
+  ), 2);
+  assert.equal(dispatchOak(
+    ["upgrade"],
+    runnerDeps([], { status: null, signal: "SIGTERM", error: null }),
+  ), 2);
+});
