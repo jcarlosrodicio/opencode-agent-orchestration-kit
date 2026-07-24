@@ -112,10 +112,10 @@ markdown and resumption depends on the LLM reading the `handoff_packet`.
 
 - **Path**: `.opencode/handoffs/<slug>.md`. The slug is kebab-case from the first
   5-10 words of the objective, prefixed by the command when applicable (e.g.
-  `feature-migrate-esm`, `loop-simplify-check-harness`). `/loop` keeps
-  `.opencode/loops/<slug>.md` as primary state; `.opencode/handoffs/` is the
-  durable mechanism for `/feature` with `estimated_scope: large` and other
-  commands with human approval outside `/loop`.
+  `feature-migrate-esm`, `loop-simplify-check-harness`).
+  `.opencode/handoffs/` is the durable mechanism for `/feature` with
+  `estimated_scope: large` and other commands with human approval outside
+  `/loop`.
 - **Minimum content**: current objective, decisions made, files read/touched,
   validation state, blockers, next action, and `approval_status`: `pending` |
   `approved` | `rejected`.
@@ -123,6 +123,25 @@ markdown and resumption depends on the LLM reading the `handoff_packet`.
   `.opencode/handoffs/<slug>.md` exists with `approval_status: pending`, `lead`
   reads it first and presents the summary to the user before continuing or
   discarding.
+
+### Durable `/loop` state
+
+`/loop` keeps Markdown as the approved contract and human view, not execution
+truth:
+
+- `.opencode/loops/<slug>.json`: canonical schema-v1 snapshot;
+- `.opencode/loops/<slug>.history.jsonl`: append-only history;
+- `.opencode/loops/<slug>.lock`: exclusive cross-session lease;
+- `.opencode/loops/<slug>.md`: approved contract and human view.
+
+`scripts/loop-state.mjs` binds approval to the Markdown SHA-256 hash and stores
+git baseline, session, status, iteration, last step, and blocker with an
+idempotent `action_id` per transition. `resume` rejects changed contracts,
+corruption, or another lease. An internal lock serializes `record` and
+`release` even for processes sharing a session ID, while state paths reject
+symlink ancestors and journals. Incomplete retries require repair, and repair
+refuses an active lock without explicit release authorization. Migration
+requires renewed human approval.
 
 `lead` must consult `docs/ai/harness/skill_registry.md` before delegating
 non-trivial work, selecting 0-3 relevant skills per handoff.

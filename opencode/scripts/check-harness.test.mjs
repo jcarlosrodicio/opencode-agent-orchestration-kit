@@ -72,10 +72,23 @@ agent: lead
 approval_gate: explicit_before_writes
 max_iterations_per_invocation: 3
 completion_authority: reviewer_only
-state_path: .opencode/loops/<slug>.md
+canonical_state_path: .opencode/loops/<slug>.json
+history_path: .opencode/loops/<slug>.history.jsonl
+lock_path: .opencode/loops/<slug>.lock
+human_view_path: .opencode/loops/<slug>.md
 worktree_mode: explicit_opt_in
 
 developer -> reviewer -> developer (state sync)
+
+## Phase 1
+
+node scripts/loop-state.mjs inspect
+
+## Phase 2
+
+node scripts/loop-state.mjs resume
+
+## Phase 3
 `;
 
 function writeLoopFixture(cwd, command) {
@@ -229,6 +242,67 @@ test("harness rejects loop when developer can approve itself", () => {
     const result = runHarness(cwd);
     assert.notEqual(result.status, 0, "checker accepted developer self-approval");
     assert.match(result.stderr, /commands\/loop\.md: missing completion_authority: reviewer_only/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects loop without canonical structured state", () => {
+  const cwd = makeFixture();
+  try {
+    writeLoopFixture(
+      cwd,
+      validLoopCommand.replace(
+        "canonical_state_path: .opencode/loops/<slug>.json",
+        "canonical_state_path: .opencode/loops/<slug>.md",
+      ),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted markdown as canonical loop state");
+    assert.match(
+      result.stderr,
+      /commands\/loop\.md: missing canonical_state_path: \.opencode\/loops\/<slug>\.json/,
+    );
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects a missing durable loop runtime", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "scripts/loop-state.mjs"));
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing loop state runtime");
+    assert.match(result.stderr, /scripts\/loop-state\.mjs: missing regular file/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects loop resume writes before approval", () => {
+  const cwd = makeFixture();
+  try {
+    writeLoopFixture(
+      cwd,
+      validLoopCommand.replace(
+        "node scripts/loop-state.mjs inspect",
+        "node scripts/loop-state.mjs resume",
+      ),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted resume before approval");
+    assert.match(
+      result.stderr,
+      /commands\/loop\.md: resume preflight must use read-only loop-state inspect/,
+    );
+    assert.match(
+      result.stderr,
+      /commands\/loop\.md: loop-state resume cannot run before approval/,
+    );
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }

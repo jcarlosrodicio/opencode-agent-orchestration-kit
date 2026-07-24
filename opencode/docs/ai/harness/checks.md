@@ -49,6 +49,17 @@ The aggregator requires `operational_status: "ok"` and the same
 `corpus_digest`. It writes deterministic JSON to stdout, does not call models,
 and does not make automatic harness-optimization decisions.
 
+Slice 2.4 adds durable structured state for `/loop`. Run its focused tests with:
+
+```bash
+node --test scripts/loop-state.test.mjs
+```
+
+The dependency-free runtime maintains a JSON snapshot, append-only JSONL
+history, and exclusive lock. Tests cover crash recovery, same-session
+contention, symlink boundaries, journal continuity, migration, and explicit
+repair.
+
 Use `npm run check:quick` when only the fast contract checker is needed. Use
 `npm run check:release` for a clean dependency install followed by contracts,
 all script tests, typechecking, dependency audit, and installation smoke.
@@ -69,6 +80,7 @@ The harness check validates:
 - local `/evolve` contract;
 - minimum consistency between agent contracts and prompts in `agents/*.md`;
 - local `/scope` and `/design` contracts;
+- durable `/loop` runtime, tests, and canonical JSON/JSONL/lock paths;
 - main docs in `docs/ai/harness/`;
 - benchmark references to replay and evidence taxonomy;
 - AHE run lifecycle under `docs/ai/evolution/runs/`;

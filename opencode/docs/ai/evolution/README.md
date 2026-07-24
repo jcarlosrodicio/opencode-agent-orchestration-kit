@@ -136,6 +136,20 @@ denominator, value, and `excluded_inconclusive`; a zero denominator produces
 Output is deterministic and sanitized JSON. It includes no prompts, sessions,
 paths, models, or providers and triggers no automatic optimization decision.
 
+## Durable `/loop` state
+
+Slice 2.4 keeps `.opencode/loops/<slug>.md` as the approved contract and human
+view, while `.opencode/loops/<slug>.json` is the canonical schema-v1 snapshot,
+`.opencode/loops/<slug>.history.jsonl` is the append-only journal, and
+`.opencode/loops/<slug>.lock` is the exclusive lease.
+
+`scripts/loop-state.mjs` provides `init`, `resume`, `record`, `release`,
+`inspect`, `migrate`, and `repair`. Contract hashing prevents resuming changed
+approval; action IDs make retries idempotent; the journal recovers interrupted
+writes. Internal transition locking serializes processes in the same session,
+and state paths reject symlink escapes. This is persistence infrastructure, not
+a scheduler or autonomous loop engine.
+
 ## Required Manifest
 
 Every applied harness change should declare:

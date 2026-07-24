@@ -130,7 +130,9 @@ durable state and at most three iterations per invocation.
 Interface:
 
 - `/loop <objective>` designs a new loop.
-- `/loop resume <slug>` resumes `.opencode/loops/<slug>.md`.
+- `/loop resume <slug>` inspects JSON without writing before the gate. Only
+  after explicit approval does it acquire `.opencode/loops/<slug>.lock`, verify
+  the human contract hash, and resume.
 - The current checkout is the default. A worktree is enabled only by an explicit
   user request.
 
@@ -140,17 +142,24 @@ Criteria:
   objective, verifiable success, scope, non-goals, validation, risks, and limits.
 - Before invoking `developer`, `lead` persists human approval in a durable
   `handoff_packet` (`.opencode/handoffs/<slug>.md` with `approval_status`) so
-  the approval state survives session restarts. `/loop` keeps
-  `.opencode/loops/<slug>.md` as primary state; the durable `handoff_packet`
-  complements approval persistence.
+  approval survives session restarts. `/loop` keeps
+  `.opencode/loops/<slug>.json` as canonical state,
+  `.opencode/loops/<slug>.history.jsonl` as append-only history, and Markdown
+  as the human view.
 - No state is written and `developer` is not invoked before explicit human
   approval of the contract.
+- `scripts/loop-state.mjs` performs atomic writes, requires idempotent
+  `action_id` values, rejects a different contract, prevents simultaneous
+  resumes, and serializes concurrent transitions from the same session.
 - Each iteration allows one focused `developer` change; `reviewer` has exclusive
   authority to approve or escalate.
 - `developer` synchronizes the verdict into state without mixing in
   implementation changes; this administrative write does not consume an
   iteration.
 - Resume opens another block of at most three iterations and preserves history.
+- Repair rebuilds the snapshot from the journal. Truncating an incomplete tail,
+  releasing an abandoned lock, or migrating schema is explicit; migration
+  never reuses approval without renewal.
 - Stop on approved success, exhausted budget, two iterations without progress,
   impossible validation, scope expansion, overlap with local changes, or a
   sensitive path.

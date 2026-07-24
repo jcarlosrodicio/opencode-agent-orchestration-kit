@@ -167,13 +167,66 @@ function checkLoopContract() {
     "approval_gate: explicit_before_writes",
     "max_iterations_per_invocation: 3",
     "completion_authority: reviewer_only",
-    "state_path: .opencode/loops/<slug>.md",
+    "canonical_state_path: .opencode/loops/<slug>.json",
+    "history_path: .opencode/loops/<slug>.history.jsonl",
+    "lock_path: .opencode/loops/<slug>.lock",
+    "human_view_path: .opencode/loops/<slug>.md",
     "worktree_mode: explicit_opt_in",
     "developer -> reviewer -> developer (state sync)",
   ];
 
   for (const token of required) {
     if (!text.includes(token)) fail(`${rel}: missing ${token}`);
+  }
+
+  const phase1 = text.split("## Phase 1")[1]?.split("## Phase 2")[0] || "";
+  const phase2 = text.split("## Phase 2")[1]?.split("## Phase 3")[0] || "";
+  if (!phase1.includes("node scripts/loop-state.mjs inspect")) {
+    fail(`${rel}: resume preflight must use read-only loop-state inspect`);
+  }
+  if (phase1.includes("node scripts/loop-state.mjs resume")) {
+    fail(`${rel}: loop-state resume cannot run before approval`);
+  }
+  if (!phase2.includes("node scripts/loop-state.mjs resume")) {
+    fail(`${rel}: loop-state resume must run after approval`);
+  }
+
+  for (const runtimeRel of [
+    "scripts/loop-state.mjs",
+    "scripts/loop-state.test.mjs",
+  ]) {
+    const absolute = path.join(root, runtimeRel);
+    if (!exists(runtimeRel) || !fs.lstatSync(absolute).isFile()) {
+      fail(`${runtimeRel}: missing regular file`);
+    }
+  }
+
+  for (const [docRel, tokens] of [
+    [
+      "docs/ai/harness/commands.md",
+      [
+        ".opencode/loops/<slug>.json",
+        ".opencode/loops/<slug>.history.jsonl",
+        "scripts/loop-state.mjs",
+      ],
+    ],
+    [
+      "docs/ai/harness/agents.md",
+      ["Durable `/loop` state", "idempotent `action_id`"],
+    ],
+    [
+      "docs/ai/harness/checks.md",
+      ["node --test scripts/loop-state.test.mjs"],
+    ],
+    [
+      "docs/ai/evolution/README.md",
+      ["Slice 2.4", "append-only journal"],
+    ],
+  ]) {
+    const docs = contractText(read(docRel));
+    for (const token of tokens) {
+      if (!docs.includes(token)) fail(`${docRel}: missing durable loop token ${token}`);
+    }
   }
 }
 

@@ -154,7 +154,7 @@ Use the smallest useful flow:
 - `/scope` when you need research and an MVP-oriented specification.
 - `/feature` when the work deserves full orchestration.
 - `/loop` when you want an approved, resumable implementation-review cycle with
-  durable state and a three-iteration cap.
+  crash-recoverable structured state and a three-iteration cap.
 
 ## Included agents
 
@@ -215,6 +215,12 @@ Examples:
 
 /review
 ```
+
+`/loop` stores its approved human-readable contract in Markdown and uses a
+schema-versioned JSON snapshot, append-only JSONL history, and exclusive lock
+for execution state. Contract hashing rejects stale approvals, action IDs make
+retries idempotent, and explicit repair recovers interrupted writes without
+turning the loop into unattended automation.
 
 A small request can also be written directly:
 
