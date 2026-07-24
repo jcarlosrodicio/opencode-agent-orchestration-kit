@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const DEFAULT_BUDGETS = {
   max_reviewers: 3,
@@ -108,16 +109,37 @@ function splitLines(text) {
   return text.split("\n").map((line) => line.trim()).filter(Boolean);
 }
 
+function splitNull(text) {
+  return text.split("\0").filter(Boolean);
+}
+
+function assertSafeRepoPath(file) {
+  if (
+    typeof file !== "string"
+    || file.length === 0
+    || path.isAbsolute(file)
+    || /^[A-Za-z]:[\\/]/.test(file)
+    || file.split(/[\\/]/).includes("..")
+    || /[\u0000-\u001f\u007f]/u.test(file)
+  ) {
+    throw new Error(`unsafe_review_path: changed file path is not safe for review`);
+  }
+  return file;
+}
+
 function getChangedFiles(cwd, options) {
-  const stagedFiles = splitLines(maybeRunGit(cwd, ["diff", "--cached", "--name-only", options.base, "--"]));
-  const unstagedFiles = options.staged ? [] : splitLines(maybeRunGit(cwd, ["diff", "--name-only", "--"]));
-  const untrackedFiles = splitLines(maybeRunGit(cwd, ["ls-files", "--others", "--exclude-standard"]));
+  const stagedFiles = splitNull(maybeRunGit(cwd, ["diff", "--cached", "--name-only", "-z", options.base, "--"]));
+  const unstagedFiles = options.staged ? [] : splitNull(maybeRunGit(cwd, ["diff", "--name-only", "-z", "--"]));
+  const untrackedFiles = splitNull(maybeRunGit(cwd, ["ls-files", "--others", "--exclude-standard", "-z"]));
 
   return {
-    staged: stagedFiles,
-    unstaged: unstagedFiles,
-    untracked: untrackedFiles,
-    reviewed: unique([...stagedFiles, ...unstagedFiles, ...(options.includeUntracked ? untrackedFiles : [])]),
+    staged: stagedFiles.map(assertSafeRepoPath),
+    unstaged: unstagedFiles.map(assertSafeRepoPath),
+    untracked: untrackedFiles.map(assertSafeRepoPath),
+    reviewed: unique(
+      [...stagedFiles, ...unstagedFiles, ...(options.includeUntracked ? untrackedFiles : [])]
+        .map(assertSafeRepoPath),
+    ),
   };
 }
 
@@ -406,8 +428,9 @@ function prepareReviewWorkspace(options) {
       droppedPatches.push({ file: item.file, bytes: item.patchBytes, reason: "max_total_patch_bytes" });
       continue;
     }
-    const safeName = item.file.replace(/[^A-Za-z0-9_.-]+/g, "__");
-    const rel = path.join("patches", `${safeName}.patch`);
+    const safeName = path.basename(item.file).replace(/[^A-Za-z0-9_.-]+/g, "__").slice(0, 80);
+    const pathDigest = createHash("sha256").update(item.file).digest("hex").slice(0, 16);
+    const rel = path.join("patches", `${pathDigest}-${safeName || "file"}.patch`);
     fs.writeFileSync(path.join(workspace, rel), [
       "BEGIN_UNTRUSTED_PATCH_DATA",
       item.patch,
@@ -536,6 +559,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 export {
   DEFAULT_BUDGETS,
+  assertSafeRepoPath,
   buildExecutionPlan,
   classify,
   cleanupWorkspace,

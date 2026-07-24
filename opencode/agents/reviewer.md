@@ -22,8 +22,8 @@ permission:
     "pnpm run lint*": allow
     "npm run typecheck*": allow
     "pnpm run typecheck*": allow
-  webfetch: allow
-  websearch: allow
+  webfetch: ask
+  websearch: ask
   external_directory: deny
   skill:
     "*": deny

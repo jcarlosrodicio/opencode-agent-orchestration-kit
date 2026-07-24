@@ -53,6 +53,7 @@ The goal is not to force every request through a heavy process. Small, clear, lo
 | Local skills | Practical checklists for testing, debugging, security, performance, documentation, APIs, code review, and more |
 | Safe installation | Backup-aware install and uninstall scripts, plus a project-local test mode |
 | Validation | Mechanical checks for JSON configuration, agent contracts, command contracts, and harness consistency |
+| Adversarial safety | Portable fixtures for injection, unsafe paths, wrapper/network permissions, approval integrity, supply-chain pins, and corrupt events |
 | Optional design workflow | Open Design integration for editable UI workspaces and design-oriented flows |
 | Optional token visibility | TUI plugin for lead and subagent token usage when OpenCode exposes session trees |
 | Versioned documentation | Agent, command, evidence, and validation contracts stored alongside the configuration |

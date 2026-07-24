@@ -107,6 +107,12 @@ The harness check validates:
 - routing replay surface: deterministic/live runners and the metrics aggregator
   as regular files, one synthetic fixture per corpus ID, and documented
   tri-state, opt-in, and privacy contracts;
+- portable adversarial corpus at
+  `docs/ai/evolution/benchmarks/adversarial-scenarios.jsonl`, with exactly
+  eleven threats and one real defense per scenario;
+- `node --test scripts/adversarial-harness.test.mjs` verifies review
+  boundaries, paths and symlinks, shell/network permissions, durable approval,
+  canaries, supply-chain rules, and corrupt or repeated events;
 - presence of `docs/ai/harness/skill_registry.md` (soft check; warns when missing);
 - `agents/lead.md` contains `Skill Resolution` or a registry reference;
 - `developer`, `researcher`, `specifier`, `reviewer`, `designer`, and `scoper`

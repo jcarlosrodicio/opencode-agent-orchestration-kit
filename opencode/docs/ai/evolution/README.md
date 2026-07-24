@@ -150,6 +150,20 @@ writes. Internal transition locking serializes processes in the same session,
 and state paths reject symlink escapes. This is persistence infrastructure, not
 a scheduler or autonomous loop engine.
 
+## Adversarial suite
+
+Slice 2.5 adds a portable corpus of 11 threats in
+`benchmarks/adversarial-scenarios.jsonl` and connects each scenario to a real
+harness control through `scripts/adversarial-harness.test.mjs`. It covers
+injection in diffs and repository documentation, external symlinks, traversal,
+control-character filenames, wrapper allowlist bypass, network exfiltration,
+approval manipulation, credential canaries, unpinned external references, and
+corrupt or repeated events.
+
+The suite runs no network, models, or installations. Fixtures are symbolic;
+the checker enforces the closed schema, all 11 threats, and the permission and
+trust contracts that support them.
+
 ## Required Manifest
 
 Every applied harness change should declare:

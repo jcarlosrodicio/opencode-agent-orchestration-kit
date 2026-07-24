@@ -14,10 +14,12 @@ permission:
     "git log*": allow
     "ls*": allow
     "rtk": allow
-    "rtk *": allow
+    "rtk *": ask
     "node scripts/review-orchestrated-prepare.mjs*": allow
     "node ./scripts/review-orchestrated-prepare.mjs*": allow
     "node *scripts/review-orchestrated-prepare.mjs*": allow
+  webfetch: deny
+  websearch: deny
   task:
     "*": deny
     review_quality: allow

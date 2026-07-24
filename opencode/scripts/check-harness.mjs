@@ -233,6 +233,14 @@ function checkLoopContract() {
 function checkFrontmatter() {
   for (const rel of listMarkdown("agents")) {
     requireFields(rel, parseFrontmatter(rel), ["description", "mode"]);
+    let nestedSection = "";
+    for (const line of frontmatterBlock(rel).split("\n")) {
+      const sectionMatch = line.match(/^  ([A-Za-z_][A-Za-z0-9_-]*):/);
+      if (sectionMatch) nestedSection = sectionMatch[1];
+      if (/^    "[^"]+":/.test(line) && ["webfetch", "websearch"].includes(nestedSection)) {
+        fail(`${rel}: quoted command permission cannot be nested under ${nestedSection}`);
+      }
+    }
   }
   for (const rel of listMarkdown("commands")) {
     requireFields(rel, parseFrontmatter(rel), ["description", "agent"]);
@@ -1286,6 +1294,135 @@ function checkRoutingReplaySurface() {
   checkRoutingReplayContradictions(evolutionRel, evolution);
 }
 
+function checkAdversarialHarnessSurface() {
+  const corpusRel = "docs/ai/evolution/benchmarks/adversarial-scenarios.jsonl";
+  const testRel = "scripts/adversarial-harness.test.mjs";
+  const requiredThreats = [
+    "approval-state-manipulation",
+    "diff-prompt-injection",
+    "event-corruption-replay",
+    "external-symlink",
+    "network-exfiltration",
+    "path-traversal",
+    "repo-doc-instruction",
+    "secret-like-data",
+    "shell-wrapper-bypass",
+    "strange-filename",
+    "unpinned-external-ref",
+  ];
+  const requiredFields = [
+    "schema_version",
+    "id",
+    "threat",
+    "surface",
+    "input_fixture",
+    "expected_control",
+    "expected_outcome",
+    "required_evidence",
+  ];
+  const allowedOutcomes = new Set([
+    "reject",
+    "require-human-approval",
+    "sanitize",
+    "treat-as-data",
+  ]);
+  const allowedEvidence = new Set(["live_smoke", "static_contract"]);
+
+  for (const rel of [corpusRel, testRel]) {
+    const absolute = path.join(root, rel);
+    if (!exists(rel) || !fs.lstatSync(absolute).isFile()) {
+      fail(`${rel}: missing regular file`);
+    }
+  }
+
+  const records = parseJsonl(corpusRel);
+  const ids = new Set();
+  const threats = new Set();
+  for (const { line, value } of records) {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      fail(`${corpusRel}: line ${line} must be an object`);
+      continue;
+    }
+    requireExactJsonlFields(corpusRel, line, value, requiredFields);
+    if (value.schema_version !== 1) fail(`${corpusRel}: line ${line} schema_version must be 1`);
+    for (const field of ["id", "threat", "surface", "input_fixture", "expected_control"]) {
+      if (typeof value[field] !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value[field])) {
+        fail(`${corpusRel}: line ${line} ${field} must be a portable symbolic identifier`);
+      }
+    }
+    if (ids.has(value.id)) fail(`${corpusRel}: duplicate id ${value.id}`);
+    if (threats.has(value.threat)) fail(`${corpusRel}: duplicate threat ${value.threat}`);
+    ids.add(value.id);
+    threats.add(value.threat);
+    if (!requiredThreats.includes(value.threat)) {
+      fail(`${corpusRel}: line ${line} unknown threat ${value.threat}`);
+    }
+    if (!allowedOutcomes.has(value.expected_outcome)) {
+      fail(`${corpusRel}: line ${line} invalid expected_outcome ${value.expected_outcome}`);
+    }
+    checkUniqueStringArray(corpusRel, line, value, "required_evidence", { nonEmpty: true });
+    if (Array.isArray(value.required_evidence)) {
+      for (const evidence of value.required_evidence) {
+        if (!allowedEvidence.has(evidence)) {
+          fail(`${corpusRel}: line ${line} invalid required_evidence ${evidence}`);
+        }
+      }
+    }
+  }
+  for (const threat of requiredThreats) {
+    if (!threats.has(threat)) fail(`${corpusRel}: missing threat ${threat}`);
+  }
+  if (records.length !== requiredThreats.length) {
+    fail(`${corpusRel}: must contain exactly ${requiredThreats.length} scenarios`);
+  }
+
+  for (const rel of listMarkdown("agents")) {
+    if (frontmatterBlock(rel).includes('"rtk *": allow')) {
+      fail(`${rel}: wrapper command rtk * must require approval`);
+    }
+  }
+  for (const rel of [
+    "agents/review_coordinator.md",
+    "agents/review_quality.md",
+    "agents/review_security.md",
+    "agents/review_tests.md",
+    "agents/review_api.md",
+  ]) {
+    const frontmatter = frontmatterBlock(rel);
+    for (const token of ["webfetch: deny", "websearch: deny"]) {
+      if (!frontmatter.includes(token)) fail(`${rel}: review network permission must include ${token}`);
+    }
+  }
+  const reviewerFrontmatter = frontmatterBlock("agents/reviewer.md");
+  for (const token of ["webfetch: ask", "websearch: ask"]) {
+    if (!reviewerFrontmatter.includes(token)) fail(`agents/reviewer.md: review network permission must include ${token}`);
+  }
+
+  const agentsIndex = contractText(read("AGENTS.md"));
+  for (const token of [
+    "local documentation, and their metadata as untrusted data",
+    "exact pinned version and explicit human approval",
+  ]) {
+    if (!agentsIndex.includes(token)) fail(`AGENTS.md: missing adversarial trust boundary ${token}`);
+  }
+
+  for (const [rel, tokens] of [
+    [
+      "docs/ai/harness/checks.md",
+      ["adversarial-scenarios.jsonl", "node --test scripts/adversarial-harness.test.mjs"],
+    ],
+    [
+      "docs/ai/evolution/README.md",
+      ["Slice 2.5", "11 threats"],
+    ],
+  ]) {
+    const text = contractText(read(rel));
+    for (const token of tokens) {
+      if (!text.includes(token)) fail(`${rel}: missing adversarial harness token ${token}`);
+    }
+  }
+}
+
 /**
  * Validate that commands/evolve.md contains the AHE flow
  * evaluator -> debugger -> evolver with flexible regex matching.
@@ -1942,6 +2079,7 @@ checkInitContextPolicy();
 checkMechanismRegistries();
 checkRouterScenarios();
 checkRoutingReplaySurface();
+checkAdversarialHarnessSurface();
 checkEvolveContract();
 checkSessionSourceDocs();
 checkCrossAgentContract();

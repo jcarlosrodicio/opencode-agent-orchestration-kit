@@ -12,10 +12,12 @@ permission:
     "git status*": allow
     "git diff*": allow
     "rtk": allow
-    "rtk *": allow
+    "rtk *": ask
     "npm test*": allow
     "pnpm test*": allow
     "bun test*": allow
+  webfetch: deny
+  websearch: deny
   lsp: allow
   external_directory: deny
 ---

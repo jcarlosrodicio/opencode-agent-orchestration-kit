@@ -97,6 +97,123 @@ function writeLoopFixture(cwd, command) {
   fs.appendFileSync(docsPath, "\n## `/loop`\n");
 }
 
+test("adversarial corpus rejects a missing threat", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "docs/ai/evolution/benchmarks/adversarial-scenarios.jsonl";
+    const records = fs.readFileSync(path.join(cwd, rel), "utf8")
+      .trim()
+      .split("\n")
+      .map(JSON.parse)
+      .filter((record) => record.threat !== "network-exfiltration");
+    write(rel, `${records.map(JSON.stringify).join("\n")}\n`, cwd);
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing adversarial threat");
+    assert.match(result.stderr, /missing threat network-exfiltration/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("adversarial corpus rejects non-portable fixture values", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "docs/ai/evolution/benchmarks/adversarial-scenarios.jsonl";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replace("PATCH_CANARY_IGNORE_POLICY", "../private"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a local path in the portable corpus");
+    assert.match(result.stderr, /input_fixture must be a portable symbolic identifier/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("adversarial surface rejects an allowlisted rtk wrapper", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "agents/review_security.md";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replace('"rtk *": ask', '"rtk *": allow'),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an allowlisted shell wrapper");
+    assert.match(result.stderr, /wrapper command rtk \* must require approval/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("adversarial surface rejects review network allow", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "agents/review_security.md";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replace("webfetch: deny", "webfetch: allow"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted network access for orchestrated review");
+    assert.match(result.stderr, /review network permission must include webfetch: deny/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("agent frontmatter rejects shell permissions nested under websearch", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "agents/review_tests.md";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replace(
+          "  websearch: deny",
+          '  websearch: deny\n    "shell canary*": allow',
+        ),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a shell permission nested under websearch");
+    assert.match(result.stderr, /quoted command permission cannot be nested under websearch/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("adversarial surface rejects a missing repository trust boundary", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "AGENTS.md";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replace("local documentation, and their metadata as", "local documentation, and their metadata as ordinary"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing repository trust boundary");
+    assert.match(result.stderr, /missing adversarial trust boundary/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("harness accepts prose evidence that mentions markdown filenames", () => {
   const cwd = makeFixture();
   try {
