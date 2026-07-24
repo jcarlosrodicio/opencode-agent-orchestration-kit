@@ -94,7 +94,6 @@ const [, , target, expected] = process.argv
 const manifest = JSON.parse(fs.readFileSync(path.join(target, ".oak", "manifest.json"), "utf8"))
 if (manifest.kit_version !== expected) throw new Error("rollback-restored manifest version mismatch")
 NODE
-./doctor.sh --target "$target" | grep -q 'doctor: current'
 
 if find "$smoke_root" -maxdepth 1 -name "$(basename "$target").backup.*" -print -quit | grep -q .; then
   echo "Unexpected sibling backup directory" >&2
@@ -107,5 +106,26 @@ fi
   node scripts/check-harness.mjs
   node --input-type=module -e "import('@opencode-ai/plugin').then(() => console.log('installed plugin import ok'))"
 )
+
+fake_bin="$smoke_root/bin"
+mkdir -p "$fake_bin"
+cat >"$fake_bin/opencode" <<'SH'
+#!/usr/bin/env bash
+test "$#" -eq 1
+test "$1" = "--version"
+printf '%s\n' '1.14.41'
+SH
+chmod 755 "$fake_bin/opencode"
+
+doctor_output="$(PATH="$fake_bin:$PATH" ./doctor.sh --target "$target")"
+grep -q '^doctor: healthy;' <<<"$doctor_output"
+for check in \
+  opencode-version node-version dependencies installed-files file-drift \
+  required-configuration optional-plugins permissions executable-scripts \
+  skill-registry compatibility legacy-residue
+do
+  grep -Eq "^\[(pass|info|not-applicable)\] $check:" <<<"$doctor_output"
+done
+grep -Eq '^summary: .*action-required=0 ' <<<"$doctor_output"
 
 echo "installation smoke ok"

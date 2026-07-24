@@ -107,12 +107,32 @@ Preserved user changes and pending protected-file merges are warnings, not autho
 
 Ordinary `doctor` is lock-free and read-only. Exit codes are:
 
-- `0`: healthy managed installation; stable preservation and user-only preserved evolution are allowed;
-- `1`: actionable state such as owned drift, a pending merge, obsolete preserved metadata, stale lock, interrupted transaction, rollback conflict, or cleanup residue;
+- `0`: no finding requires action; informational and not-applicable findings are allowed;
+- `1`: one or more findings require safe operator action, including incompatible
+  runtimes, incomplete dependencies or configuration, owned drift, a pending
+  merge, unsafe permissions, stale generated registries, legacy residue, stale
+  locks, interrupted transactions, rollback conflicts, or cleanup residue;
 - `2`: invalid invocation, corrupt/unknown state, unsafe path/symlink, structural collision, or a filesystem error that prevents safe analysis.
 
-Its structured report adds `sourceVersion`, `installedVersion`, and
-`versionState`. The state is exactly one of:
+The human-readable report has a deterministic headline, twelve ordered checks,
+an immediate action beneath every `action-required` finding, and a final
+summary. Check statuses are `pass`, `info`, `action-required`, or
+`not-applicable`. The stable check order is `opencode-version`,
+`node-version`, `dependencies`, `installed-files`, `file-drift`,
+`required-configuration`, `optional-plugins`, `permissions`,
+`executable-scripts`, `skill-registry`, `compatibility`, and
+`legacy-residue`.
+
+External pinned plugins are reported as `info` when they cannot be verified
+offline; missing local plugin files are actionable. Ordinary doctor does not
+run npm, access the network, inspect models, authentication, or caches, repair
+files, delete legacy state, or adopt unmanaged files. It never prints
+configuration contents, subprocess stderr, environment values, credentials, or
+lifecycle backup bytes. Only the explicit `--accept-preserved` workflow below
+can mutate state.
+
+The report retains `sourceVersion`, `installedVersion`, and `versionState`.
+The state is exactly one of:
 
 - `not-installed`: manifest absent;
 - `current`: version and payload match;

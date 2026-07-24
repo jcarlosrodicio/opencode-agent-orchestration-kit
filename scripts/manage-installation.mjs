@@ -3,7 +3,9 @@
 import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { checkCompatibility } from "./check-compatibility.mjs";
 import { parseStableVersion, readCanonicalVersion, formatVersion, compareStableVersions } from "./version.mjs";
 
 export const SCHEMA_VERSION = 1;
@@ -14,6 +16,120 @@ export const PROTECTED_ROOT_FILES = [
   "package-lock.json",
   "tui.json",
 ];
+
+const DOCTOR_CHECK_IDS = [
+  "opencode-version",
+  "node-version",
+  "dependencies",
+  "installed-files",
+  "file-drift",
+  "required-configuration",
+  "optional-plugins",
+  "permissions",
+  "executable-scripts",
+  "skill-registry",
+  "compatibility",
+  "legacy-residue",
+];
+
+function doctorCheck(id, status, summary, action = null) {
+  if (!DOCTOR_CHECK_IDS.includes(id)) throw invalid("doctor check id is invalid");
+  if (!["pass", "info", "action-required", "not-applicable"].includes(status)) {
+    throw invalid("doctor check status is invalid");
+  }
+  if (typeof summary !== "string" || summary.length === 0 || summary.includes("\n")) {
+    throw invalid("doctor check summary must be one non-empty line");
+  }
+  if (status === "action-required") {
+    if (typeof action !== "string" || action.length === 0 || action.includes("\n")) {
+      throw invalid("action-required doctor check must have one action line");
+    }
+  } else if (action !== null) {
+    throw invalid("non-actionable doctor check action must be null");
+  }
+  return { id, status, summary, action };
+}
+
+function summarizeDoctorChecks(checks) {
+  const summary = { pass: 0, info: 0, actionRequired: 0, notApplicable: 0 };
+  const keys = {
+    pass: "pass",
+    info: "info",
+    "action-required": "actionRequired",
+    "not-applicable": "notApplicable",
+  };
+  for (const check of checks) summary[keys[check.status]] += 1;
+  return summary;
+}
+
+function renderDoctorReport(report) {
+  const actions = {
+    "not-installed": "run install --dry-run",
+    current: "none",
+    "upgrade-available": "run upgrade --dry-run",
+    "source-older": "use a source checkout at least as new as the installation",
+    "same-version-different-payload": "fix the release identity mismatch",
+    "invalid-version-state": "repair the invalid version state",
+  };
+  const expectedSummary = summarizeDoctorChecks(report.checks);
+  if (JSON.stringify(expectedSummary) !== JSON.stringify(report.summary)) {
+    throw invalid("doctor report summary is inconsistent");
+  }
+  const lifecycleActionable = report.versionState !== "current"
+    || report.blockers.length > 0
+    || report.activeTransaction
+    || report.activeLock
+    || report.cleanupResidue.length > 0;
+  const actionable = lifecycleActionable
+    || report.checks.some((check) => check.status === "action-required");
+  const lines = [
+    `doctor: ${actionable ? "action required" : "healthy"}; source=${report.sourceVersion ?? "invalid"}; installed=${report.installedVersion ?? "none"}; version=${report.versionState}; action=${actions[report.versionState]}`,
+  ];
+  for (const check of report.checks) {
+    lines.push(`[${check.status}] ${check.id}: ${check.summary}`);
+    if (check.status === "action-required") lines.push(`  action: ${check.action}`);
+  }
+  lines.push(
+    `summary: pass=${report.summary.pass} info=${report.summary.info} action-required=${report.summary.actionRequired} not-applicable=${report.summary.notApplicable}`,
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function parseRuntimeVersion(value, label) {
+  if (typeof value !== "string") throw invalid(`${label} version is invalid`);
+  const canonical = value.trim().replace(/^v(?=\d)/, "");
+  try {
+    return parseStableVersion(canonical);
+  } catch {
+    throw invalid(`${label} version is invalid`);
+  }
+}
+
+function nodeSatisfiesCanonicalEngines(versionValue, engines) {
+  const version = parseRuntimeVersion(versionValue, "Node");
+  if (typeof engines !== "string") throw invalid("Node compatibility contract is invalid");
+  const ranges = engines.split(" || ");
+  if (ranges.length === 0) throw invalid("Node compatibility contract is invalid");
+  return ranges.some((range) => {
+    if (!range.startsWith("^")) throw invalid("Node compatibility contract is invalid");
+    const floor = parseRuntimeVersion(range.slice(1), "Node compatibility");
+    return version.major === floor.major && compareStableVersions(version.canonical, floor.canonical) >= 0;
+  });
+}
+
+function opencodeSatisfiesCompatibility(versionValue, compatibility) {
+  const version = parseRuntimeVersion(versionValue, "OpenCode");
+  const minimum = parseRuntimeVersion(compatibility.opencode.minimum_tested, "OpenCode compatibility");
+  const range = /^>=(\d+\.\d+\.\d+) <(\d+\.\d+\.\d+)$/.exec(compatibility.opencode.supported_range);
+  if (!range) throw invalid("OpenCode compatibility contract is invalid");
+  const lower = parseRuntimeVersion(range[1], "OpenCode compatibility");
+  const upper = parseRuntimeVersion(range[2], "OpenCode compatibility");
+  if (lower.canonical !== minimum.canonical) {
+    throw invalid("OpenCode compatibility contract is invalid");
+  }
+  return compareStableVersions(version.canonical, minimum.canonical) >= 0
+    && compareStableVersions(version.canonical, upper.canonical) < 0;
+}
 
 const COMMAND_FLAGS = {
   install: new Set(["dryRun", "force", "target", "help"]),
@@ -891,6 +1007,11 @@ function currentManifestDigest(targetRoot, fsOps = fs) {
 export function createInstallationManager(options) {
   const sourceRoot = options.sourceRoot;
   const fsOps = options.fsOps ?? fs;
+  const repositoryRoot = options.repositoryRoot ?? path.dirname(sourceRoot);
+  const commandRunner = options.commandRunner ?? spawnSync;
+  const nodeVersionProvider = options.nodeVersionProvider ?? (() => process.version);
+  const compatibilityProvider = options.compatibilityProvider
+    ?? (() => checkCompatibility(repositoryRoot, { fsOps, surfaces: false }));
   const clock = options.clock ?? (() => new Date());
   const newTransactionId = options.transactionId ?? (() => crypto.randomUUID());
   const failpoint = options.failpoint ?? (() => {});
@@ -1172,6 +1293,353 @@ export function createInstallationManager(options) {
     return { exitCode: 0, transaction: active };
   }
 
+  function readTargetJson(targetRoot, relative, { required = false } = {}) {
+    const state = inspectTargetPath(targetRoot, relative, fsOps);
+    if (state.kind === "absent") {
+      if (required) throw invalid(`${relative} is missing`);
+      return null;
+    }
+    if (state.kind !== "file") throw invalid(`${relative} must be a regular file`);
+    try {
+      return JSON.parse(fsOps.readFileSync(path.join(targetRoot, relative), "utf8"));
+    } catch {
+      throw invalid(`${relative} is invalid JSON`);
+    }
+  }
+
+  function dependencyDoctorCheck(targetRoot) {
+    const packageJson = readTargetJson(targetRoot, "package.json");
+    const packageLock = readTargetJson(targetRoot, "package-lock.json");
+    if (!packageJson && !packageLock) {
+      return doctorCheck("dependencies", "not-applicable", "no dependency contract is installed");
+    }
+    if (!packageJson || !packageLock) {
+      return doctorCheck(
+        "dependencies",
+        "action-required",
+        "the installed package and lockfile are incomplete",
+        "review package.json and package-lock.json before installing dependencies",
+      );
+    }
+    const dependencies = packageJson.dependencies;
+    const lockRoot = packageLock.packages?.[""];
+    if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)
+      || !lockRoot || typeof lockRoot !== "object" || Array.isArray(lockRoot)
+      || !lockRoot.dependencies || typeof lockRoot.dependencies !== "object") {
+      throw invalid("installed dependency contract is invalid");
+    }
+    const problems = [];
+    for (const name of Object.keys(dependencies).sort()) {
+      const expected = dependencies[name];
+      const locked = lockRoot.dependencies[name];
+      const lockEntry = packageLock.packages?.[`node_modules/${name}`];
+      const installed = readTargetJson(targetRoot, `node_modules/${name}/package.json`);
+      if (typeof expected !== "string" || locked !== expected
+        || lockEntry?.version !== expected || installed?.version !== expected) {
+        problems.push(name);
+      }
+    }
+    return problems.length === 0
+      ? doctorCheck("dependencies", "pass", `${Object.keys(dependencies).length} direct dependencies are installed`)
+      : doctorCheck(
+        "dependencies",
+        "action-required",
+        `${problems.length} direct dependencies require attention`,
+        "review package manifests, then run npm ci --ignore-scripts",
+      );
+  }
+
+  function configurationAndPluginDoctorChecks(targetRoot, sourceRoot) {
+    let sourceConfig;
+    try {
+      sourceConfig = readTargetJson(sourceRoot, "opencode.json");
+    } catch {
+      sourceConfig = null;
+    }
+    if (typeof sourceConfig?.default_agent !== "string" || sourceConfig.default_agent.length === 0) {
+      return {
+        configuration: doctorCheck(
+          "required-configuration",
+          "not-applicable",
+          "no semantic OpenCode configuration contract is installed",
+        ),
+        plugins: doctorCheck("optional-plugins", "not-applicable", "no optional plugin contract is installed"),
+      };
+    }
+    const config = readTargetJson(targetRoot, "opencode.json");
+    const tui = readTargetJson(targetRoot, "tui.json");
+    if (!config) {
+      return {
+        configuration: doctorCheck(
+          "required-configuration",
+          "not-applicable",
+          "no OpenCode configuration is installed",
+        ),
+        plugins: doctorCheck("optional-plugins", "not-applicable", "no optional plugins are configured"),
+      };
+    }
+    const defaultAgent = config.default_agent;
+    const agentState = typeof defaultAgent === "string" && defaultAgent.length > 0
+      ? inspectTargetPath(targetRoot, `agents/${defaultAgent}.md`, fsOps)
+      : { kind: "absent" };
+    const configuration = typeof defaultAgent === "string"
+      && defaultAgent.length > 0
+      && agentState.kind === "file"
+      ? doctorCheck("required-configuration", "pass", `default agent ${defaultAgent} is available`)
+      : doctorCheck(
+        "required-configuration",
+        "action-required",
+        "the required default agent configuration is incomplete",
+        "set default_agent to an installed regular agent file",
+      );
+    const references = [];
+    for (const value of [config.plugin, tui?.plugin]) {
+      if (value === undefined) continue;
+      if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || entry.length === 0)) {
+        throw invalid("plugin configuration must be an array of non-empty strings");
+      }
+      references.push(...value);
+    }
+    if (references.length === 0) {
+      return {
+        configuration,
+        plugins: doctorCheck("optional-plugins", "not-applicable", "no optional plugins are configured"),
+      };
+    }
+    let externalPinned = 0;
+    const broken = [];
+    for (const reference of references) {
+      if (reference.startsWith("./")) {
+        try {
+          const relative = normalizeManagedPath(reference.slice(2));
+          if (inspectTargetPath(targetRoot, relative, fsOps).kind !== "file") broken.push(relative);
+        } catch {
+          broken.push("local-plugin");
+        }
+      } else if (/#([0-9a-f]{40})$/.test(reference)) {
+        externalPinned += 1;
+      } else {
+        broken.push("external-plugin");
+      }
+    }
+    const plugins = broken.length > 0
+      ? doctorCheck(
+        "optional-plugins",
+        "action-required",
+        `${broken.length} configured plugin references require attention`,
+        "repair local plugin paths or pin external executable references",
+      )
+      : externalPinned > 0
+        ? doctorCheck(
+          "optional-plugins",
+          "info",
+          `${externalPinned} pinned external plugin references are not verified offline`,
+        )
+        : doctorCheck("optional-plugins", "pass", "configured local plugins are available");
+    return { configuration, plugins };
+  }
+
+  function ownershipDoctorChecks(targetRoot, inspection, plan) {
+    const wrappers = [
+      "install.sh",
+      "uninstall.sh",
+      "upgrade.sh",
+      "doctor.sh",
+      "rollback.sh",
+      "scripts/check.sh",
+      "scripts/opencode-compat-smoke.sh",
+      "scripts/package-smoke.sh",
+    ];
+    const rootPackage = lstatIfExists(path.join(repositoryRoot, "package.json"), fsOps);
+    const sourceExecutablesEvaluable = rootPackage?.isFile() && !rootPackage.isSymbolicLink();
+    const brokenWrappers = sourceExecutablesEvaluable
+      ? wrappers.filter((relative) => {
+        const stat = lstatIfExists(path.join(repositoryRoot, relative), fsOps);
+        return !stat?.isFile() || stat.isSymbolicLink() || (stat.mode & 0o111) === 0;
+      })
+      : [];
+    if (!inspection?.manifest) {
+      const notApplicable = (id, summary) => doctorCheck(id, "not-applicable", summary);
+      return {
+        installed: notApplicable("installed-files", "no ownership manifest is installed"),
+        drift: notApplicable("file-drift", "file drift cannot be evaluated without an ownership manifest"),
+        permissions: notApplicable("permissions", "managed permissions cannot be evaluated without an ownership manifest"),
+        executables: sourceExecutablesEvaluable
+          ? brokenWrappers.length === 0
+            ? doctorCheck("executable-scripts", "pass", "expected source executable scripts retain approved modes")
+            : doctorCheck(
+              "executable-scripts",
+              "action-required",
+              "one or more source executable scripts require attention",
+              `inspect ${brokenWrappers[0]}`,
+            )
+          : notApplicable("executable-scripts", "no executable script group is evaluable"),
+      };
+    }
+    const managedEntries = [
+      ...inspection.manifest.owned_files,
+      ...inspection.manifest.preserved_files,
+    ];
+    const unsafe = managedEntries.filter((entry) => inspection.target[entry.path]?.kind !== "file");
+    const installed = unsafe.length === 0
+      ? doctorCheck("installed-files", "pass", `${managedEntries.length} managed paths are regular files`)
+      : doctorCheck(
+        "installed-files",
+        "action-required",
+        `${unsafe.length} managed paths are missing or unsafe`,
+        `inspect ${unsafe[0].path}`,
+      );
+    const actionableWarnings = new Set([
+      "preserved-source-changed",
+      "preserved-both-changed",
+      "preserved-missing",
+      "obsolete-preserved-present",
+      "obsolete-preserved-missing",
+    ]);
+    const driftActionable = plan.blockers.length > 0
+      || plan.warnings.some((warning) => actionableWarnings.has(warning.classification));
+    const userOnly = !driftActionable
+      && plan.warnings.some((warning) => warning.classification === "preserved-user-changed");
+    const drift = driftActionable
+      ? doctorCheck(
+        "file-drift",
+        "action-required",
+        "managed file drift requires attention",
+        "review the reported ownership conflicts before upgrade",
+      )
+      : userOnly
+        ? doctorCheck("file-drift", "info", "preserved user configuration changed without source drift")
+        : doctorCheck("file-drift", "pass", "managed file hashes match their approved state");
+    const ownedModeDrift = inspection.manifest.owned_files.filter((entry) => {
+      const expectedMode = Object.hasOwn(entry, "mode") ? entry.mode : entry.observed_mode;
+      return inspection.target[entry.path]?.kind === "file"
+        && inspection.target[entry.path].mode !== expectedMode;
+    });
+    const preservedModeDrift = inspection.manifest.preserved_files.filter((entry) => (
+      inspection.target[entry.path]?.kind === "file"
+        && inspection.target[entry.path].mode !== entry.observed_mode
+    ));
+    const oakStat = lstatIfExists(path.join(targetRoot, ".oak"), fsOps);
+    const stateFiles = [
+      ".oak/manifest.json",
+      ".oak/lock.json",
+      ".oak/transaction.json",
+      ".oak/rollback/transaction.json",
+      ".oak/rollback.next/transaction.json",
+      ".oak/rollback.previous/transaction.json",
+    ];
+    const unsafeStateFile = stateFiles.find((relative) => {
+      const stat = lstatIfExists(path.join(targetRoot, relative), fsOps);
+      return stat && (stat.isSymbolicLink() || !stat.isFile() || (stat.mode & 0o777) !== 0o600);
+    });
+    const stateModeUnsafe = !oakStat?.isDirectory()
+      || oakStat.isSymbolicLink()
+      || (oakStat.mode & 0o777) !== 0o700
+      || unsafeStateFile;
+    const permissions = ownedModeDrift.length > 0 || stateModeUnsafe
+      ? doctorCheck(
+        "permissions",
+        "action-required",
+        "managed or lifecycle permissions require attention",
+        `inspect ${ownedModeDrift[0]?.path ?? unsafeStateFile ?? ".oak"}`,
+      )
+      : preservedModeDrift.length > 0
+        ? doctorCheck("permissions", "info", "preserved user file modes differ from their recorded baselines")
+        : doctorCheck("permissions", "pass", "managed and lifecycle permissions match");
+    const executableEntries = inspection.manifest.owned_files.filter((entry) => (entry.mode & 0o111) !== 0);
+    const brokenExecutable = executableEntries.filter((entry) => {
+      const current = inspection.target[entry.path];
+      return current?.kind !== "file" || (current.mode & entry.mode & 0o111) !== (entry.mode & 0o111);
+    });
+    const executables = brokenExecutable.length === 0 && brokenWrappers.length === 0
+      ? doctorCheck("executable-scripts", "pass", "expected executable scripts retain approved modes")
+      : doctorCheck(
+        "executable-scripts",
+        "action-required",
+        "one or more executable scripts require attention",
+        `inspect ${brokenExecutable[0]?.path ?? brokenWrappers[0]}`,
+      );
+    return { installed, drift, permissions, executables };
+  }
+
+  function skillRegistryDoctorCheck(targetRoot, inspection) {
+    const relative = "scripts/update-skill-registry.mjs";
+    const expected = [
+      ...(inspection?.manifest?.owned_files ?? []),
+      ...(inspection?.manifest?.preserved_files ?? []),
+    ].some((entry) => entry.path === relative);
+    let state;
+    try {
+      state = inspectTargetPath(targetRoot, relative, fsOps);
+    } catch {
+      state = { kind: "unsafe" };
+    }
+    if (state.kind !== "file") {
+      return expected
+        ? doctorCheck(
+          "skill-registry",
+          "action-required",
+          "the installed skill registry checker is unavailable",
+          "restore scripts/update-skill-registry.mjs from a reviewed kit source",
+        )
+        : doctorCheck("skill-registry", "not-applicable", "no portable skill registry checker is installed");
+    }
+    let observed;
+    try {
+      observed = commandRunner(process.execPath, [path.join(targetRoot, relative), "--check"], {
+        cwd: targetRoot,
+        encoding: "utf8",
+        env: { ...process.env, OPENCODE_INCLUDE_USER_SKILLS: "0" },
+        maxBuffer: 64 * 1024,
+        shell: false,
+        timeout: 5_000,
+      });
+    } catch {
+      observed = null;
+    }
+    return observed?.status === 0 && !observed.error
+      ? doctorCheck("skill-registry", "pass", "the portable skill registry is current")
+      : doctorCheck(
+        "skill-registry",
+        "action-required",
+        "the portable skill registry requires attention",
+        "run node scripts/update-skill-registry.mjs after reviewing local changes",
+      );
+  }
+
+  function legacyResidueDoctorCheck(targetRoot, inspection, common, plan) {
+    if (inspection?.manifest) {
+      const obsolete = plan?.warnings.some((warning) => warning.classification.startsWith("obsolete-"))
+        || plan?.blockers.some((blocker) => blocker.classification.startsWith("obsolete-"));
+      const actionable = common.activeTransaction
+        || common.activeLock === "stale"
+        || common.cleanupResidue.length > 0
+        || obsolete;
+      return actionable
+        ? doctorCheck(
+          "legacy-residue",
+          "action-required",
+          "lifecycle residue or obsolete managed state requires attention",
+          "review rollback and recovery state before changing the installation",
+        )
+        : doctorCheck("legacy-residue", "pass", "no legacy or lifecycle residue was found");
+    }
+    const markers = [
+      lstatIfExists(path.join(targetRoot, "AGENTS.md"), fsOps)?.isFile(),
+      lstatIfExists(path.join(targetRoot, "opencode.json"), fsOps)?.isFile(),
+      lstatIfExists(path.join(targetRoot, "agents"), fsOps)?.isDirectory(),
+      lstatIfExists(path.join(targetRoot, "commands"), fsOps)?.isDirectory(),
+    ];
+    return markers.every(Boolean)
+      ? doctorCheck(
+        "legacy-residue",
+        "action-required",
+        "an unmanaged legacy harness installation was detected",
+        "back up the target and review install --dry-run",
+      )
+      : doctorCheck("legacy-residue", "not-applicable", "no managed or legacy harness state was detected");
+  }
+
   function doctorReport(targetRoot) {
     const oakPath = path.join(targetRoot, ".oak");
     const manifestPath = path.join(oakPath, "manifest.json");
@@ -1187,6 +1655,82 @@ export function createInstallationManager(options) {
       activeLock: activeLock ? classifyExistingLock(activeLock) : null,
       rollbackAvailable: Boolean(lstatIfExists(path.join(oakPath, "rollback", "transaction.json"), fsOps)),
       cleanupResidue: residue,
+    };
+    const compatibility = compatibilityProvider();
+    const nodeVersion = nodeVersionProvider();
+    const nodeCompatible = nodeSatisfiesCanonicalEngines(nodeVersion, compatibility.node.engines);
+    const nodeCheck = nodeCompatible
+      ? doctorCheck("node-version", "pass", `Node ${parseRuntimeVersion(nodeVersion, "Node").canonical} is supported`)
+      : doctorCheck(
+        "node-version",
+        "action-required",
+        `Node ${parseRuntimeVersion(nodeVersion, "Node").canonical} is outside the supported range`,
+        `use Node ${compatibility.node.engines}`,
+      );
+    let opencodeCheck;
+    try {
+      const observed = commandRunner("opencode", ["--version"], {
+        encoding: "utf8",
+        maxBuffer: 64 * 1024,
+        shell: false,
+        timeout: 5_000,
+      });
+      if (observed?.status !== 0 || observed?.error) {
+        opencodeCheck = doctorCheck(
+          "opencode-version",
+          "action-required",
+          "OpenCode version could not be determined",
+          "install OpenCode or correct PATH",
+        );
+      } else {
+        const parsed = parseRuntimeVersion(String(observed.stdout ?? "").split(/\r?\n/, 1)[0], "OpenCode");
+        opencodeCheck = opencodeSatisfiesCompatibility(parsed.canonical, compatibility)
+          ? doctorCheck("opencode-version", "pass", `OpenCode ${parsed.canonical} is supported`)
+          : doctorCheck(
+            "opencode-version",
+            "action-required",
+            `OpenCode ${parsed.canonical} is outside the supported range`,
+            `use OpenCode ${compatibility.opencode.supported_range}`,
+          );
+      }
+    } catch {
+      opencodeCheck = doctorCheck(
+        "opencode-version",
+        "action-required",
+        "OpenCode version could not be determined",
+        "install OpenCode or correct PATH",
+      );
+    }
+    const attachDoctorChecks = (report, { inspection = null, plan = null } = {}) => {
+      const dependencies = dependencyDoctorCheck(targetRoot);
+      const configuration = configurationAndPluginDoctorChecks(targetRoot, inspection?.sourceRoot ?? sourceRoot);
+      const ownership = ownershipDoctorChecks(targetRoot, inspection, plan);
+      const registry = skillRegistryDoctorCheck(targetRoot, inspection);
+      const legacy = legacyResidueDoctorCheck(targetRoot, inspection, common, plan);
+      const checks = [
+        opencodeCheck,
+        nodeCheck,
+        dependencies,
+        ownership.installed,
+        ownership.drift,
+        configuration.configuration,
+        configuration.plugins,
+        ownership.permissions,
+        ownership.executables,
+        registry,
+        nodeCheck.status === "pass"
+          && opencodeCheck.status === "pass"
+          && dependencies.status !== "action-required"
+          ? doctorCheck("compatibility", "pass", "runtime compatibility is satisfied")
+          : doctorCheck(
+            "compatibility",
+            "action-required",
+            "runtime compatibility requires action",
+            "resolve the runtime findings above",
+          ),
+        legacy,
+      ];
+      return { ...report, checks, summary: summarizeDoctorChecks(checks) };
     };
     let sourceVersion = null;
     let sourceInvalid = false;
@@ -1204,7 +1748,7 @@ export function createInstallationManager(options) {
       return {
         exitCode: 2,
         report: {
-          ...common,
+          ...attachDoctorChecks(common),
           manifest: "invalid",
           blockers: [{ path: "kit_version", classification: "invalid-installed-version-state" }],
           sourceVersion,
@@ -1217,7 +1761,7 @@ export function createInstallationManager(options) {
     if (sourceInvalid) return {
       exitCode: 2,
       report: {
-        ...common,
+        ...attachDoctorChecks(common),
         manifest: validatedManifest ? "valid" : "absent",
         blockers: [{ path: "package.json", classification: "invalid-source-version-state" }],
         sourceVersion: null,
@@ -1229,7 +1773,7 @@ export function createInstallationManager(options) {
     if (!inspection.manifest) return {
       exitCode: 1,
       report: {
-        ...common,
+        ...attachDoctorChecks(common),
         manifest: "absent",
         sourceVersion,
         installedVersion: null,
@@ -1246,20 +1790,22 @@ export function createInstallationManager(options) {
       || plan.blockers.length > 0
       || plan.warnings.some((warning) => actionableWarnings.has(warning.classification))
       || activeTransaction || activeLock || residue.length > 0;
+    const report = {
+      ...attachDoctorChecks({}, { inspection, plan }),
+      manifest: "valid",
+      blockers: plan.blockers,
+      warnings: plan.warnings,
+      activeTransaction: Boolean(activeTransaction),
+      activeLock: activeLock ? classifyExistingLock(activeLock) : null,
+      rollbackAvailable: Boolean(lstatIfExists(path.join(oakPath, "rollback", "transaction.json"), fsOps)),
+      cleanupResidue: residue,
+      sourceVersion,
+      installedVersion,
+      versionState,
+    };
     return {
-      exitCode: actionable ? 1 : 0,
-      report: {
-        manifest: "valid",
-        blockers: plan.blockers,
-        warnings: plan.warnings,
-        activeTransaction: Boolean(activeTransaction),
-        activeLock: activeLock ? classifyExistingLock(activeLock) : null,
-        rollbackAvailable: Boolean(lstatIfExists(path.join(oakPath, "rollback", "transaction.json"), fsOps)),
-        cleanupResidue: residue,
-        sourceVersion,
-        installedVersion,
-        versionState,
-      },
+      exitCode: actionable || report.checks.some((check) => check.status === "action-required") ? 1 : 0,
+      report,
     };
   }
 
@@ -1445,6 +1991,10 @@ export async function main(argv, options = {}) {
       pidProbe: options.pidProbe,
       failpoint: options.failpoint,
       fsOps: options.fsOps,
+      repositoryRoot: options.repositoryRoot ?? repositoryRoot,
+      commandRunner: options.commandRunner,
+      nodeVersionProvider: options.nodeVersionProvider,
+      compatibilityProvider: options.compatibilityProvider,
       stdin: input,
       stdout,
       stderr,
@@ -1470,15 +2020,7 @@ export async function main(argv, options = {}) {
     else if (result.exitCode === 1 && result.plan?.blockers?.length) {
       for (const blocker of result.plan.blockers) stderr.write(`Conflict: ${blocker.path} (${blocker.classification})\n`);
     } else if (command === "doctor" && !parsed.acceptPreserved && result.report) {
-      const actions = {
-        "not-installed": "run install --dry-run",
-        current: "none",
-        "upgrade-available": "run upgrade --dry-run",
-        "source-older": "use a source checkout at least as new as the installation",
-        "same-version-different-payload": "fix the release identity mismatch",
-        "invalid-version-state": "repair the invalid version state",
-      };
-      stdout.write(`doctor: ${result.report.versionState}; source=${result.report.sourceVersion ?? "invalid"}; installed=${result.report.installedVersion ?? "none"}; action=${actions[result.report.versionState]}\n`);
+      stdout.write(renderDoctorReport(result.report));
     } else if (command !== "doctor" || !parsed.acceptPreserved) {
       const changes = result.plan?.entries?.length ?? 0;
       stdout.write(`${command}: ${result.exitCode === 0 ? "ok" : "action required"}${result.plan ? ` (${changes} planned changes)` : ""}\n`);

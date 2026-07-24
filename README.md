@@ -390,7 +390,20 @@ and an older source is blocked to prevent downgrade. `doctor` reports
 `same-version-different-payload`, or `invalid-version-state` without consulting
 the network.
 
-Doctor returns `0` for a healthy installation, `1` for safely actionable state, and `2` for invalid invocation, corrupt/unsafe state, or an unrecoverable filesystem error. To acknowledge a completed manual merge, run:
+Doctor prints twelve ordered findings for OpenCode and Node compatibility,
+installed dependencies, managed files and drift, required configuration,
+optional plugins, permissions, executable scripts, the generated skill
+registry, aggregate compatibility, and legacy residue. Each finding is
+classified as `pass`, `info`, `action-required`, or `not-applicable`, followed
+by a deterministic summary. It does not print configuration contents,
+subprocess stderr, environment values, credentials, or rollback bytes.
+
+Doctor returns `0` when no finding requires action, `1` for safely actionable
+state, and `2` for invalid invocation, corrupt/unsafe state, or an unrecoverable
+filesystem error. Suggested actions are never applied automatically, and
+preserved custom configuration remains user-owned. See the
+[installation lifecycle guide](docs/installation.md) for the full diagnostic
+contract. To acknowledge a completed manual merge, run:
 
 ```bash
 ./doctor.sh --accept-preserved opencode.json

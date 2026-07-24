@@ -143,6 +143,34 @@ function put(root, relative, bytes, mode = 0o644) {
   };
 }
 
+function snapshotTree(root) {
+  const entries = [];
+  function walk(directory, prefix = "") {
+    for (const name of fs.readdirSync(directory).sort()) {
+      const relative = prefix ? `${prefix}/${name}` : name;
+      const fullPath = path.join(directory, name);
+      const stat = fs.lstatSync(fullPath);
+      if (stat.isDirectory()) {
+        entries.push({ relative, kind: "directory", mode: stat.mode & 0o777 });
+        walk(fullPath, relative);
+      } else if (stat.isFile()) {
+        entries.push({
+          relative,
+          kind: "file",
+          mode: stat.mode & 0o777,
+          sha256: crypto.createHash("sha256").update(fs.readFileSync(fullPath)).digest("hex"),
+        });
+      } else if (stat.isSymbolicLink()) {
+        entries.push({ relative, kind: "symlink", target: fs.readlinkSync(fullPath) });
+      } else {
+        entries.push({ relative, kind: "other", mode: stat.mode & 0o777 });
+      }
+    }
+  }
+  if (fs.existsSync(root)) walk(root);
+  return entries;
+}
+
 function persistManifest(targetRoot, manifest) {
   fs.mkdirSync(path.join(targetRoot, ".oak"), { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(targetRoot, ".oak", "manifest.json"), canonicalManifestBytes(manifest), { mode: 0o600 });
@@ -166,10 +194,400 @@ function managerFixture(sourceRoot, overrides = {}) {
   return createInstallationManager({
     sourceRoot,
     versionProvider: () => "1.0.27",
+    compatibilityProvider: () => doctorCompatibility(),
+    commandRunner: successfulDoctorCommand,
+    nodeVersionProvider: () => "v24.14.1",
     ...deterministicDeps(),
     ...overrides,
   });
 }
+
+function doctorCompatibility(overrides = {}) {
+  return {
+    schema_version: 1,
+    node: {
+      engines: "^22.9.0 || ^24.0.0",
+      blocking_majors: [22, 24],
+      canary_major: 26,
+    },
+    opencode: {
+      supported_range: ">=1.14.41 <2.0.0",
+      minimum_tested: "1.14.41",
+      stable_tested: "1.18.4",
+      canary: "latest",
+    },
+    sdk: {
+      opencode_plugin: "1.14.41",
+      opentui_core: "0.2.5",
+      opentui_solid: "0.2.5",
+    },
+    ...overrides,
+  };
+}
+
+function successfulDoctorCommand(command, args) {
+  if (command === "opencode" && args.length === 1 && args[0] === "--version") {
+    return { status: 0, stdout: "1.18.4\n", stderr: "" };
+  }
+  return { status: 0, stdout: "", stderr: "" };
+}
+
+const privatePathCanary = ["", "Users", "private-example"].join("/");
+
+function writeDoctorPayload(sourceRoot, { executable = false } = {}) {
+  put(sourceRoot, "AGENTS.md", "# Agent map\n");
+  put(sourceRoot, "agents/lead.md", "---\ndescription: Lead\nmode: primary\n---\n");
+  put(sourceRoot, "commands/feature.md", "---\ndescription: Feature\nagent: lead\n---\n");
+  put(sourceRoot, "opencode.json", `${JSON.stringify({
+    default_agent: "lead",
+    plugin: ["superpowers@git+https://github.com/example/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99"],
+  }, null, 2)}\n`);
+  put(sourceRoot, "tui.json", `${JSON.stringify({ plugin: ["./plugins/token-tree-usage.tsx"] }, null, 2)}\n`);
+  put(sourceRoot, "plugins/token-tree-usage.tsx", "export default {}\n");
+  const dependencies = {
+    "@opencode-ai/plugin": "1.14.41",
+    "@opentui/core": "0.2.5",
+    "@opentui/solid": "0.2.5",
+  };
+  put(sourceRoot, "package.json", `${JSON.stringify({
+    type: "module",
+    engines: { node: "^22.9.0 || ^24.0.0" },
+    dependencies,
+  }, null, 2)}\n`);
+  const packages = {
+    "": { engines: { node: "^22.9.0 || ^24.0.0" }, dependencies },
+  };
+  for (const [name, version] of Object.entries(dependencies)) {
+    packages[`node_modules/${name}`] = { version };
+  }
+  put(sourceRoot, "package-lock.json", `${JSON.stringify({
+    name: "doctor-fixture",
+    lockfileVersion: 3,
+    packages,
+  }, null, 2)}\n`);
+  put(sourceRoot, "scripts/update-skill-registry.mjs", "process.exit(0)\n");
+  put(sourceRoot, "docs/ai/harness/skill_registry.md", "# Skill Registry\n");
+  put(sourceRoot, "docs/ai/harness/skill_registry.json", '{"schema_version":2,"skills":[]}\n');
+  put(sourceRoot, "skills/example/SKILL.md", "---\nname: example\ndescription: Example\n---\n");
+  if (executable) put(sourceRoot, "scripts/run.sh", "#!/usr/bin/env bash\nexit 0\n", 0o755);
+}
+
+async function installedDoctorFixture(t, options = {}) {
+  const fixture = makeFixture(t);
+  writeDoctorPayload(fixture.sourceRoot, options);
+  const manager = managerFixture(fixture.sourceRoot);
+  const installed = await manager.run("install", { targetRoot: fixture.targetRoot });
+  assert.equal(installed.exitCode, 0);
+  for (const [name, version] of Object.entries(doctorCompatibility().sdk).map(([field, version]) => {
+    const names = {
+      opencode_plugin: "@opencode-ai/plugin",
+      opentui_core: "@opentui/core",
+      opentui_solid: "@opentui/solid",
+    };
+    return [names[field], version];
+  })) {
+    put(fixture.targetRoot, `node_modules/${name}/package.json`, `${JSON.stringify({ name, version })}\n`);
+  }
+  return { ...fixture, manager };
+}
+
+test("[D001] doctor diagnostic report exposes the closed schema in canonical order", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const result = await managerFixture(sourceRoot, {
+    compatibilityProvider: () => doctorCompatibility(),
+    commandRunner: successfulDoctorCommand,
+    nodeVersionProvider: () => "v24.14.1",
+  }).run("doctor", { targetRoot });
+
+  assert.deepEqual(result.report.checks.map((check) => check.id), [
+    "opencode-version",
+    "node-version",
+    "dependencies",
+    "installed-files",
+    "file-drift",
+    "required-configuration",
+    "optional-plugins",
+    "permissions",
+    "executable-scripts",
+    "skill-registry",
+    "compatibility",
+    "legacy-residue",
+  ]);
+  for (const check of result.report.checks) {
+    assert.deepEqual(Object.keys(check).sort(), ["action", "id", "status", "summary"]);
+    assert.match(check.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    assert.match(check.status, /^(pass|info|action-required|not-applicable)$/);
+    assert.equal(check.summary.includes("\n"), false);
+    if (check.status === "action-required") {
+      assert.equal(typeof check.action, "string");
+      assert.ok(check.action.length > 0);
+    } else {
+      assert.equal(check.action, null);
+    }
+  }
+  assert.deepEqual(Object.keys(result.report.summary).sort(), [
+    "actionRequired",
+    "info",
+    "notApplicable",
+    "pass",
+  ]);
+  assert.equal(Object.values(result.report.summary).reduce((sum, value) => sum + value, 0), 12);
+});
+
+test("[D002] doctor diagnostic node-version uses the canonical engine", async (t) => {
+  for (const [version, expected] of [
+    ["v22.9.0", "pass"],
+    ["v22.99.0", "pass"],
+    ["v24.0.0", "pass"],
+    ["v24.14.1", "pass"],
+    ["v22.8.9", "action-required"],
+    ["v23.0.0", "action-required"],
+    ["v26.0.0", "action-required"],
+  ]) {
+    await t.test(version, async (child) => {
+      const { sourceRoot, targetRoot } = makeFixture(child);
+      put(sourceRoot, "agents/lead.md", "lead\n");
+      const result = await managerFixture(sourceRoot, {
+        compatibilityProvider: () => doctorCompatibility(),
+        commandRunner: successfulDoctorCommand,
+        nodeVersionProvider: () => version,
+      }).run("doctor", { targetRoot });
+      const check = result.report.checks.find((entry) => entry.id === "node-version");
+      assert.equal(check.status, expected);
+    });
+  }
+});
+
+test("[D003] doctor diagnostic opencode-version is bounded and sanitized", async (t) => {
+  for (const [version, expected] of [
+    ["1.18.4", "pass"],
+    ["1.14.41", "pass"],
+    ["1.14.40", "action-required"],
+    ["2.0.0", "action-required"],
+    ["invalid", "action-required"],
+  ]) {
+    await t.test(version, async (child) => {
+      const { sourceRoot, targetRoot } = makeFixture(child);
+      put(sourceRoot, "agents/lead.md", "lead\n");
+      const calls = [];
+      const canary = `${privatePathCanary} provider-canary stderr-canary`;
+      const result = await managerFixture(sourceRoot, {
+        compatibilityProvider: () => doctorCompatibility(),
+        nodeVersionProvider: () => "v24.14.1",
+        commandRunner(command, args, options) {
+          calls.push({ command, args, options });
+          return { status: 0, stdout: `${version}\n`, stderr: canary };
+        },
+      }).run("doctor", { targetRoot });
+      const check = result.report.checks.find((entry) => entry.id === "opencode-version");
+      assert.equal(check.status, expected);
+      assert.equal(JSON.stringify(result.report).includes(canary), false);
+      assert.equal(calls[0].command, "opencode");
+      assert.deepEqual(calls[0].args, ["--version"]);
+      assert.equal(calls[0].options.shell, false);
+      assert.ok(calls[0].options.timeout > 0);
+      assert.ok(calls[0].options.maxBuffer > 0);
+    });
+  }
+});
+
+test("[D004] doctor diagnostic dependencies validates direct installed packages without npm", async (t) => {
+  const healthy = await installedDoctorFixture(t);
+  const passing = await healthy.manager.run("doctor", { targetRoot: healthy.targetRoot });
+  assert.equal(passing.report.checks.find((entry) => entry.id === "dependencies").status, "pass");
+
+  fs.rmSync(path.join(healthy.targetRoot, "node_modules", "@opentui", "solid"), { recursive: true });
+  const missing = await healthy.manager.run("doctor", { targetRoot: healthy.targetRoot });
+  assert.equal(missing.report.checks.find((entry) => entry.id === "dependencies").status, "action-required");
+});
+
+test("[D005] doctor diagnostic required-configuration accepts valid managed configuration", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  const passing = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(passing.report.checks.find((entry) => entry.id === "required-configuration").status, "pass");
+
+  fs.writeFileSync(path.join(fixture.targetRoot, "opencode.json"), "{bad\n");
+  const invalid = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(invalid.exitCode, 2);
+});
+
+test("[D006] doctor diagnostic optional-plugins distinguishes pinned external and broken local references", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  const informational = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(informational.report.checks.find((entry) => entry.id === "optional-plugins").status, "info");
+
+  fs.rmSync(path.join(fixture.targetRoot, "plugins", "token-tree-usage.tsx"));
+  const broken = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(broken.report.checks.find((entry) => entry.id === "optional-plugins").status, "action-required");
+});
+
+test("[D007] doctor diagnostic installed-files and file-drift preserve lifecycle evidence", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  const passing = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(passing.report.checks.find((entry) => entry.id === "installed-files").status, "pass");
+  assert.equal(passing.report.checks.find((entry) => entry.id === "file-drift").status, "pass");
+
+  fs.writeFileSync(path.join(fixture.targetRoot, "agents", "lead.md"), "changed\n");
+  const drifted = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(drifted.report.checks.find((entry) => entry.id === "file-drift").status, "action-required");
+});
+
+test("[D008] doctor diagnostic permissions reports managed mode drift", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  const passing = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(passing.report.checks.find((entry) => entry.id === "permissions").status, "pass");
+
+  fs.chmodSync(path.join(fixture.targetRoot, "agents", "lead.md"), 0o600);
+  const drifted = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(drifted.report.checks.find((entry) => entry.id === "permissions").status, "action-required");
+
+  const preserved = preservedFixture(t);
+  fs.chmodSync(path.join(preserved.targetRoot, "opencode.json"), 0o644);
+  const preservedMode = await managerFixture(preserved.sourceRoot).run("doctor", { targetRoot: preserved.targetRoot });
+  assert.equal(preservedMode.report.checks.find((entry) => entry.id === "permissions").status, "info");
+
+  const state = await installedDoctorFixture(t);
+  fs.chmodSync(path.join(state.targetRoot, ".oak", "manifest.json"), 0o644);
+  const permissiveState = await state.manager.run("doctor", { targetRoot: state.targetRoot });
+  assert.equal(permissiveState.report.checks.find((entry) => entry.id === "permissions").status, "action-required");
+});
+
+test("[D009] doctor diagnostic executable-scripts follows approved manifest modes", async (t) => {
+  const sourceOnly = makeFixture(t);
+  put(sourceOnly.sourceRoot, "agents/lead.md", "lead\n");
+  put(path.join(sourceOnly.root, "repo"), "package.json", "{}\n");
+  for (const relative of [
+    "install.sh",
+    "uninstall.sh",
+    "upgrade.sh",
+    "doctor.sh",
+    "rollback.sh",
+    "scripts/check.sh",
+    "scripts/opencode-compat-smoke.sh",
+    "scripts/package-smoke.sh",
+  ]) {
+    put(path.join(sourceOnly.root, "repo"), relative, "#!/usr/bin/env bash\n", 0o755);
+  }
+  const sourceManager = managerFixture(sourceOnly.sourceRoot, {
+    repositoryRoot: path.join(sourceOnly.root, "repo"),
+  });
+  const sourcePassing = await sourceManager.run("doctor", { targetRoot: sourceOnly.targetRoot });
+  assert.equal(sourcePassing.report.checks.find((entry) => entry.id === "executable-scripts").status, "pass");
+  fs.chmodSync(path.join(sourceOnly.root, "repo", "doctor.sh"), 0o644);
+  const sourceBroken = await sourceManager.run("doctor", { targetRoot: sourceOnly.targetRoot });
+  assert.equal(sourceBroken.report.checks.find((entry) => entry.id === "executable-scripts").status, "action-required");
+
+  const fixture = await installedDoctorFixture(t, { executable: true });
+  const passing = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(passing.report.checks.find((entry) => entry.id === "executable-scripts").status, "pass");
+
+  fs.chmodSync(path.join(fixture.targetRoot, "scripts", "run.sh"), 0o644);
+  const drifted = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(drifted.report.checks.find((entry) => entry.id === "executable-scripts").status, "action-required");
+});
+
+test("[D010] doctor diagnostic skill-registry is bounded and local", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  const passing = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(passing.report.checks.find((entry) => entry.id === "skill-registry").status, "pass");
+
+  const failingManager = managerFixture(fixture.sourceRoot, {
+    commandRunner(command, args) {
+      if (command === "opencode") return { status: 0, stdout: "1.18.4\n", stderr: "" };
+      assert.equal(command, process.execPath);
+      assert.equal(args.at(-1), "--check");
+      return { status: 1, stdout: "", stderr: "registry-canary" };
+    },
+  });
+  const failing = await failingManager.run("doctor", { targetRoot: fixture.targetRoot });
+  assert.equal(failing.report.checks.find((entry) => entry.id === "skill-registry").status, "action-required");
+  assert.equal(JSON.stringify(failing.report).includes("registry-canary"), false);
+});
+
+test("[D011] doctor diagnostic legacy-residue recognizes an unmanaged harness without mutation", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  put(targetRoot, "AGENTS.md", "map\n");
+  put(targetRoot, "opencode.json", '{"default_agent":"lead"}\n');
+  fs.mkdirSync(path.join(targetRoot, "agents"), { recursive: true });
+  fs.mkdirSync(path.join(targetRoot, "commands"), { recursive: true });
+  const before = fs.readdirSync(targetRoot).sort();
+  const result = await managerFixture(sourceRoot).run("doctor", { targetRoot });
+  assert.equal(result.report.checks.find((entry) => entry.id === "legacy-residue").status, "action-required");
+  assert.deepEqual(fs.readdirSync(targetRoot).sort(), before);
+  assert.equal(fs.existsSync(path.join(targetRoot, ".oak")), false);
+});
+
+test("[D012] doctor diagnostic CLI renders ordered findings and immediate actions", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  const stdout = capture();
+  const stderr = capture();
+  const exitCode = await main(["doctor", "--target", fixture.targetRoot], {
+    sourceRoot: fixture.sourceRoot,
+    versionProvider: () => "1.0.27",
+    compatibilityProvider: () => doctorCompatibility(),
+    commandRunner: successfulDoctorCommand,
+    nodeVersionProvider: () => "v24.14.1",
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
+  assert.equal(exitCode, 0);
+  assert.match(stdout.read(), /^doctor: healthy;/);
+  let previous = -1;
+  for (const id of [
+    "opencode-version",
+    "node-version",
+    "dependencies",
+    "installed-files",
+    "file-drift",
+    "required-configuration",
+    "optional-plugins",
+    "permissions",
+    "executable-scripts",
+    "skill-registry",
+    "compatibility",
+    "legacy-residue",
+  ]) {
+    const index = stdout.read().indexOf(`] ${id}:`);
+    assert.ok(index > previous, `${id} must appear in canonical order`);
+    previous = index;
+  }
+  assert.match(stdout.read(), /^summary: pass=\d+ info=\d+ action-required=\d+ not-applicable=\d+$/m);
+  assert.equal(stderr.read(), "");
+});
+
+test("[D013] doctor diagnostic never renders private subprocess or configuration material", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  const configPath = path.join(fixture.targetRoot, "opencode.json");
+  const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  config.unrelated_secret = "config-secret-canary";
+  fs.writeFileSync(configPath, `${JSON.stringify(config)}\n`);
+  const commandCanary = `${privatePathCanary} provider-canary model-canary stderr-canary`;
+  const manager = managerFixture(fixture.sourceRoot, {
+    commandRunner(command) {
+      return command === "opencode"
+        ? { status: 0, stdout: "1.18.4\n", stderr: commandCanary }
+        : { status: 1, stdout: commandCanary, stderr: commandCanary };
+    },
+  });
+  const result = await manager.run("doctor", { targetRoot: fixture.targetRoot });
+  const serialized = JSON.stringify(result.report);
+  for (const canary of ["config-secret-canary", privatePathCanary, "provider-canary", "model-canary", "stderr-canary"]) {
+    assert.equal(serialized.includes(canary), false);
+  }
+});
+
+test("[D014] actionable ordinary doctor leaves the complete target unchanged", async (t) => {
+  const fixture = await installedDoctorFixture(t);
+  fs.rmSync(path.join(fixture.targetRoot, "node_modules", "@opentui", "solid"), { recursive: true });
+  const before = snapshotTree(fixture.targetRoot);
+  const result = await fixture.manager.run("doctor", { targetRoot: fixture.targetRoot });
+  const after = snapshotTree(fixture.targetRoot);
+  assert.equal(result.exitCode, 1);
+  assert.deepEqual(after, before);
+  assert.equal(fs.existsSync(path.join(fixture.targetRoot, ".oak", "lock.json")), false);
+});
 
 test("[S020] CLI parsing, help, target precedence, and exit codes are deterministic", async (t) => {
   await t.test("explicit target wins without tilde expansion", () => {
