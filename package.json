@@ -4,6 +4,9 @@
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
+  "bin": {
+    "oak": "scripts/oak.mjs"
+  },
   "files": [
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",

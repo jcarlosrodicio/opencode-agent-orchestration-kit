@@ -33,6 +33,8 @@ scripts/package-smoke.test.mjs
 scripts/opencode-compat-smoke.sh
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
+scripts/oak.mjs
+scripts/oak.test.mjs
 docs/releases/v${kit_version}.md
 opencode/AGENTS.md
 opencode/opencode.json
@@ -79,13 +81,27 @@ for file in $required_files; do
   test -f "$file" || { echo "Missing required file: $file" >&2; exit 1; }
 done
 
-for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh scripts/opencode-compat-smoke.sh scripts/package-smoke.sh; do
+for file in install.sh uninstall.sh upgrade.sh doctor.sh rollback.sh scripts/check.sh scripts/oak.mjs scripts/opencode-compat-smoke.sh scripts/package-smoke.sh; do
   test -x "$file" || { echo "Not executable: $file" >&2; exit 1; }
 done
 
 node scripts/version.mjs --check
 node scripts/check-compatibility.mjs
 node scripts/check-supply-chain.mjs
+
+node <<'NODE'
+const fs = require('fs')
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+if (JSON.stringify(packageJson.bin) !== JSON.stringify({ oak: 'scripts/oak.mjs' })) {
+  throw new Error('package.json must expose exactly bin.oak = scripts/oak.mjs')
+}
+NODE
+
+grep -q '"install"' scripts/oak.mjs
+grep -q '"replay"' scripts/oak.mjs
+grep -q 'shell: false' scripts/oak.mjs
+! grep -q 'run-routing-live-replay' scripts/oak.mjs
+! grep -q '"benchmark"' scripts/oak.mjs
 
 node -e "JSON.parse(require('fs').readFileSync('opencode/opencode.json','utf8')); JSON.parse(require('fs').readFileSync('docker/open-design/opencode-od/opencode.json','utf8')); console.log('json ok')"
 (cd opencode && node scripts/check-harness.mjs)

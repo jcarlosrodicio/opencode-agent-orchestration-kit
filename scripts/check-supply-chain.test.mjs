@@ -156,6 +156,7 @@ function withSurfaceFixture(callback) {
     fs.writeFileSync(path.join(root, "supply-chain.json"), `${JSON.stringify(VALID)}\n`);
     fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
       files: PACKAGE_FILES,
+      bin: { oak: "scripts/oak.mjs" },
       scripts: {
         "dependency-audit": "npm --prefix opencode audit --omit=dev --audit-level=low",
         "dependency-signature-audit": "npm --prefix opencode audit signatures",
@@ -211,6 +212,7 @@ function withCliFixture(inventory, callback) {
         writeValidDocumentation(root);
         fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
           files: PACKAGE_FILES,
+          bin: { oak: "scripts/oak.mjs" },
           scripts: {
             "dependency-audit": "npm --prefix opencode audit --omit=dev --audit-level=low",
             "dependency-signature-audit": "npm --prefix opencode audit signatures",
@@ -323,6 +325,23 @@ test("surface validation accepts exact overrides, regenerated lock entries, and 
   withSurfaceFixture((root) => {
     assert.deepEqual(checkSupplyChain(root), VALID);
   });
+});
+
+test("surface validation requires exactly the canonical oak bin", () => {
+  for (const [bin, expected] of [
+    [undefined, /package\.json bin/i],
+    [{ oak: "scripts/other.mjs" }, /bin\.oak/i],
+    [{ oak: "scripts/oak.mjs", other: "scripts/other.mjs" }, /keys must be exactly/i],
+  ]) {
+    withSurfaceFixture((root) => {
+      const packagePath = path.join(root, "package.json");
+      const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+      if (bin === undefined) delete packageJson.bin;
+      else packageJson.bin = bin;
+      fs.writeFileSync(packagePath, `${JSON.stringify(packageJson)}\n`);
+      assert.throws(() => checkSupplyChain(root), expected);
+    });
+  }
 });
 
 test("surface validation requires the exact Superpowers commit", () => {

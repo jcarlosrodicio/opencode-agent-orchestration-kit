@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -12,6 +13,8 @@ import {
   dispatchOak,
   resolveCheckTarget,
 } from "./oak.mjs";
+
+const REPOSITORY_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 function capture() {
   let value = "";
@@ -260,4 +263,15 @@ test("[O009] replay overrides paths and preserves closed exit codes", () => {
   ]) {
     assert.equal(dispatchOak(argv, runnerDeps()), 2);
   }
+});
+
+test("[O010] package exposes exactly one executable oak binary", () => {
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(REPOSITORY_ROOT, "package.json"), "utf8"),
+  );
+  assert.deepEqual(packageJson.bin, { oak: "scripts/oak.mjs" });
+  const stat = fs.lstatSync(path.join(REPOSITORY_ROOT, packageJson.bin.oak));
+  assert.equal(stat.isFile(), true);
+  assert.equal(stat.isSymbolicLink(), false);
+  assert.notEqual(stat.mode & 0o111, 0);
 });

@@ -10,6 +10,7 @@ const CONCRETE_STABLE_VERSION = /(?<![0-9])(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|
 const OPERATIONAL_VERSION_SURFACES = [
   "scripts/version.mjs",
   "scripts/manage-installation.mjs",
+  "scripts/oak.mjs",
   "install.sh",
   "upgrade.sh",
   "doctor.sh",

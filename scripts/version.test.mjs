@@ -30,6 +30,7 @@ function makeRepository(t, packageOverrides = {}) {
 const OPERATIONAL_VERSION_SURFACES = [
   "scripts/version.mjs",
   "scripts/manage-installation.mjs",
+  "scripts/oak.mjs",
   "install.sh",
   "upgrade.sh",
   "doctor.sh",
