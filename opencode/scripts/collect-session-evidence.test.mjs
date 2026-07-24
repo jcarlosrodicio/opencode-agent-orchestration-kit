@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { collectExecutionTreeByRoot } from "./collect-session-evidence.mjs";
 
 // collect-session-evidence.mjs exposes only async streamSqliteJson; sync runSqliteJson was removed.
 
@@ -80,10 +81,10 @@ function createFixtureDb(dbPath) {
     insert into session (
       id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, path, agent, model, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write
     ) values
-      ('ses_root_1', 'proj_1', null, 'steady-otter', '/tmp/repo', 'Investigate harness issue', '1.15.12', 1000, 2000, '', 'lead', '{"id":"gpt-5.4","providerID":"openai","variant":"medium"}', 1.5, 120, 45, 3, 10, 0),
-      ('ses_child_1', 'proj_1', 'ses_root_1', 'curious-otter', '/tmp/repo', 'Research harness issue (@researcher subagent)', '1.15.12', 1100, 2100, '', 'researcher', '{"id":"gpt-5.4","providerID":"openai","variant":"medium"}', 0.5, 50, 10, 1, 0, 0),
-      ('ses_grandchild_1', 'proj_1', 'ses_child_1', 'quiet-otter', '/tmp/repo', 'Review harness issue (@reviewer subagent)', '1.15.12', 1150, 2200, '', 'reviewer', '{"id":"gpt-5.4","providerID":"openai","variant":"medium"}', 0.25, 25, 15, 2, 0, 0),
-      ('ses_root_2', 'proj_1', null, 'brisk-otter', '/tmp/repo', 'Independent direct session', '1.15.12', 3000, 3000, '', 'developer', '{"id":"gpt-5.4","providerID":"openai","variant":"medium"}', 0.75, 90, 20, 0, 0, 0);
+      ('ses_root_1', 'proj_1', null, 'steady-otter', '/tmp/repo', 'Investigate harness issue', '1.15.12', 1000, 2000, '', 'lead', '{"id":"synthetic-model","providerID":"synthetic-provider","variant":"synthetic-variant"}', 1.5, 120, 45, 3, 10, 0),
+      ('ses_child_1', 'proj_1', 'ses_root_1', 'curious-otter', '/tmp/repo', 'Research harness issue (@researcher subagent)', '1.15.12', 1100, 2100, '', 'researcher', '{"id":"synthetic-model","providerID":"synthetic-provider","variant":"synthetic-variant"}', 0.5, 50, 10, 1, 0, 0),
+      ('ses_grandchild_1', 'proj_1', 'ses_child_1', 'quiet-otter', '/tmp/repo', 'Review harness issue (@reviewer subagent)', '1.15.12', 1150, 2200, '', 'reviewer', '{"id":"synthetic-model","providerID":"synthetic-provider","variant":"synthetic-variant"}', 0.25, 25, 15, 2, 0, 0),
+      ('ses_root_2', 'proj_1', null, 'brisk-otter', '/tmp/repo', 'Independent direct session', '1.15.12', 3000, 3000, '', 'developer', '{"id":"synthetic-model","providerID":"synthetic-provider","variant":"synthetic-variant"}', 0.75, 90, 20, 0, 0, 0);
 
     insert into message (id, session_id, time_created, time_updated, data) values
       ('msg_user_root_1', 'ses_root_1', 1000, 1000, '{"role":"user","time":{"created":1000}}'),
@@ -163,7 +164,7 @@ function createLargeFixtureDb(dbPath, repeatCount = 400000) {
       id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, path, agent, model, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write
     ) values (
       'ses_large_1', 'proj_1', null, 'steady-otter', '/tmp/repo', 'Large evidence session', '1.15.12', 1000, 2000, '', 'developer',
-      '{"id":"gpt-5.4","providerID":"openai","variant":"medium"}', 0, 120, 45, 3, 10, 0
+      '{"id":"synthetic-model","providerID":"synthetic-provider","variant":"synthetic-variant"}', 0, 120, 45, 3, 10, 0
     );
     insert into message (id, session_id, time_created, time_updated, data) values
       ('msg_user_large_1', 'ses_large_1', 1100, 1100, '{"role":"user","time":{"created":1100}}'),
@@ -187,6 +188,141 @@ function readJsonl(file) {
   if (!text) return [];
   return text.split("\n").map((line) => JSON.parse(line));
 }
+
+test("exact root collector returns only the requested execution tree", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+    assert.equal(tree.root_session_id, "ses_root_1");
+    assert.deepEqual(
+      tree.child_sessions.map((row) => row.session_id),
+      ["ses_child_1", "ses_grandchild_1"],
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector returns null for an unknown root", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    assert.equal(await collectExecutionTreeByRoot(dbPath, "ses_unknown"), null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector does not promote a child session to root", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    assert.equal(await collectExecutionTreeByRoot(dbPath, "ses_child_1"), null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector does not promote an orphan session to root", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    run("sqlite3", [dbPath, "update session set parent_id = 'ses_missing' where id = 'ses_child_1';"]);
+    assert.equal(await collectExecutionTreeByRoot(dbPath, "ses_child_1"), null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector does not promote a cyclic session to root", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    run("sqlite3", [
+      dbPath,
+      `
+      update session set parent_id = 'ses_grandchild_1' where id = 'ses_child_1';
+      update session set parent_id = 'ses_child_1' where id = 'ses_grandchild_1';
+      `,
+    ]);
+    assert.equal(await collectExecutionTreeByRoot(dbPath, "ses_child_1"), null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector neither loads raw external sources nor writes files", async () => {
+  const tmp = makeTempDir();
+  const previousRawSessionsDir = process.env.RAW_SESSIONS_DIR;
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    const rawDir = path.join(tmp, "raw");
+    fs.mkdirSync(rawDir);
+    createFixtureDb(dbPath);
+    writeJson(path.join(rawDir, "ses_root_1.json"), [{ file: "external-canary.txt" }]);
+    process.env.RAW_SESSIONS_DIR = rawDir;
+    const before = fs.readdirSync(tmp, { recursive: true }).sort();
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+    assert.deepEqual(tree.supplemental_raw_session_ids, []);
+    assert.deepEqual(tree.source_formats, ["opencode-sqlite"]);
+    assert.deepEqual(fs.readdirSync(tmp, { recursive: true }).sort(), before);
+  } finally {
+    if (previousRawSessionsDir === undefined) {
+      delete process.env.RAW_SESSIONS_DIR;
+    } else {
+      process.env.RAW_SESSIONS_DIR = previousRawSessionsDir;
+    }
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector rejects an empty or non-string root session ID", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    for (const rootSessionId of ["", null, undefined, 1]) {
+      await assert.rejects(
+        collectExecutionTreeByRoot(dbPath, rootSessionId),
+        new Error("rootSessionId must be a non-empty string"),
+      );
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector rejects a missing database without creating it", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "missing.db");
+    await assert.rejects(
+      collectExecutionTreeByRoot(dbPath, "ses_root_1"),
+      new Error("dbPath must reference an existing regular file"),
+    );
+    assert.equal(fs.existsSync(dbPath), false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("exact root collector rejects a non-regular database path", async () => {
+  const tmp = makeTempDir();
+  try {
+    await assert.rejects(
+      collectExecutionTreeByRoot(tmp, "ses_root_1"),
+      new Error("dbPath must reference an existing regular file"),
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
 
 test("collector stages execution trees, per-session detail, and cursor artifacts", () => {
   const tmp = makeTempDir();
@@ -317,7 +453,7 @@ test("collector uses prior iteration cursor to ingest only updated execution tre
       id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, path, agent, model, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write
     ) values (
       'ses_root_3', 'proj_1', null, 'fresh-otter', '/tmp/repo', 'Brand new orchestration', '1.15.12', 4000, 4000, '', 'lead',
-      '{"id":"gpt-5.4","providerID":"openai","variant":"medium"}', 1.0, 30, 5, 0, 0, 0
+      '{"id":"synthetic-model","providerID":"synthetic-provider","variant":"synthetic-variant"}', 1.0, 30, 5, 0, 0, 0
     );
     insert into message (id, session_id, time_created, time_updated, data) values
       ('msg_user_root_3', 'ses_root_3', 4000, 4000, '{"role":"user","time":{"created":4000}}'),

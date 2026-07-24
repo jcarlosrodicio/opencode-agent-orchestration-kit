@@ -40,6 +40,35 @@ Record:
 - limitations;
 - evaluation artifact path.
 
+### Routing Replay
+
+Slice 2.2 separates two surfaces: a deterministic runner for synthetic fixtures
+and an opt-in live adapter for one isolated real execution. Both use the same
+evaluator and produce a `pass`, `fail`, or `inconclusive` verdict. Missing
+evidence is never interpreted as success.
+
+The deterministic replay uses no network or models:
+
+```bash
+node scripts/replay-routing.mjs \
+  --corpus docs/ai/evolution/benchmarks/router-scenarios.jsonl \
+  --fixtures docs/ai/evolution/benchmarks/replay-fixtures.jsonl
+```
+
+Live replay requires explicit confirmation:
+
+```bash
+node scripts/run-routing-live-replay.mjs \
+  --scenario <id> \
+  --confirm-live
+```
+
+Live execution can consume tokens, is variable, and never runs as part of
+normal checks or CI. Raw live evidence is temporary and private. The sanitized
+report omits model, provider, paths, prompt, and reasoning. No model or provider
+configuration is persisted in this repository, whose replay fixtures are
+synthetic only.
+
 ## Session Evidence
 
 When `/evolve` uses OpenCode session evidence, it should first collect and

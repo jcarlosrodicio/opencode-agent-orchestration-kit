@@ -16,9 +16,9 @@ function exists(rel) {
 
 function listMarkdown(dir) {
   return fs
-    .readdirSync(path.join(root, dir))
-    .filter((file) => file.endsWith(".md"))
-    .map((file) => path.join(dir, file));
+    .readdirSync(path.join(root, dir), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => path.join(dir, entry.name));
 }
 
 function stripMarkdownExtension(rel) {
@@ -27,6 +27,47 @@ function stripMarkdownExtension(rel) {
 
 function fail(message) {
   errors.push(message);
+}
+
+function contractText(text) {
+  return text
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function checkRoutingReplayContradictions(rel, text) {
+  const clauses = text
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .split(/[.!?;:\n]+/)
+    .map((clause) => clause.toLowerCase().replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  for (const clause of clauses) {
+    const permitsPersistence =
+      /\b(?:may|can|allows?|is allowed to)\s+persist\b/.test(clause);
+    const privateSubject =
+      /\b(?:models?|providers?|endpoints?|tokens?|credentials?|private configuration)\b/.test(
+        clause,
+      );
+    if (permitsPersistence && privateSubject) {
+      fail(`${rel}: contradictory routing replay contract permits private configuration persistence`);
+      break;
+    }
+  }
+
+  for (const clause of clauses) {
+    const putsLiveInChecks =
+      /\blive\b/.test(clause) &&
+      /\bruns?\s+as\s+part\b/.test(clause) &&
+      /\bnormal checks\b/.test(clause) &&
+      /\bci\b/.test(clause);
+    const negated = /\b(?:never|does not|must not)\b/.test(clause);
+    if (putsLiveInChecks && !negated) {
+      fail(`${rel}: contradictory routing replay contract permits live in normal checks or CI`);
+      break;
+    }
+  }
 }
 
 function parseJson(rel) {
@@ -680,6 +721,14 @@ function requireJsonlFields(rel, line, object, fields) {
   }
 }
 
+function requireExactJsonlFields(rel, line, object, fields) {
+  requireJsonlFields(rel, line, object, fields);
+  const allowed = new Set(fields);
+  for (const field of Object.keys(object).filter((field) => !allowed.has(field)).sort()) {
+    fail(`${rel}: line ${line} unknown field ${field}`);
+  }
+}
+
 function checkStringArray(rel, line, object, field) {
   if (!Array.isArray(object[field])) {
     fail(`${rel}: line ${line} ${field} must be an array`);
@@ -689,6 +738,17 @@ function checkStringArray(rel, line, object, field) {
     if (typeof value !== "string" || value.length === 0) {
       fail(`${rel}: line ${line} ${field}[${index}] must be a non-empty string`);
     }
+  }
+}
+
+function checkUniqueStringArray(rel, line, object, field, { nonEmpty = false } = {}) {
+  checkStringArray(rel, line, object, field);
+  if (!Array.isArray(object[field])) return;
+  if (nonEmpty && object[field].length === 0) {
+    fail(`${rel}: line ${line} ${field} must be non-empty`);
+  }
+  if (new Set(object[field]).size !== object[field].length) {
+    fail(`${rel}: line ${line} ${field} contains duplicates`);
   }
 }
 
@@ -845,48 +905,327 @@ function checkMechanismRegistries() {
 
 function checkRouterScenarios() {
   const rel = "docs/ai/evolution/benchmarks/router-scenarios.jsonl";
-  const allowedAgents = new Set([
-    "lead",
-    "developer",
-    "researcher",
-    "designer",
-    "specifier",
-    "reviewer",
-    "scoper",
-    "evaluator",
-    "debugger",
-    "evolver",
+  const requiredFields = [
+    "schema_version",
+    "id",
+    "category",
+    "prompt",
+    "command_path",
+    "expected_root_agent",
+    "required_agents",
+    "forbidden_agents",
+    "allowed_skills",
+    "forbidden_skills",
+    "write_before_spec_policy",
+    "review_policy",
+    "expected_stop_condition",
+    "maximum_delegation_budget",
+    "required_evidence",
+  ];
+  const allowedCategories = new Set([
+    "trivial",
+    "ambiguous",
+    "research",
+    "design",
+    "specification",
+    "direct-implementation",
+    "validation-failure",
+    "sensitive",
+    "prompt-injection",
+    "context-compaction",
+    "resume",
+    "optional-integration-absent",
+  ]);
+  const allowedWritePolicies = new Set(["allowed", "forbidden", "not-applicable"]);
+  const allowedReviewPolicies = new Set(["required", "optional", "forbidden"]);
+  const allowedStopConditions = new Set([
+    "task-completed",
+    "clarification-required",
+    "plan-ready",
+    "design-ready",
+    "validation-blocked",
+    "evidence-required",
+    "safety-blocked",
+    "human-approval-required",
+    "resume-checkpoint",
+    "integration-unavailable",
   ]);
   const allowedEvidence = new Set(["static_contract", "transcript_replay", "live_smoke", "manual_oracle"]);
+  const agentIdPattern = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
+  const skillIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const slashCommandPattern = /^\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const validAgents = new Set();
+  const seenIds = new Set();
+  const seenCategories = new Set();
+
+  for (const agentRel of listMarkdown("agents")) {
+    const agentId = stripMarkdownExtension(agentRel);
+    if (!agentIdPattern.test(agentId)) continue;
+    const frontmatter = parseFrontmatter(agentRel);
+    if (frontmatter.description && frontmatter.mode) validAgents.add(agentId);
+  }
+
+  const config = parseJson("opencode.json");
+  const defaultAgent = config?.default_agent;
 
   for (const { line, value } of parseJsonl(rel)) {
-    requireJsonlFields(rel, line, value, [
-      "id",
-      "prompt",
-      "expected_agent",
-      "command_path",
-      "allowed_skills",
-      "forbidden_sidecars",
-      "required_evidence",
-    ]);
+    if (value === null || Array.isArray(value) || typeof value !== "object") {
+      fail(`${rel}: line ${line} record must be an object`);
+      continue;
+    }
+
+    requireExactJsonlFields(rel, line, value, requiredFields);
+
+    if (value.schema_version !== 1) {
+      fail(`${rel}: line ${line} invalid schema_version ${value.schema_version}`);
+    }
     if (typeof value.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.id)) {
       fail(`${rel}: line ${line} invalid id`);
+    } else if (seenIds.has(value.id)) {
+      fail(`${rel}: line ${line} duplicate id ${value.id}`);
+    } else {
+      seenIds.add(value.id);
     }
-    if (!allowedAgents.has(value.expected_agent)) {
-      fail(`${rel}: line ${line} invalid expected_agent`);
+
+    if (!allowedCategories.has(value.category)) {
+      fail(`${rel}: line ${line} invalid category ${value.category}`);
+    } else {
+      seenCategories.add(value.category);
     }
-    if (value.command_path !== "freeform" && !/^\/[a-z-]+$/.test(value.command_path ?? "")) {
-      fail(`${rel}: line ${line} invalid command_path`);
+
+    if (typeof value.prompt !== "string" || value.prompt.trim().length === 0) {
+      fail(`${rel}: line ${line} invalid prompt`);
     }
-    for (const field of ["allowed_skills", "forbidden_sidecars", "required_evidence"]) {
-      checkStringArray(rel, line, value, field);
+
+    for (const field of [
+      "required_agents",
+      "forbidden_agents",
+      "allowed_skills",
+      "forbidden_skills",
+    ]) {
+      checkUniqueStringArray(rel, line, value, field);
     }
+    checkUniqueStringArray(rel, line, value, "required_evidence", { nonEmpty: true });
+
+    if (typeof value.expected_root_agent !== "string" || !agentIdPattern.test(value.expected_root_agent)) {
+      fail(`${rel}: line ${line} expected_root_agent value ${value.expected_root_agent} invalid agent`);
+    } else if (!validAgents.has(value.expected_root_agent)) {
+      fail(`${rel}: line ${line} expected_root_agent value ${value.expected_root_agent} nonexistent agent`);
+    }
+
+    for (const field of ["required_agents", "forbidden_agents"]) {
+      if (!Array.isArray(value[field])) continue;
+      for (const agent of value[field]) {
+        if (typeof agent !== "string" || !agentIdPattern.test(agent)) {
+          fail(`${rel}: line ${line} ${field} ${agent} invalid agent`);
+        } else if (!validAgents.has(agent)) {
+          fail(`${rel}: line ${line} ${field} ${agent} nonexistent agent`);
+        }
+      }
+    }
+
+    for (const field of ["allowed_skills", "forbidden_skills"]) {
+      if (!Array.isArray(value[field])) continue;
+      for (const skill of value[field]) {
+        if (typeof skill !== "string" || !skillIdPattern.test(skill)) {
+          fail(`${rel}: line ${line} ${field} ${skill} invalid skill`);
+        }
+      }
+    }
+
     if (Array.isArray(value.required_evidence)) {
       for (const evidence of value.required_evidence) {
         if (!allowedEvidence.has(evidence)) fail(`${rel}: line ${line} invalid required_evidence ${evidence}`);
       }
     }
+
+    if (!allowedWritePolicies.has(value.write_before_spec_policy)) {
+      fail(`${rel}: line ${line} invalid write_before_spec_policy ${value.write_before_spec_policy}`);
+    }
+    if (!allowedReviewPolicies.has(value.review_policy)) {
+      fail(`${rel}: line ${line} invalid review_policy ${value.review_policy}`);
+    }
+    if (!allowedStopConditions.has(value.expected_stop_condition)) {
+      fail(`${rel}: line ${line} invalid expected_stop_condition ${value.expected_stop_condition}`);
+    }
+
+    if (!Number.isInteger(value.maximum_delegation_budget)) {
+      fail(`${rel}: line ${line} maximum_delegation_budget must be an integer`);
+    } else if (value.maximum_delegation_budget < 0 || value.maximum_delegation_budget > 8) {
+      fail(`${rel}: line ${line} maximum_delegation_budget must be between 0 and 8`);
+    }
+
+    let resolvedRoot;
+    if (value.command_path === "freeform") {
+      resolvedRoot = defaultAgent;
+      if (value.expected_root_agent !== resolvedRoot) {
+        fail(`${rel}: line ${line} expected_root_agent ${value.expected_root_agent} must match default_agent ${resolvedRoot}`);
+      }
+    } else if (typeof value.command_path !== "string" || !slashCommandPattern.test(value.command_path)) {
+      fail(`${rel}: line ${line} invalid command_path ${value.command_path}`);
+    } else {
+      const commandName = value.command_path.slice(1);
+      const commandRel = `commands/${commandName}.md`;
+      const commandPath = path.join(root, commandRel);
+      if (!exists(commandRel) || !fs.lstatSync(commandPath).isFile()) {
+        fail(`${rel}: line ${line} command_path ${value.command_path} missing command`);
+      } else {
+        const commandFrontmatter = parseFrontmatter(commandRel);
+        if (
+          typeof commandFrontmatter.agent !== "string" ||
+          !agentIdPattern.test(commandFrontmatter.agent) ||
+          !validAgents.has(commandFrontmatter.agent)
+        ) {
+          fail(`${rel}: line ${line} command_path ${value.command_path} missing or invalid agent`);
+        } else {
+          resolvedRoot = commandFrontmatter.agent;
+          if (value.expected_root_agent !== resolvedRoot) {
+            fail(`${rel}: line ${line} expected_root_agent ${value.expected_root_agent} for ${value.command_path} must be ${resolvedRoot}`);
+          }
+        }
+      }
+    }
+
+    const requiredAgents = Array.isArray(value.required_agents) ? value.required_agents : [];
+    const forbiddenAgents = Array.isArray(value.forbidden_agents) ? value.forbidden_agents : [];
+    const allowedSkills = Array.isArray(value.allowed_skills) ? value.allowed_skills : [];
+    const forbiddenSkills = Array.isArray(value.forbidden_skills) ? value.forbidden_skills : [];
+
+    if (requiredAgents.includes(value.expected_root_agent)) {
+      fail(`${rel}: line ${line} expected_root_agent ${value.expected_root_agent} must not appear in required_agents`);
+    }
+    if (forbiddenAgents.includes(value.expected_root_agent)) {
+      fail(`${rel}: line ${line} expected_root_agent ${value.expected_root_agent} must not appear in forbidden_agents`);
+    }
+    if (requiredAgents.some((agent) => forbiddenAgents.includes(agent))) {
+      fail(`${rel}: line ${line} required_agents must not overlap forbidden_agents`);
+    }
+    if (allowedSkills.some((skill) => forbiddenSkills.includes(skill))) {
+      fail(`${rel}: line ${line} allowed_skills must not overlap forbidden_skills`);
+    }
+
+    const reviewerParticipates =
+      value.expected_root_agent === "reviewer" || requiredAgents.includes("reviewer");
+    if (value.review_policy === "required" && !reviewerParticipates) {
+      fail(`${rel}: line ${line} review_policy required needs reviewer`);
+    }
+    if (value.review_policy === "forbidden") {
+      if (reviewerParticipates) {
+        fail(`${rel}: line ${line} review_policy forbidden excludes reviewer`);
+      }
+      if (!forbiddenAgents.includes("reviewer")) {
+        fail(`${rel}: line ${line} review_policy forbidden requires reviewer in forbidden_agents`);
+      }
+    }
+
+    const developerIsRoot = value.expected_root_agent === "developer";
+    const developerIndex = requiredAgents.indexOf("developer");
+    if (
+      value.write_before_spec_policy === "not-applicable" &&
+      (developerIsRoot || developerIndex !== -1)
+    ) {
+      fail(`${rel}: line ${line} write_before_spec_policy not-applicable excludes developer`);
+    }
+    if (value.write_before_spec_policy === "forbidden") {
+      if (developerIsRoot) {
+        fail(`${rel}: line ${line} write_before_spec_policy forbidden excludes developer root`);
+      }
+      if (developerIndex !== -1) {
+        const specifierIndex = requiredAgents.indexOf("specifier");
+        if (specifierIndex === -1 || specifierIndex > developerIndex) {
+          fail(`${rel}: line ${line} write_before_spec_policy forbidden requires specifier to appear before developer`);
+        }
+      }
+    }
+
+    if (
+      Number.isInteger(value.maximum_delegation_budget) &&
+      value.maximum_delegation_budget < requiredAgents.length
+    ) {
+      fail(`${rel}: line ${line} maximum_delegation_budget must cover required_agents`);
+    }
   }
+
+  for (const category of allowedCategories) {
+    if (!seenCategories.has(category)) {
+      fail(`${rel}: missing category ${category}`);
+    }
+  }
+}
+
+function checkRoutingReplaySurface() {
+  const corpusRel = "docs/ai/evolution/benchmarks/router-scenarios.jsonl";
+  const fixturesRel = "docs/ai/evolution/benchmarks/replay-fixtures.jsonl";
+  const requiredFiles = [
+    "scripts/replay-routing.mjs",
+    "scripts/run-routing-live-replay.mjs",
+    fixturesRel,
+  ];
+
+  let missingRequiredFile = false;
+  for (const rel of requiredFiles) {
+    const absolute = path.join(root, rel);
+    if (!exists(rel) || !fs.lstatSync(absolute).isFile()) {
+      fail(`${rel}: missing regular file`);
+      missingRequiredFile = true;
+    }
+  }
+
+  if (!missingRequiredFile) {
+    const corpusIds = parseJsonl(corpusRel)
+      .map(({ value }) => value?.id)
+      .filter((id) => typeof id === "string")
+      .sort();
+    const fixtureIds = parseJsonl(fixturesRel)
+      .map(({ value }) => value?.scenario_id)
+      .filter((id) => typeof id === "string")
+      .sort();
+    if (JSON.stringify(fixtureIds) !== JSON.stringify(corpusIds)) {
+      fail(`${fixturesRel}: scenario IDs must equal ${corpusRel} IDs`);
+    }
+  }
+
+  const evidenceRel = "docs/ai/harness/evidence.md";
+  const evidence = contractText(read(evidenceRel));
+  for (const token of [
+    "deterministic runner",
+    "opt-in live adapter",
+    "`pass`, `fail`, or `inconclusive`",
+    "never runs as part of normal checks or CI",
+    "No model or provider configuration is persisted",
+  ]) {
+    if (!evidence.includes(token)) {
+      fail(`${evidenceRel}: missing routing replay token ${token}`);
+    }
+  }
+  checkRoutingReplayContradictions(evidenceRel, evidence);
+
+  const checksRel = "docs/ai/harness/checks.md";
+  const checks = contractText(read(checksRel));
+  for (const token of [
+    "node scripts/replay-routing.mjs",
+    "--corpus docs/ai/evolution/benchmarks/router-scenarios.jsonl",
+    "--fixtures docs/ai/evolution/benchmarks/replay-fixtures.jsonl",
+    "does not execute the live adapter",
+  ]) {
+    if (!checks.includes(token)) {
+      fail(`${checksRel}: missing routing replay token ${token}`);
+    }
+  }
+  checkRoutingReplayContradictions(checksRel, checks);
+
+  const evolutionRel = "docs/ai/evolution/README.md";
+  const evolution = contractText(read(evolutionRel));
+  for (const token of [
+    "Slice 2.3",
+    '`operational_status` is `"ok"`',
+    "without implementing its metrics",
+  ]) {
+    if (!evolution.includes(token)) {
+      fail(`${evolutionRel}: missing routing replay boundary token ${token}`);
+    }
+  }
+  checkRoutingReplayContradictions(evolutionRel, evolution);
 }
 
 /**
@@ -1544,6 +1883,7 @@ checkResultContractSurface();
 checkInitContextPolicy();
 checkMechanismRegistries();
 checkRouterScenarios();
+checkRoutingReplaySurface();
 checkEvolveContract();
 checkSessionSourceDocs();
 checkCrossAgentContract();

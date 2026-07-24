@@ -110,8 +110,21 @@ Each accepted mechanism declares `mechanism_id`, `status`, `owning_surface`,
 `failure_modes`. Rejected mechanisms declare `mechanism_id`, `status`, `reason`,
 `evidence`, and `failure_modes`.
 
-Scenarios in `benchmarks/router-scenarios.jsonl` are the compact benchmark for
-routing, allowed skills, forbidden sidecars, and required evidence.
+## Canonical Routing Corpus
+
+`benchmarks/router-scenarios.jsonl` is a schema-versioned JSONL corpus. Each
+scenario separates `expected_root_agent` from `required_agents`, whose order
+expresses the expected first appearance, and declares allowed/forbidden agents
+and skills. It also fixes the pre-spec write and review policies, stop
+condition, `maximum_delegation_budget`, and required evidence.
+
+Slice 2.1 validates the schema and its invariants statically. Slice 2.2 adds
+deterministic replays over synthetic fixtures and an isolated opt-in live
+adapter; both produce sanitized reports with a tri-state verdict.
+
+Slice 2.3 will consume only reports whose `operational_status` is `"ok"` and
+will not reread raw evidence. Slice 2.2 prepares that contract without
+implementing its metrics.
 
 ## Required Manifest
 

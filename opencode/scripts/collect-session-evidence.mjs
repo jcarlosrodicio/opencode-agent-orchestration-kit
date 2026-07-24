@@ -517,6 +517,20 @@ function buildExecutionTrees(sqliteRows, rawRows, previousCursor, fullRescan) {
   };
 }
 
+export async function collectExecutionTreeByRoot(dbPath, rootSessionId) {
+  if (typeof rootSessionId !== "string" || !rootSessionId) {
+    throw new Error("rootSessionId must be a non-empty string");
+  }
+  if (!fs.existsSync(dbPath) || !fs.statSync(dbPath).isFile()) {
+    throw new Error("dbPath must reference an existing regular file");
+  }
+  const result = await summarizeSqlite(dbPath, null, true);
+  const rootSession = result.normalized.find((row) => row.session_id === rootSessionId);
+  if (!rootSession || rootSession.parent_session_id !== null) return null;
+  const built = buildExecutionTrees(result.normalized, [], null, true);
+  return built.trees.find((tree) => tree.root_session_id === rootSessionId) || null;
+}
+
 function makeCursor(previousCursor, treeSummary, trees, supplementalRawSummary, fullRescan) {
   const lastTree = trees.at(-1) || null;
   return {

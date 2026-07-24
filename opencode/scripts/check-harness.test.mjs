@@ -35,6 +35,35 @@ function write(rel, content, cwd) {
   fs.writeFileSync(path.join(cwd, rel), content);
 }
 
+function canonicalRouterScenario(overrides = {}) {
+  return {
+    schema_version: 1,
+    id: "test-router-scenario",
+    category: "trivial",
+    prompt: "Apply a small direct fix.",
+    command_path: "freeform",
+    expected_root_agent: "lead",
+    required_agents: ["developer"],
+    forbidden_agents: ["evolver"],
+    allowed_skills: [],
+    forbidden_skills: [],
+    write_before_spec_policy: "allowed",
+    review_policy: "optional",
+    expected_stop_condition: "task-completed",
+    maximum_delegation_budget: 1,
+    required_evidence: ["static_contract"],
+    ...overrides,
+  };
+}
+
+function writeRouterScenarios(cwd, scenarios) {
+  write(
+    "docs/ai/evolution/benchmarks/router-scenarios.jsonl",
+    `${scenarios.map((scenario) => JSON.stringify(scenario)).join("\n")}\n`,
+    cwd,
+  );
+}
+
 const validLoopCommand = `---
 description: Run a bounded and verifiable engineering loop.
 agent: lead
@@ -60,6 +89,83 @@ test("harness accepts prose evidence that mentions markdown filenames", () => {
   try {
     const result = runHarness(cwd);
     assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("routing replay surface rejects a missing deterministic runner", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "scripts/replay-routing.mjs"));
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing replay runner");
+    assert.match(result.stderr, /scripts\/replay-routing\.mjs: missing regular file/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("routing replay surface rejects fixture IDs that differ from the corpus", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "docs/ai/evolution/benchmarks/replay-fixtures.jsonl";
+    const fixtures = fs.readFileSync(path.join(cwd, rel), "utf8");
+    write(
+      rel,
+      fixtures.replace(
+        '"scenario_id":"freeform-tiny-direct-fix"',
+        '"scenario_id":"unknown-scenario"',
+      ),
+      cwd,
+    );
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted fixture/corpus ID drift");
+    assert.match(
+      result.stderr,
+      /replay-fixtures\.jsonl: scenario IDs must equal .*router-scenarios\.jsonl IDs/,
+    );
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("routing replay surface rejects docs without tri-state verdicts", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "docs/ai/harness/evidence.md";
+    write(
+      rel,
+      fs
+        .readFileSync(path.join(cwd, rel), "utf8")
+        .replace("`pass`, `fail`, or `inconclusive`", "`pass` or `fail`"),
+      cwd,
+    );
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted docs without inconclusive");
+    assert.match(result.stderr, /evidence\.md: missing routing replay token/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("routing replay surface rejects docs that put live replay in normal checks", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "docs/ai/harness/evidence.md";
+    write(
+      rel,
+      fs
+        .readFileSync(path.join(cwd, rel), "utf8")
+        .replace(
+          /never runs as part of\s+normal checks or CI/,
+          "runs as part of normal checks and CI",
+        ),
+      cwd,
+    );
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted live replay in normal checks");
+    assert.match(result.stderr, /contradictory routing replay contract permits live in normal checks or CI/);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
@@ -357,22 +463,279 @@ test("harness rejects duplicate mechanisms without pruning notes", () => {
   }
 });
 
-test("harness rejects invalid router scenarios", () => {
-  const cwd = makeFixture();
-  try {
-    write(
-      "docs/ai/evolution/benchmarks/router-scenarios.jsonl",
-      `{"id":"bad-router","prompt":"x","expected_agent":"wizard","command_path":"feature","allowed_skills":"none","forbidden_sidecars":[],"required_evidence":["static_contract"]}\n`,
-      cwd,
-    );
+test("harness rejects invalid router scenario canonical schema records", async (t) => {
+  const cases = [
+    ["missing field category", (scenario) => {
+      const { category, ...rest } = scenario;
+      return rest;
+    }, /missing category/],
+    ["unknown key unexpected", (scenario) => ({ ...scenario, unexpected: true }), /unknown field unexpected/],
+    ["legacy expected_agent field", (scenario) => ({ ...scenario, expected_agent: "developer" }), /unknown field expected_agent/],
+    ["schema_version 2", (scenario) => ({ ...scenario, schema_version: 2 }), /invalid schema_version/],
+    ["whitespace-only prompt", (scenario) => ({ ...scenario, prompt: "   " }), /invalid prompt/],
+    ["invalid category", (scenario) => ({ ...scenario, category: "other" }), /invalid category other/],
+    ["missing slash command", (scenario) => ({
+      ...scenario,
+      command_path: "/missing-command",
+    }), /router-scenarios\.jsonl: line 1 command_path .*\/missing-command.* missing/],
+    ["wrong freeform root", (scenario) => ({
+      ...scenario,
+      expected_root_agent: "developer",
+      required_agents: [],
+      maximum_delegation_budget: 0,
+    }), /router-scenarios\.jsonl: line 1 (?=.*expected_root_agent)(?=.*developer)(?=.*default_agent)(?=.*lead)/],
+    ["root in required_agents", (scenario) => ({ ...scenario, required_agents: ["lead"] }), /expected_root_agent .* required_agents/],
+    ["root in forbidden_agents", (scenario) => ({ ...scenario, forbidden_agents: ["lead"] }), /expected_root_agent .* forbidden_agents/],
+    ["required and forbidden agent overlap", (scenario) => ({ ...scenario, forbidden_agents: ["developer"] }), /required_agents .* forbidden_agents/],
+    ["invalid skill ID", (scenario) => ({ ...scenario, allowed_skills: ["Bad Skill"] }), /allowed_skills.*invalid skill/],
+    ["allowed and forbidden skill overlap", (scenario) => ({
+      ...scenario,
+      allowed_skills: ["open-design"],
+      forbidden_skills: ["open-design"],
+    }), /allowed_skills .* forbidden_skills/],
+    ["invalid evidence value", (scenario) => ({ ...scenario, required_evidence: ["unknown"] }), /invalid required_evidence unknown/],
+    ["review required without reviewer", (scenario) => ({ ...scenario, review_policy: "required" }), /review_policy required .* reviewer/],
+    ["review forbidden without reviewer explicitly forbidden", (scenario) => ({
+      ...scenario,
+      review_policy: "forbidden",
+      forbidden_agents: ["evolver"],
+    }), /review_policy forbidden .* forbidden_agents/],
+    ["reviewer present when review forbidden", (scenario) => ({
+      ...scenario,
+      required_agents: ["reviewer"],
+      forbidden_agents: ["evolver"],
+      write_before_spec_policy: "not-applicable",
+      review_policy: "forbidden",
+    }), /review_policy forbidden .* reviewer/],
+    ["write forbidden without specifier before developer", (scenario) => ({
+      ...scenario,
+      write_before_spec_policy: "forbidden",
+    }), /specifier .* before developer/],
+    ["write forbidden with reversed developer specifier order", (scenario) => ({
+      ...scenario,
+      required_agents: ["developer", "specifier"],
+      write_before_spec_policy: "forbidden",
+      maximum_delegation_budget: 2,
+    }), /specifier .* before developer/],
+    ["write not-applicable with developer", (scenario) => ({
+      ...scenario,
+      write_before_spec_policy: "not-applicable",
+    }), /not-applicable .* developer/],
+    ["negative budget", (scenario) => ({ ...scenario, maximum_delegation_budget: -1 }), /maximum_delegation_budget .* 0.*8/],
+    ["non-integer budget", (scenario) => ({ ...scenario, maximum_delegation_budget: 1.5 }), /maximum_delegation_budget .* integer/],
+    ["insufficient budget", (scenario) => ({ ...scenario, maximum_delegation_budget: 0 }), /maximum_delegation_budget .* required_agents/],
+    ["budget above 8", (scenario) => ({ ...scenario, maximum_delegation_budget: 9 }), /maximum_delegation_budget .* 0.*8/],
+    ["empty required_evidence", (scenario) => ({ ...scenario, required_evidence: [] }), /required_evidence .* non-empty/],
+  ];
 
-    const result = runHarness(cwd);
-    assert.notEqual(result.status, 0, "checker accepted invalid router scenario");
-    assert.match(result.stderr, /router-scenarios\.jsonl: line 1 invalid expected_agent/);
-    assert.match(result.stderr, /router-scenarios\.jsonl: line 1 allowed_skills must be an array/);
-  } finally {
-    fs.rmSync(cwd, { recursive: true, force: true });
+  for (const [name, mutate, diagnostic] of cases) {
+    await t.test(`router scenario rejects ${name}`, () => {
+      const cwd = makeFixture();
+      try {
+        writeRouterScenarios(cwd, [mutate(canonicalRouterScenario())]);
+
+        const result = runHarness(cwd);
+        assert.notEqual(result.status, 0, `checker accepted router scenario with ${name}`);
+        assert.match(result.stderr, diagnostic);
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
   }
+
+  await t.test("router scenario rejects duplicate scenario IDs", () => {
+    const cwd = makeFixture();
+    try {
+      writeRouterScenarios(cwd, [
+        canonicalRouterScenario(),
+        canonicalRouterScenario({ category: "ambiguous" }),
+      ]);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted duplicate router scenario IDs");
+      assert.match(result.stderr, /duplicate id test-router-scenario/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  const arrayFields = [
+    ["required_agents", ["developer", "developer"]],
+    ["forbidden_agents", ["evolver", "evolver"]],
+    ["allowed_skills", ["open-design", "open-design"]],
+    ["forbidden_skills", ["open-design", "open-design"]],
+    ["required_evidence", ["static_contract", "static_contract"]],
+  ];
+  for (const [field, values] of arrayFields) {
+    await t.test(`router scenario rejects duplicate strings in ${field}`, () => {
+      const cwd = makeFixture();
+      try {
+        writeRouterScenarios(cwd, [
+          canonicalRouterScenario({
+            [field]: values,
+            maximum_delegation_budget: field === "required_agents" ? 2 : 1,
+          }),
+        ]);
+
+        const result = runHarness(cwd);
+        assert.notEqual(result.status, 0, `checker accepted duplicate strings in router scenario ${field}`);
+        assert.match(result.stderr, new RegExp(`${field} .* duplicates`));
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  }
+
+  await t.test("router scenario rejects a missing category from a complete corpus", () => {
+    const cwd = makeFixture();
+    try {
+      const categories = [
+        "trivial",
+        "ambiguous",
+        "research",
+        "design",
+        "specification",
+        "direct-implementation",
+        "validation-failure",
+        "sensitive",
+        "prompt-injection",
+        "context-compaction",
+        "resume",
+      ];
+      writeRouterScenarios(
+        cwd,
+        categories.map((category) => canonicalRouterScenario({
+          id: `coverage-${category}`,
+          category,
+        })),
+      );
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted router scenario corpus with a missing category");
+      assert.match(result.stderr, /missing category optional-integration-absent/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("router scenario rejects /implement root mismatch", () => {
+    const cwd = makeFixture();
+    try {
+      writeRouterScenarios(cwd, [
+        canonicalRouterScenario({
+          command_path: "/implement",
+          expected_root_agent: "lead",
+        }),
+      ]);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted router scenario with mismatched slash-command root");
+      assert.match(
+        result.stderr,
+        /router-scenarios\.jsonl: line 1 (?=.*expected_root_agent)(?=.*lead)(?=.*\/implement)(?=.*developer)/,
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("router scenario rejects slash command with description-only frontmatter", () => {
+    const cwd = makeFixture();
+    try {
+      const implement = fs.readFileSync(path.join(cwd, "commands/implement.md"), "utf8");
+      const implementWithoutAgent = implement.replace(/^agent: developer\n/m, "");
+      assert.notEqual(implementWithoutAgent, implement, "implement fixture did not contain its expected agent");
+      write(
+        "commands/implement.md",
+        implementWithoutAgent,
+        cwd,
+      );
+      writeRouterScenarios(cwd, [
+        canonicalRouterScenario({
+          command_path: "/implement",
+          expected_root_agent: "developer",
+          required_agents: [],
+          maximum_delegation_budget: 0,
+        }),
+      ]);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted router scenario whose command has no agent");
+      assert.match(
+        result.stderr,
+        /router-scenarios\.jsonl: line 1 (?=.*\/implement)(?=.*(?:missing|invalid) agent)/,
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("router scenario rejects invalid agent ID", () => {
+    const cwd = makeFixture();
+    try {
+      writeRouterScenarios(cwd, [
+        canonicalRouterScenario({ expected_root_agent: "Bad Agent" }),
+      ]);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted router scenario with invalid agent ID");
+      assert.match(result.stderr, /expected_root_agent .* invalid agent/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("router scenario rejects syntactically valid nonexistent agent", () => {
+    const cwd = makeFixture();
+    try {
+      writeRouterScenarios(cwd, [
+        canonicalRouterScenario({ expected_root_agent: "nonexistent-agent" }),
+      ]);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted router scenario with nonexistent agent");
+      assert.match(result.stderr, /expected_root_agent .* nonexistent-agent/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("router scenario rejects a directory masquerading as an agent file", () => {
+    const cwd = makeFixture();
+    try {
+      fs.mkdirSync(path.join(cwd, "agents/fake.md"));
+      writeRouterScenarios(cwd, [
+        canonicalRouterScenario({ expected_root_agent: "fake" }),
+      ]);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted directory as a router scenario agent file");
+      assert.match(
+        result.stderr,
+        /router-scenarios\.jsonl: line 1 (?=.*expected_root_agent)(?=.*fake)(?=.*(?:invalid|nonexistent))/,
+      );
+      assert.doesNotMatch(
+        result.stderr,
+        /EISDIR|node:fs:|node:internal|Node\.js v|(?:TypeError|Error):|^\s+at .*check-harness\.mjs/m,
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("router scenario rejects null and array JSONL records deterministically", () => {
+    const cwd = makeFixture();
+    try {
+      writeRouterScenarios(cwd, [null, []]);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, "checker accepted non-object router scenario records");
+      assert.match(result.stderr, /router-scenarios\.jsonl: line 1 record must be an object/);
+      assert.match(result.stderr, /router-scenarios\.jsonl: line 2 record must be an object/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 });
 
 test("skill registry file exists and has correct header", () => {

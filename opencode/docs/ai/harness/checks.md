@@ -24,6 +24,18 @@ The normal local check combines both paths:
 npm run check
 ```
 
+Deterministic routing replay is part of normal validation:
+
+```bash
+node scripts/replay-routing.mjs \
+  --corpus docs/ai/evolution/benchmarks/router-scenarios.jsonl \
+  --fixtures docs/ai/evolution/benchmarks/replay-fixtures.jsonl
+```
+
+The contract checker validates the replay surface and scenario-ID
+correspondence but does not execute the live adapter. Live replay requires
+`--confirm-live`, can consume tokens, and remains outside normal checks and CI.
+
 Use `npm run check:quick` when only the fast contract checker is needed. Use
 `npm run check:release` for a clean dependency install followed by contracts,
 all script tests, typechecking, dependency audit, and installation smoke.
@@ -55,7 +67,21 @@ The harness check validates:
 - `memory-as-hint` contract: persistent memory/MCP context is a hint and must be
   verified against current state;
 - accepted/rejected mechanism JSONL registries;
-- router/skill scenarios in `docs/ai/evolution/benchmarks/router-scenarios.jsonl`.
+- router/skill scenarios in
+  `docs/ai/evolution/benchmarks/router-scenarios.jsonl`: exact schema v1 keys
+  (`schema_version`, `id`, `category`, `prompt`, `command_path`,
+  `expected_root_agent`, `required_agents`, `forbidden_agents`,
+  `allowed_skills`, `forbidden_skills`, `write_before_spec_policy`,
+  `review_policy`, `expected_stop_condition`, `maximum_delegation_budget`, and
+  `required_evidence`); agents derived from regular `agents/*.md` files that
+  satisfy the existing frontmatter contract; root-agent consistency with
+  `default_agent` or the selected command; unique IDs and array entries, with
+  disjoint required/forbidden and allowed/forbidden lists; coverage of all 12
+  categories; and invariants for review, pre-spec writes, delegation budget,
+  and evidence. This is a static check and does not execute replays;
+- routing replay surface: deterministic/live runners as regular files, one
+  synthetic fixture per corpus ID, and documented tri-state, opt-in, and
+  privacy contracts;
 - presence of `docs/ai/harness/skill_registry.md` (soft check; warns when missing);
 - `agents/lead.md` contains `Skill Resolution` or a registry reference;
 - `developer`, `researcher`, `specifier`, `reviewer`, `designer`, and `scoper`
@@ -108,7 +134,8 @@ The local check turns the cheapest maintenance rules into mechanical checks:
 - `AGENTS.md` must stay a short map, not a long manual;
 - new agents and commands must appear in the harness docs;
 - manifests and evaluations must not point to missing local artifacts.
-- mechanisms and router scenarios must be parseable JSONL with minimum fields.
+- mechanisms and router scenarios must be parseable JSONL with their required
+  schema and invariants.
 
 Budget rule:
 
