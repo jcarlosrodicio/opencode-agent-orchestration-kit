@@ -566,6 +566,19 @@ Run the normal local check with:
 npm run check
 ```
 
+The bundled routing corpus can also be replayed deterministically without
+calling a model:
+
+```bash
+node opencode/scripts/replay-routing.mjs \
+  --corpus opencode/docs/ai/evolution/benchmarks/router-scenarios.jsonl \
+  --fixtures opencode/docs/ai/evolution/benchmarks/replay-fixtures.jsonl
+```
+
+An isolated live replay is available only through explicit opt-in. It may
+consume model tokens, is intentionally excluded from normal checks and CI, and
+does not persist model/provider configuration or raw output by default.
+
 This runs the fast contract checker and every bundled `node:test` suite. For a
 fast structural check while editing documentation or contracts, use
 `npm run check:quick`. Before a release, use `npm run check:release`; it performs
@@ -578,7 +591,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.29
+node scripts/version.mjs --check-tag v1.0.30
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.
