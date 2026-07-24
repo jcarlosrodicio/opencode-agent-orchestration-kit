@@ -106,6 +106,21 @@ test("routing replay surface rejects a missing deterministic runner", () => {
   }
 });
 
+test("routing replay surface rejects a missing metrics aggregator", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "scripts/summarize-routing-metrics.mjs"));
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing metrics aggregator");
+    assert.match(
+      result.stderr,
+      /scripts\/summarize-routing-metrics\.mjs: missing regular file/,
+    );
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("routing replay surface rejects fixture IDs that differ from the corpus", () => {
   const cwd = makeFixture();
   try {

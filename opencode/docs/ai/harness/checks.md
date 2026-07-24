@@ -36,6 +36,19 @@ The contract checker validates the replay surface and scenario-ID
 correspondence but does not execute the live adapter. Live replay requires
 `--confirm-live`, can consume tokens, and remains outside normal checks and CI.
 
+Slice 2.3 aggregates one or more sanitized reports without rereading raw
+evidence:
+
+```bash
+node scripts/summarize-routing-metrics.mjs \
+  --corpus docs/ai/evolution/benchmarks/router-scenarios.jsonl \
+  --report /path/to/routing-replay-report.json
+```
+
+The aggregator requires `operational_status: "ok"` and the same
+`corpus_digest`. It writes deterministic JSON to stdout, does not call models,
+and does not make automatic harness-optimization decisions.
+
 Use `npm run check:quick` when only the fast contract checker is needed. Use
 `npm run check:release` for a clean dependency install followed by contracts,
 all script tests, typechecking, dependency audit, and installation smoke.
@@ -79,9 +92,9 @@ The harness check validates:
   disjoint required/forbidden and allowed/forbidden lists; coverage of all 12
   categories; and invariants for review, pre-spec writes, delegation budget,
   and evidence. This is a static check and does not execute replays;
-- routing replay surface: deterministic/live runners as regular files, one
-  synthetic fixture per corpus ID, and documented tri-state, opt-in, and
-  privacy contracts;
+- routing replay surface: deterministic/live runners and the metrics aggregator
+  as regular files, one synthetic fixture per corpus ID, and documented
+  tri-state, opt-in, and privacy contracts;
 - presence of `docs/ai/harness/skill_registry.md` (soft check; warns when missing);
 - `agents/lead.md` contains `Skill Resolution` or a registry reference;
 - `developer`, `researcher`, `specifier`, `reviewer`, `designer`, and `scoper`

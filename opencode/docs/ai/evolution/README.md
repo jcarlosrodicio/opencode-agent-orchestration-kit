@@ -122,9 +122,19 @@ Slice 2.1 validates the schema and its invariants statically. Slice 2.2 adds
 deterministic replays over synthetic fixtures and an isolated opt-in live
 adapter; both produce sanitized reports with a tri-state verdict.
 
-Slice 2.3 will consume only reports whose `operational_status` is `"ok"` and
-will not reread raw evidence. Slice 2.2 prepares that contract without
-implementing its metrics.
+Slice 2.3 consumes only reports whose `operational_status` is `"ok"`, requires
+the same `corpus_digest`, and does not reread raw evidence. The aggregator
+calculates `routing_accuracy`, `forbidden_agent_activation_rate`,
+`premature_write_rate`, `review_bypass_rate`, `resume_success_rate`,
+`human_intervention_rate`, `validation_failure_closure_rate`, and
+`delegations_per_accepted_task`. Every metric declares its numerator,
+denominator, value, and `excluded_inconclusive`; a zero denominator produces
+`unavailable`, never an invented zero.
+
+`tokens_per_accepted_task` remains explicitly `unavailable` with
+`token-evidence-absent` because v1 reports contain no token-usage evidence.
+Output is deterministic and sanitized JSON. It includes no prompts, sessions,
+paths, models, or providers and triggers no automatic optimization decision.
 
 ## Required Manifest
 

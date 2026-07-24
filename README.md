@@ -575,6 +575,18 @@ node opencode/scripts/replay-routing.mjs \
   --fixtures opencode/docs/ai/evolution/benchmarks/replay-fixtures.jsonl
 ```
 
+Aggregate one or more sanitized replay reports into deterministic routing
+metrics without calling a model or rereading raw evidence:
+
+```bash
+node opencode/scripts/summarize-routing-metrics.mjs \
+  --corpus opencode/docs/ai/evolution/benchmarks/router-scenarios.jsonl \
+  --report /path/to/routing-replay-report.json
+```
+
+Inconclusive observations are excluded from metric denominators. Token cost is
+reported as unavailable until the replay report schema carries token evidence.
+
 An isolated live replay is available only through explicit opt-in. It may
 consume model tokens, is intentionally excluded from normal checks and CI, and
 does not persist model/provider configuration or raw output by default.

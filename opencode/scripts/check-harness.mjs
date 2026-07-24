@@ -1159,6 +1159,7 @@ function checkRoutingReplaySurface() {
   const requiredFiles = [
     "scripts/replay-routing.mjs",
     "scripts/run-routing-live-replay.mjs",
+    "scripts/summarize-routing-metrics.mjs",
     fixturesRel,
   ];
 
@@ -1204,7 +1205,9 @@ function checkRoutingReplaySurface() {
   const checks = contractText(read(checksRel));
   for (const token of [
     "node scripts/replay-routing.mjs",
+    "node scripts/summarize-routing-metrics.mjs",
     "--corpus docs/ai/evolution/benchmarks/router-scenarios.jsonl",
+    "--report",
     "--fixtures docs/ai/evolution/benchmarks/replay-fixtures.jsonl",
     "does not execute the live adapter",
   ]) {
@@ -1219,7 +1222,9 @@ function checkRoutingReplaySurface() {
   for (const token of [
     "Slice 2.3",
     '`operational_status` is `"ok"`',
-    "without implementing its metrics",
+    "`excluded_inconclusive`",
+    "`token-evidence-absent`",
+    "does not reread raw evidence",
   ]) {
     if (!evolution.includes(token)) {
       fail(`${evolutionRel}: missing routing replay boundary token ${token}`);

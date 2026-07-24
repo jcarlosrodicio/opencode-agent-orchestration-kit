@@ -798,12 +798,19 @@ function evaluateScenario(scenario, fixture, redact) {
   };
 }
 
-function buildReport(scenarios, observations, mode) {
+export function computeCorpusDigest(scenarios) {
   const canonicalCorpus = `${scenarios
     .slice()
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((scenario) => JSON.stringify(scenario))
     .join("\n")}\n`;
+  return `sha256:${crypto
+    .createHash("sha256")
+    .update(canonicalCorpus)
+    .digest("hex")}`;
+}
+
+function buildReport(scenarios, observations, mode) {
   const scenariosById = new Map(scenarios.map((scenario) => [scenario.id, scenario]));
   const observationsById = new Map(
     observations.map((observation) => [observation.scenario_id, observation]),
@@ -820,10 +827,7 @@ function buildReport(scenarios, observations, mode) {
   const status = aggregate(scenarioResults.map((result) => result.status));
   return {
     schema_version: 1,
-    corpus_digest: `sha256:${crypto
-      .createHash("sha256")
-      .update(canonicalCorpus)
-      .digest("hex")}`,
+    corpus_digest: computeCorpusDigest(scenarios),
     mode,
     operational_status: "ok",
     status,
