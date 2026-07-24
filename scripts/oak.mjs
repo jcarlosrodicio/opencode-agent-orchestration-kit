@@ -127,6 +127,32 @@ function dispatchCheck(args, runtime) {
   );
 }
 
+function dispatchReplay(args, runtime) {
+  const values = new Map();
+  const allowed = new Set(["--corpus", "--fixtures", "--output"]);
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index];
+    const value = args[index + 1];
+    if (!allowed.has(flag) || values.has(flag) || !value || value.startsWith("--")) {
+      return invalid(runtime.stderr, "invalid replay arguments");
+    }
+    values.set(flag, value);
+  }
+  const replayArgs = [
+    "--corpus",
+    values.get("--corpus") ?? OAK_REPLAY_DEFAULTS.corpus,
+    "--fixtures",
+    values.get("--fixtures") ?? OAK_REPLAY_DEFAULTS.fixtures,
+  ];
+  if (values.has("--output")) replayArgs.push("--output", values.get("--output"));
+  return runNode(
+    OAK_ENTRYPOINTS.replay,
+    replayArgs,
+    { cwd: runtime.cwd, env: runtime.env, label: "replay" },
+    runtime,
+  );
+}
+
 export function dispatchOak(argv, deps = {}) {
   const runtime = {
     run: deps.run ?? spawnSync,
@@ -157,6 +183,7 @@ export function dispatchOak(argv, deps = {}) {
   }
   if (command === "version") return invalid(runtime.stderr, "version accepts no arguments");
   if (command === "check") return dispatchCheck(rest, runtime);
+  if (command === "replay") return dispatchReplay(rest, runtime);
   if (LIFECYCLE_COMMANDS.has(command)) {
     return runNode(
       OAK_ENTRYPOINTS.manager,

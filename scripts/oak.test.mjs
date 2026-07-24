@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   OAK_COMMANDS,
   OAK_ENTRYPOINTS,
+  OAK_REPLAY_DEFAULTS,
   dispatchOak,
   resolveCheckTarget,
 } from "./oak.mjs";
@@ -212,4 +213,51 @@ test("[O007] check dispatch is read-only", (t) => {
     fsOps: fs,
   }), 0);
   assert.deepEqual(snapshotTree(target), before);
+});
+
+test("[O008] replay defaults to packaged static evidence", () => {
+  const calls = [];
+  const deps = runnerDeps(calls);
+  assert.equal(dispatchOak(["replay"], deps), 0);
+  assert.deepEqual(calls[0].args, [
+    OAK_ENTRYPOINTS.replay,
+    "--corpus",
+    OAK_REPLAY_DEFAULTS.corpus,
+    "--fixtures",
+    OAK_REPLAY_DEFAULTS.fixtures,
+  ]);
+  assert.equal(path.isAbsolute(OAK_REPLAY_DEFAULTS.corpus), true);
+  assert.equal(path.isAbsolute(OAK_REPLAY_DEFAULTS.fixtures), true);
+});
+
+test("[O009] replay overrides paths and preserves closed exit codes", () => {
+  const calls = [];
+  const deps = runnerDeps(calls);
+  assert.equal(dispatchOak([
+    "replay",
+    "--output", "result.json",
+    "--fixtures", "custom-fixtures.jsonl",
+    "--corpus", "custom-corpus.jsonl",
+  ], deps), 0);
+  assert.deepEqual(calls[0].args, [
+    OAK_ENTRYPOINTS.replay,
+    "--corpus", "custom-corpus.jsonl",
+    "--fixtures", "custom-fixtures.jsonl",
+    "--output", "result.json",
+  ]);
+
+  for (const status of [0, 1, 2, 3]) {
+    assert.equal(dispatchOak(
+      ["replay"],
+      runnerDeps([], { status, signal: null, error: null }),
+    ), status);
+  }
+  for (const argv of [
+    ["replay", "--corpus"],
+    ["replay", "--unknown", "x"],
+    ["replay", "--corpus", "a", "--corpus", "b"],
+    ["benchmark"],
+  ]) {
+    assert.equal(dispatchOak(argv, runnerDeps()), 2);
+  }
 });
