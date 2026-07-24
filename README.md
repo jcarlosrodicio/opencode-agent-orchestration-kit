@@ -369,6 +369,22 @@ first, then choose the install command for that user-owned dependency graph.
 
 ## Upgrade, diagnose, uninstall, and rollback
 
+The package also exposes the dependency-free `oak` CLI as a thin frontend over
+the same tested engines:
+
+```bash
+oak --help
+oak doctor
+oak check
+oak replay
+```
+
+The shell wrappers remain supported. `oak check` validates the installed target
+without executing a target-provided checker, while `oak replay` defaults to the
+packaged static corpus and synthetic fixtures. See the [`oak` CLI
+guide](docs/cli.md) for commands, target precedence, exit codes, and explicit
+exclusions.
+
 Preview an ownership-safe upgrade, then apply it:
 
 ```bash

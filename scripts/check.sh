@@ -65,6 +65,7 @@ docker/open-design/docker-compose.yml
 docker/open-design/.env.example
 docker/open-design/opencode-od/opencode.json
 docs/supply-chain.md
+docs/cli.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 .github/PULL_REQUEST_TEMPLATE.md
@@ -125,6 +126,11 @@ grep -q './plugins/token-tree-usage.tsx' opencode/tui.json
 
 grep -q 'Open Design' README.md
 grep -q 'Superpowers' README.md
+grep -q 'oak check' README.md
+grep -q 'oak replay' README.md
+grep -q 'OPENCODE_CONFIG_DIR' docs/cli.md
+grep -q 'benchmark' docs/cli.md
+grep -q 'Live replay' docs/cli.md
 grep -q 'Impeccable' README.md
 
 grep -q '"open-design": allow' opencode/agents/designer.md
