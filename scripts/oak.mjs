@@ -99,6 +99,34 @@ export function resolveCheckTarget(options, env = process.env) {
   return resolveTarget(options, env);
 }
 
+function dispatchCheck(args, runtime) {
+  let target;
+  if (args.length === 0) {
+    target = undefined;
+  } else if (args.length === 2 && args[0] === "--target" && args[1] && !args[1].startsWith("--")) {
+    target = args[1];
+  } else {
+    return invalid(runtime.stderr, "invalid check arguments");
+  }
+  let absoluteTarget;
+  let stat;
+  try {
+    absoluteTarget = path.resolve(resolveCheckTarget({ target }, runtime.env));
+    stat = runtime.fsOps.lstatSync(absoluteTarget);
+  } catch {
+    return invalid(runtime.stderr, "check target is unavailable");
+  }
+  if (stat.isSymbolicLink() || !stat.isDirectory()) {
+    return invalid(runtime.stderr, "check target must be a non-symlink directory");
+  }
+  return runNode(
+    OAK_ENTRYPOINTS.check,
+    [],
+    { cwd: absoluteTarget, env: runtime.env, label: "check" },
+    runtime,
+  );
+}
+
 export function dispatchOak(argv, deps = {}) {
   const runtime = {
     run: deps.run ?? spawnSync,
@@ -128,6 +156,7 @@ export function dispatchOak(argv, deps = {}) {
     return 0;
   }
   if (command === "version") return invalid(runtime.stderr, "version accepts no arguments");
+  if (command === "check") return dispatchCheck(rest, runtime);
   if (LIFECYCLE_COMMANDS.has(command)) {
     return runNode(
       OAK_ENTRYPOINTS.manager,
