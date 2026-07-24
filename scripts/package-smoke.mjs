@@ -14,6 +14,7 @@ const REQUIRED_FILES = [
   "package/supply-chain.json",
   "package/install.sh",
   "package/scripts/manage-installation.mjs",
+  "package/scripts/oak.mjs",
   "package/scripts/package-smoke.sh",
   "package/scripts/package-smoke.mjs",
   "package/opencode/opencode.json",
@@ -109,6 +110,30 @@ export function validatePackedFileSet(names) {
   }
   for (const name of names) {
     if (forbiddenPackedName(name)) throw smokeError(`packed file set contains forbidden state: ${name}`);
+  }
+}
+
+export function validatePackedOak({ packed, packedRoot, fsOps = fs }) {
+  if (
+    !packed?.bin
+    || typeof packed.bin !== "object"
+    || Array.isArray(packed.bin)
+    || JSON.stringify(Object.keys(packed.bin).sort()) !== JSON.stringify(["oak"])
+    || packed.bin.oak !== "scripts/oak.mjs"
+  ) {
+    throw smokeError("packed package bin must expose exactly oak at scripts/oak.mjs");
+  }
+  let stat;
+  try {
+    stat = fsOps.lstatSync(path.join(packedRoot, packed.bin.oak));
+  } catch {
+    throw smokeError("packed oak entrypoint is missing");
+  }
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    throw smokeError("packed oak entrypoint must be a regular non-symlink file");
+  }
+  if ((stat.mode & 0o111) === 0) {
+    throw smokeError("packed oak entrypoint must be executable");
   }
 }
 
@@ -278,6 +303,7 @@ export async function smokeTarball(options = {}) {
     }
 
     const packedRoot = path.join(extracted, "package");
+    validatePackedOak({ packed, packedRoot });
     const opencodeRoot = path.join(packedRoot, "opencode");
     run("npm", ["ci", "--ignore-scripts"], {
       cwd: opencodeRoot,
@@ -293,6 +319,32 @@ export async function smokeTarball(options = {}) {
       cwd: packedRoot,
       env: environment,
       label: "packed installation smoke failed",
+    });
+    const version = run(process.execPath, ["scripts/oak.mjs", "--version"], {
+      cwd: packedRoot,
+      env: environment,
+      label: "packed oak version failed",
+    });
+    if (version.stdout !== `${canonical.name} ${canonical.version}\n`) {
+      throw smokeError("packed oak version output is invalid");
+    }
+    const help = run(process.execPath, ["scripts/oak.mjs", "--help"], {
+      cwd: packedRoot,
+      env: environment,
+      label: "packed oak help failed",
+    });
+    if (!help.stdout.startsWith("Usage: oak <command>")) {
+      throw smokeError("packed oak help output is invalid");
+    }
+    run(process.execPath, ["scripts/oak.mjs", "check", "--target", "opencode"], {
+      cwd: packedRoot,
+      env: environment,
+      label: "packed oak check failed",
+    });
+    run(process.execPath, ["scripts/oak.mjs", "replay"], {
+      cwd: packedRoot,
+      env: environment,
+      label: "packed oak replay failed",
     });
     return {
       basename,

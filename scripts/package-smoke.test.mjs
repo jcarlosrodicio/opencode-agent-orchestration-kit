@@ -11,6 +11,7 @@ import {
   parseChecksumFile,
   smokeTarball,
   validateArchiveEntries,
+  validatePackedOak,
   validatePackedFileSet,
 } from "./package-smoke.mjs";
 
@@ -22,6 +23,7 @@ const REQUIRED = [
   "package/supply-chain.json",
   "package/install.sh",
   "package/scripts/manage-installation.mjs",
+  "package/scripts/oak.mjs",
   "package/scripts/package-smoke.sh",
   "package/scripts/package-smoke.mjs",
   "package/opencode/opencode.json",
@@ -100,6 +102,36 @@ test("validatePackedFileSet reports a missing required representative", () => {
     () => validatePackedFileSet(REQUIRED.filter((name) => name !== "package/opencode/package-lock.json")),
     /opencode\/package-lock\.json/,
   );
+});
+
+test("validatePackedFileSet requires the oak entrypoint", () => {
+  assert.throws(
+    () => validatePackedFileSet(REQUIRED.filter((name) => name !== "package/scripts/oak.mjs")),
+    /scripts\/oak\.mjs/,
+  );
+});
+
+test("validatePackedOak requires exact metadata and executable regular file", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "oak-packed-bin-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, "scripts"));
+  fs.writeFileSync(path.join(root, "scripts/oak.mjs"), "#!/usr/bin/env node\n", { mode: 0o755 });
+  assert.doesNotThrow(() => validatePackedOak({
+    packed: { bin: { oak: "scripts/oak.mjs" } },
+    packedRoot: root,
+  }));
+  for (const bin of [
+    undefined,
+    { oak: "scripts/other.mjs" },
+    { oak: "scripts/oak.mjs", other: "scripts/other.mjs" },
+  ]) {
+    assert.throws(() => validatePackedOak({ packed: { bin }, packedRoot: root }), /bin/i);
+  }
+  fs.chmodSync(path.join(root, "scripts/oak.mjs"), 0o644);
+  assert.throws(() => validatePackedOak({
+    packed: { bin: { oak: "scripts/oak.mjs" } },
+    packedRoot: root,
+  }), /executable/i);
 });
 
 for (const forbidden of [

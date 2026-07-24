@@ -107,6 +107,9 @@ fi
   node --input-type=module -e "import('@opencode-ai/plugin').then(() => console.log('installed plugin import ok'))"
 )
 
+node scripts/oak.mjs check --target "$target"
+node scripts/oak.mjs replay >/dev/null
+
 fake_bin="$smoke_root/bin"
 mkdir -p "$fake_bin"
 cat >"$fake_bin/opencode" <<'SH'
