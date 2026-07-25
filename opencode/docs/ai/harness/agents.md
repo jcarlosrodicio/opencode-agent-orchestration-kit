@@ -1,5 +1,12 @@
 # Agent Contracts
 
+`docs/ai/harness/orchestration-contracts.json` declares the portable agent
+inventory, mode, semantic write authority, and delegation relationships that
+the checker can compare mechanically. Agent frontmatter remains the effective
+OpenCode configuration; this document retains explanations, exceptions, and
+expectations outside the schema. Version 1 validates both surfaces but does not
+generate or modify frontmatter.
+
 ## Usage Matrix
 
 | Agent | Use when | Do not use when | Expected evidence |

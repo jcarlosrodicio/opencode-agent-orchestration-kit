@@ -21,6 +21,7 @@ const REQUIRED_FILES = [
   "package/opencode/package.json",
   "package/opencode/package-lock.json",
   "package/opencode/agents/lead.md",
+  "package/opencode/docs/ai/harness/orchestration-contracts.json",
   "package/docs/installation.md",
   "package/LICENSE",
   "package/NOTICE.md",

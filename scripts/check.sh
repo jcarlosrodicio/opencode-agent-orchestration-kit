@@ -54,6 +54,7 @@ opencode/docs/ai/harness/agents.md
 opencode/docs/ai/harness/commands.md
 opencode/docs/ai/harness/evidence.md
 opencode/docs/ai/harness/checks.md
+opencode/docs/ai/harness/orchestration-contracts.json
 opencode/docs/ai/evolution/README.md
 opencode/docs/ai/evolution/evolution_history.md
 opencode/docs/ai/evolution/mechanisms.jsonl

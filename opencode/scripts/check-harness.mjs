@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 
 const root = process.cwd();
 const errors = [];
+let orchestrationCatalog = null;
 
 function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
@@ -77,6 +78,621 @@ function parseJson(rel) {
     fail(`${rel}: invalid JSON (${error.message})`);
     return null;
   }
+}
+
+const orchestrationContractRel =
+  "docs/ai/harness/orchestration-contracts.json";
+
+function readOrchestrationContract() {
+  if (!exists(orchestrationContractRel)) {
+    fail(`${orchestrationContractRel}: missing orchestration contract`);
+    return null;
+  }
+  const stat = fs.lstatSync(path.join(root, orchestrationContractRel));
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    fail(`${orchestrationContractRel}: must be a regular non-symlink file`);
+    return null;
+  }
+  return parseJson(orchestrationContractRel);
+}
+
+function checkOrchestrationContracts() {
+  const contract = readOrchestrationContract();
+  if (!contract) return;
+  checkExactKeys("contract", contract, [
+    "schema_version",
+    "contract_id",
+    "evidence_types",
+    "agents",
+    "commands",
+    "routing_rules",
+    "retry_policies",
+    "workflows",
+    "profiles",
+  ]);
+  if (contract.schema_version !== 1) {
+    fail(`${orchestrationContractRel}: schema_version must be 1`);
+  }
+  if (contract.contract_id !== "oak-orchestration") {
+    fail(`${orchestrationContractRel}: contract_id must be oak-orchestration`);
+  }
+  const canonicalEvidence = [
+    "live_smoke",
+    "manual_oracle",
+    "static_contract",
+    "transcript_replay",
+  ];
+  if (JSON.stringify(contract.evidence_types) !== JSON.stringify(canonicalEvidence)) {
+    fail(
+      `${orchestrationContractRel}: evidence_types must match the canonical catalog`,
+    );
+  }
+  const expectedAgentIds = listMarkdown("agents")
+    .map(stripMarkdownExtension)
+    .sort();
+  const declaredAgentIds = Array.isArray(contract.agents)
+    ? contract.agents.map((agent) => agent?.id).sort()
+    : [];
+  if (JSON.stringify(declaredAgentIds) !== JSON.stringify(expectedAgentIds)) {
+    fail(`${orchestrationContractRel}: agent catalog must match harness agents`);
+  }
+  const actualAgentDelegations = new Map();
+  if (Array.isArray(contract.agents)) {
+    for (const agent of contract.agents) {
+      const label = `agent ${agent?.id ?? "<unknown>"}`;
+      if (!checkExactKeys(label, agent, [
+        "id",
+        "mode",
+        "permission_invariants",
+        "delegates_to",
+      ])) {
+        continue;
+      }
+      if (!/^[a-z][a-z0-9_]*$/.test(agent.id)) {
+        fail(`${orchestrationContractRel}: ${label} id must be canonical`);
+        continue;
+      }
+      if (!["primary", "subagent", "all"].includes(agent.mode)) {
+        fail(`${orchestrationContractRel}: ${label} mode is invalid`);
+      }
+      if (!checkExactKeys(`${label} permission_invariants`, agent.permission_invariants, [
+        "repository_write",
+        "task_default",
+      ])) {
+        continue;
+      }
+      for (const key of ["repository_write", "task_default"]) {
+        if (!["allow", "ask", "deny", "unspecified"].includes(agent.permission_invariants[key])) {
+          fail(`${orchestrationContractRel}: ${label} ${key} is invalid`);
+        }
+      }
+      checkSortedUniqueStrings(`${label} delegates_to`, agent.delegates_to);
+
+      const rel = `agents/${agent.id}.md`;
+      if (!exists(rel)) continue;
+      const frontmatter = parseFrontmatter(rel);
+      const permissions = parsePortableAgentPermissions(rel);
+      if (agent.mode !== frontmatter.mode) {
+        fail(`${orchestrationContractRel}: ${label} mode must match frontmatter`);
+      }
+      if (agent.permission_invariants.repository_write !== permissions.repositoryWrite) {
+        fail(`${orchestrationContractRel}: ${label} repository_write must match frontmatter`);
+      }
+      if (agent.permission_invariants.task_default !== permissions.taskDefault) {
+        fail(`${orchestrationContractRel}: ${label} task_default must match frontmatter`);
+      }
+      actualAgentDelegations.set(agent.id, permissions.taskAllows);
+    }
+  }
+
+  const declaredCommandIds = Array.isArray(contract.commands)
+    ? contract.commands.map((command) => command?.id)
+    : [];
+  checkSortedUniqueStrings("command ids", declaredCommandIds);
+  if (Array.isArray(contract.commands)) {
+    for (const command of contract.commands) {
+      const label = `command ${command?.id ?? "<unknown>"}`;
+      if (!checkExactKeys(label, command, [
+        "id",
+        "root_agent",
+        "subtask",
+        "workflow",
+      ])) {
+        continue;
+      }
+      if (!/^[a-z][a-z0-9-]*$/.test(command.id)) {
+        fail(`${orchestrationContractRel}: ${label} id must be canonical`);
+        continue;
+      }
+      if (!expectedAgentIds.includes(command.root_agent)) {
+        fail(`${orchestrationContractRel}: ${label} root_agent must reference an agent`);
+      }
+      if (typeof command.subtask !== "boolean") {
+        fail(`${orchestrationContractRel}: ${label} subtask must be boolean`);
+      }
+      if (!/^[a-z][a-z0-9-]*$/.test(command.workflow)) {
+        fail(`${orchestrationContractRel}: ${label} workflow must be canonical`);
+      }
+
+      const rel = `commands/${command.id}.md`;
+      if (!exists(rel)) continue;
+      const frontmatter = parseFrontmatter(rel);
+      const actualSubtask = frontmatter.subtask === "true";
+      if (command.root_agent !== frontmatter.agent) {
+        fail(`${orchestrationContractRel}: ${label} root_agent must match frontmatter`);
+      }
+      if (command.subtask !== actualSubtask) {
+        fail(`${orchestrationContractRel}: ${label} subtask must match frontmatter`);
+      }
+    }
+  }
+
+  const workflowIds = Array.isArray(contract.workflows)
+    ? contract.workflows.map((workflow) => workflow?.id)
+    : [];
+  checkSortedUniqueStrings("workflow ids", workflowIds);
+  const canonicalWorkflowIds = [
+    "design",
+    "direct-development",
+    "direct-research",
+    "direct-review",
+    "direct-spec",
+    "evolve",
+    "feature",
+    "freeform",
+    "init",
+    "loop",
+    "plan",
+    "review-orchestrated",
+    "review-preflight",
+    "scope",
+  ];
+  if (JSON.stringify(workflowIds) !== JSON.stringify(canonicalWorkflowIds)) {
+    fail(`${orchestrationContractRel}: workflow catalog must match the approved catalog`);
+  }
+  const workflowIdSet = new Set(workflowIds);
+  const retryIds = Array.isArray(contract.retry_policies)
+    ? contract.retry_policies.map((policy) => policy?.id)
+    : [];
+  checkSortedUniqueStrings("retry ids", retryIds);
+  const retryIdSet = new Set(retryIds);
+
+  const retryScopes = new Set();
+  if (Array.isArray(contract.retry_policies)) {
+    const approvedRetries = {
+      "developer-default": ["developer", 2, true, "escalate-review"],
+      "loop-iterations": ["loop", 3, true, "ask-user"],
+      "reviewer-default": ["reviewer", 2, true, "block"],
+    };
+    for (const policy of contract.retry_policies) {
+      const label = `retry ${policy?.id ?? "<unknown>"}`;
+      if (!checkExactKeys(label, policy, [
+        "id",
+        "scope",
+        "max_attempts",
+        "requires_new_evidence",
+        "on_exhaustion",
+      ])) {
+        continue;
+      }
+      if (!/^[a-z][a-z0-9-]*$/.test(policy.id)) {
+        fail(`${orchestrationContractRel}: ${label} id must be canonical`);
+      }
+      if (!expectedAgentIds.includes(policy.scope) && !workflowIdSet.has(policy.scope)) {
+        fail(`${orchestrationContractRel}: ${label} scope must reference an agent or workflow`);
+      }
+      if (retryScopes.has(policy.scope)) {
+        fail(`${orchestrationContractRel}: retry scope ${policy.scope} must be unique`);
+      }
+      retryScopes.add(policy.scope);
+      if (!Number.isInteger(policy.max_attempts) || policy.max_attempts < 1 || policy.max_attempts > 3) {
+        fail(`${orchestrationContractRel}: ${label} max_attempts must be between 1 and 3`);
+      }
+      if (typeof policy.requires_new_evidence !== "boolean") {
+        fail(`${orchestrationContractRel}: ${label} requires_new_evidence must be boolean`);
+      }
+      if (!["ask-user", "block", "escalate-review"].includes(policy.on_exhaustion)) {
+        fail(`${orchestrationContractRel}: ${label} on_exhaustion is invalid`);
+      }
+      const observed = [
+        policy.scope,
+        policy.max_attempts,
+        policy.requires_new_evidence,
+        policy.on_exhaustion,
+      ];
+      if (JSON.stringify(observed) !== JSON.stringify(approvedRetries[policy.id])) {
+        fail(`${orchestrationContractRel}: ${label} must match the approved policy`);
+      }
+    }
+  }
+
+  const usedEntrypoints = new Set();
+  const entrypointWorkflows = new Map();
+  const approvedStageSequences = {
+    design: ["designer:required"],
+    "direct-development": ["developer:required"],
+    "direct-research": ["researcher:required"],
+    "direct-review": ["reviewer:required"],
+    "direct-spec": ["specifier:required"],
+    evolve: [
+      "lead:required",
+      "evaluator:required",
+      "debugger:required",
+      "evolver:required",
+      "developer:conditional",
+      "evaluator:required",
+      "debugger:required",
+      "reviewer:required",
+    ],
+    feature: [
+      "lead:required",
+      "designer:conditional",
+      "researcher:conditional",
+      "specifier:required",
+      "developer:required",
+      "reviewer:required",
+    ],
+    freeform: [
+      "lead:required",
+      "designer:conditional",
+      "researcher:conditional",
+      "specifier:conditional",
+      "developer:conditional",
+      "reviewer:conditional",
+    ],
+    init: ["lead:required"],
+    loop: [
+      "lead:required",
+      "developer:required",
+      "reviewer:required",
+      "developer:state-sync",
+    ],
+    plan: [
+      "lead:required",
+      "researcher:required",
+      "specifier:required",
+      "reviewer:required",
+    ],
+    "review-orchestrated": [
+      "review_coordinator:required",
+      "review_api:conditional",
+      "review_quality:conditional",
+      "review_security:conditional",
+      "review_tests:conditional",
+      "review_coordinator:state-sync",
+    ],
+    "review-preflight": ["lead:required"],
+    scope: ["scoper:required", "researcher:required", "specifier:required"],
+  };
+  const approvedCompletionAuthorities = {
+    design: ["agent", "designer"],
+    "direct-development": ["result-contract", null],
+    "direct-research": ["agent", "researcher"],
+    "direct-review": ["agent", "reviewer"],
+    "direct-spec": ["agent", "specifier"],
+    evolve: ["agent", "reviewer"],
+    feature: ["agent", "lead"],
+    freeform: ["agent", "lead"],
+    init: ["agent", "lead"],
+    loop: ["agent", "reviewer"],
+    plan: ["agent", "reviewer"],
+    "review-orchestrated": ["agent", "review_coordinator"],
+    "review-preflight": ["result-contract", null],
+    scope: ["result-contract", null],
+  };
+  const barrierConditions = new Set([
+    "acceptance-criteria-ready",
+    "approval-explicit",
+    "diff-reviewable",
+    "research-ready",
+    "review-approved",
+    "visual-criteria-ready",
+  ]);
+  if (Array.isArray(contract.workflows)) {
+    for (const workflow of contract.workflows) {
+      const label = `workflow ${workflow?.id ?? "<unknown>"}`;
+      if (!checkExactKeys(label, workflow, [
+        "id",
+        "entrypoints",
+        "stages",
+        "barriers",
+        "retry_policy",
+        "completion_authority",
+        "required_evidence",
+        "adaptive",
+      ])) {
+        continue;
+      }
+      checkSortedUniqueStrings(`${label} entrypoints`, workflow.entrypoints, { nonEmpty: true });
+      for (const entrypoint of Array.isArray(workflow.entrypoints) ? workflow.entrypoints : []) {
+        if (entrypoint !== "freeform" && !declaredCommandIds.includes(entrypoint)) {
+          fail(`${orchestrationContractRel}: ${label} entrypoint must reference a command`);
+        }
+        if (usedEntrypoints.has(entrypoint)) {
+          fail(`${orchestrationContractRel}: entrypoint ${entrypoint} must be unique`);
+        }
+        usedEntrypoints.add(entrypoint);
+        entrypointWorkflows.set(entrypoint, workflow.id);
+      }
+      if (!Array.isArray(workflow.stages) || workflow.stages.length === 0) {
+        fail(`${orchestrationContractRel}: ${label} stages must be non-empty`);
+      } else {
+        const seenAgents = new Set();
+        for (const [index, stage] of workflow.stages.entries()) {
+          const stageLabel = `${label} stage ${index}`;
+          if (!checkExactKeys(stageLabel, stage, ["agent", "requirement"])) continue;
+          if (!expectedAgentIds.includes(stage.agent)) {
+            fail(`${orchestrationContractRel}: ${label} stage agent must reference an agent`);
+          }
+          if (!["required", "conditional", "state-sync"].includes(stage.requirement)) {
+            fail(`${orchestrationContractRel}: ${stageLabel} requirement is invalid`);
+          }
+          const evolvePostChange =
+            workflow.id === "evolve"
+            && ["evaluator", "debugger"].includes(stage.agent)
+            && index >= 5;
+          if (seenAgents.has(stage.agent) && stage.requirement !== "state-sync" && !evolvePostChange) {
+            fail(`${orchestrationContractRel}: ${label} repeats ${stage.agent} without a recognized role`);
+          }
+          seenAgents.add(stage.agent);
+        }
+        const observedSequence = workflow.stages.map(
+          (stage) => `${stage.agent}:${stage.requirement}`,
+        );
+        if (JSON.stringify(observedSequence) !== JSON.stringify(approvedStageSequences[workflow.id])) {
+          fail(`${orchestrationContractRel}: ${label} stages must match the approved sequence`);
+        }
+      }
+      if (!Array.isArray(workflow.barriers)) {
+        fail(`${orchestrationContractRel}: ${label} barriers must be an array`);
+      } else {
+        checkSortedUniqueStrings(
+          `${label} barrier ids`,
+          workflow.barriers.map((barrier) => barrier?.id),
+        );
+        for (const barrier of workflow.barriers) {
+          const barrierLabel = `${label} barrier ${barrier?.id ?? "<unknown>"}`;
+          if (!checkExactKeys(barrierLabel, barrier, [
+            "id",
+            "before_stage",
+            "authority",
+            "condition",
+          ])) {
+            continue;
+          }
+          if (!Number.isInteger(barrier.before_stage)
+            || barrier.before_stage < 0
+            || barrier.before_stage >= workflow.stages.length) {
+            fail(`${orchestrationContractRel}: ${barrierLabel} before_stage is invalid`);
+          }
+          if (!["human", "none", ...expectedAgentIds].includes(barrier.authority)) {
+            fail(`${orchestrationContractRel}: ${barrierLabel} authority is invalid`);
+          }
+          if (!barrierConditions.has(barrier.condition)) {
+            fail(`${orchestrationContractRel}: ${barrierLabel} condition is invalid`);
+          }
+          if (barrier.condition === "approval-explicit" && barrier.authority !== "human") {
+            fail(`${orchestrationContractRel}: ${barrierLabel} approval-explicit requires human authority`);
+          }
+        }
+      }
+      if (workflow.retry_policy !== null && !retryIdSet.has(workflow.retry_policy)) {
+        fail(`${orchestrationContractRel}: ${label} retry_policy must reference a retry`);
+      }
+      if (checkExactKeys(`${label} completion_authority`, workflow.completion_authority, [
+        "kind",
+        "agent",
+      ])) {
+        const completion = workflow.completion_authority;
+        if (!["agent", "human", "result-contract"].includes(completion.kind)) {
+          fail(`${orchestrationContractRel}: ${label} completion kind is invalid`);
+        } else if (completion.kind === "agent" && !expectedAgentIds.includes(completion.agent)) {
+          fail(`${orchestrationContractRel}: ${label} completion agent must reference an agent`);
+        } else if (completion.kind !== "agent" && completion.agent !== null) {
+          fail(`${orchestrationContractRel}: ${label} completion agent must be null`);
+        }
+        if (JSON.stringify([completion.kind, completion.agent])
+          !== JSON.stringify(approvedCompletionAuthorities[workflow.id])) {
+          fail(`${orchestrationContractRel}: ${label} completion authority must match the approved authority`);
+        }
+      }
+      if (checkSortedUniqueStrings(
+        `${label} required_evidence`,
+        workflow.required_evidence,
+        { nonEmpty: true },
+      )) {
+        for (const evidence of workflow.required_evidence) {
+          if (!canonicalEvidence.includes(evidence)) {
+            fail(`${orchestrationContractRel}: ${label} required_evidence is invalid`);
+          }
+        }
+      }
+      if (typeof workflow.adaptive !== "boolean") {
+        fail(`${orchestrationContractRel}: ${label} adaptive must be boolean`);
+      } else if (workflow.adaptive !== (workflow.id === "freeform")) {
+        fail(`${orchestrationContractRel}: ${label} adaptive must match the approved policy`);
+      }
+    }
+  }
+  for (const command of Array.isArray(contract.commands) ? contract.commands : []) {
+    if (entrypointWorkflows.get(command.id) !== command.workflow) {
+      fail(`${orchestrationContractRel}: command ${command.id} workflow must match its entrypoint`);
+    }
+  }
+
+  const routingPrecedence = new Set();
+  let hasAskUserFallback = false;
+  if (Array.isArray(contract.routing_rules)) {
+    const approvedRouting = {
+      "technical-uncertainty": ["researcher", 1],
+      "reviewable-change": ["reviewer", 2],
+      "visual-impact": ["designer", 3],
+      "specification-gap": ["specifier", 4],
+      "small-clear-change": ["developer", 5],
+      "routing-ambiguity": ["ask-user", 6],
+    };
+    if (JSON.stringify(contract.routing_rules.map((rule) => rule?.id))
+      !== JSON.stringify(Object.keys(approvedRouting))) {
+      fail(`${orchestrationContractRel}: routing rule catalog must match the approved catalog`);
+    }
+    for (const rule of contract.routing_rules) {
+      const label = `routing rule ${rule?.id ?? "<unknown>"}`;
+      if (!checkExactKeys(label, rule, ["id", "target", "precedence"])) continue;
+      if (!expectedAgentIds.includes(rule.target) && rule.target !== "ask-user") {
+        fail(`${orchestrationContractRel}: ${label} target must reference an agent or ask-user`);
+      }
+      if (!Number.isInteger(rule.precedence) || rule.precedence < 1) {
+        fail(`${orchestrationContractRel}: ${label} precedence must be a positive integer`);
+      }
+      if (routingPrecedence.has(rule.precedence)) {
+        fail(`${orchestrationContractRel}: routing precedence ${rule.precedence} must be unique`);
+      }
+      routingPrecedence.add(rule.precedence);
+      if (rule.target === "ask-user") hasAskUserFallback = true;
+      if (JSON.stringify([rule.target, rule.precedence]) !== JSON.stringify(approvedRouting[rule.id])) {
+        fail(`${orchestrationContractRel}: ${label} must match the approved rule`);
+      }
+    }
+  }
+  if (Array.isArray(contract.routing_rules) && contract.routing_rules.length > 0 && !hasAskUserFallback) {
+    fail(`${orchestrationContractRel}: routing rules must include ask-user fallback`);
+  }
+
+  checkExactKeys("profiles", contract.profiles, ["private", "public"]);
+  const actualCommandIds = listMarkdown("commands")
+    .map(stripMarkdownExtension)
+    .sort();
+  let matchingProfiles = 0;
+  let selectedProfile = null;
+  for (const [profileId, profile] of Object.entries(
+    isPlainObject(contract.profiles) ? contract.profiles : {},
+  )) {
+    const label = `profile ${profileId}`;
+    if (!checkExactKeys(label, profile, [
+      "agent_ids",
+      "command_ids",
+      "delegation_extensions",
+    ])) {
+      continue;
+    }
+    checkSortedUniqueStrings(`${label} agent_ids`, profile.agent_ids);
+    checkSortedUniqueStrings(`${label} command_ids`, profile.command_ids);
+    if (!isPlainObject(profile.delegation_extensions)) {
+      fail(`${orchestrationContractRel}: ${label} delegation_extensions must be an object`);
+    } else {
+      for (const [agentId, delegates] of Object.entries(profile.delegation_extensions)) {
+        if (!expectedAgentIds.includes(agentId)) {
+          fail(`${orchestrationContractRel}: ${label} delegation extension agent is unknown`);
+        }
+        checkSortedUniqueStrings(`${label} ${agentId} delegation_extensions`, delegates, {
+          nonEmpty: true,
+        });
+        for (const delegate of Array.isArray(delegates) ? delegates : []) {
+          if (!expectedAgentIds.includes(delegate)) {
+            fail(`${orchestrationContractRel}: ${label} delegation extension target is unknown`);
+          }
+        }
+      }
+    }
+    if (
+      JSON.stringify(profile.agent_ids) === JSON.stringify(expectedAgentIds)
+      && JSON.stringify(profile.command_ids) === JSON.stringify(actualCommandIds)
+    ) {
+      matchingProfiles += 1;
+      selectedProfile = profile;
+    }
+  }
+  const profiledCommandIds = [
+    ...new Set(
+      Object.values(isPlainObject(contract.profiles) ? contract.profiles : {})
+        .flatMap((profile) => Array.isArray(profile?.command_ids) ? profile.command_ids : []),
+    ),
+  ].sort();
+  if (JSON.stringify(declaredCommandIds) !== JSON.stringify(profiledCommandIds)) {
+    fail(`${orchestrationContractRel}: command catalog must match inventory profiles`);
+  }
+  if (matchingProfiles !== 1) {
+    fail(`${orchestrationContractRel}: must select exactly one inventory profile`);
+  } else {
+    const agentsById = new Map(contract.agents.map((agent) => [agent.id, agent]));
+    for (const agentId of expectedAgentIds) {
+      const base = agentsById.get(agentId)?.delegates_to ?? [];
+      const extension = selectedProfile.delegation_extensions[agentId] ?? [];
+      const effective = [...new Set([...base, ...extension])].sort();
+      if (JSON.stringify(effective) !== JSON.stringify(actualAgentDelegations.get(agentId))) {
+        fail(`${orchestrationContractRel}: agent ${agentId} delegates_to must match selected profile`);
+      }
+    }
+    orchestrationCatalog = {
+      agentIds: new Set(expectedAgentIds),
+      commandIds: new Set(selectedProfile.command_ids),
+      evidenceTypes: new Set(canonicalEvidence),
+      routingTargets: contract.routing_rules.map((rule) => rule.target),
+    };
+  }
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function checkExactKeys(label, value, expected) {
+  if (!isPlainObject(value)) {
+    fail(`${orchestrationContractRel}: ${label} must be an object`);
+    return false;
+  }
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  if (JSON.stringify(actual) !== JSON.stringify(wanted)) {
+    fail(
+      `${orchestrationContractRel}: ${label} must contain exactly ${wanted.join(", ")}`,
+    );
+    return false;
+  }
+  return true;
+}
+
+function checkSortedUniqueStrings(label, value, { nonEmpty = false } = {}) {
+  if (
+    !Array.isArray(value)
+    || (nonEmpty && value.length === 0)
+    || value.some((item) => typeof item !== "string" || item.trim() !== item)
+    || new Set(value).size !== value.length
+    || JSON.stringify(value) !== JSON.stringify([...value].sort())
+  ) {
+    fail(`${orchestrationContractRel}: ${label} must be a sorted unique string array`);
+    return false;
+  }
+  return true;
+}
+
+function parsePortableAgentPermissions(rel) {
+  let repositoryWrite = "unspecified";
+  let taskDefault = "unspecified";
+  const taskAllows = [];
+  let section = "";
+
+  for (const line of frontmatterBlock(rel).split("\n")) {
+    const sectionMatch = line.match(/^  ([A-Za-z_][A-Za-z0-9_-]*):(?:\s*(\S+))?$/);
+    if (sectionMatch) {
+      section = sectionMatch[1];
+      if (section === "edit" && sectionMatch[2]) {
+        repositoryWrite = sectionMatch[2];
+      }
+      continue;
+    }
+    if (section !== "task") continue;
+    const taskMatch = line.match(/^    "?([A-Za-z_*][A-Za-z0-9_*-]*)"?:\s*(allow|ask|deny)$/);
+    if (!taskMatch) continue;
+    if (taskMatch[1] === "*") taskDefault = taskMatch[2];
+    else if (taskMatch[2] === "allow") taskAllows.push(taskMatch[1]);
+  }
+
+  return {
+    repositoryWrite,
+    taskDefault,
+    taskAllows: taskAllows.sort(),
+  };
 }
 
 function parseFrontmatter(rel) {
@@ -1011,11 +1627,14 @@ function checkRouterScenarios() {
     "resume-checkpoint",
     "integration-unavailable",
   ]);
-  const allowedEvidence = new Set(["static_contract", "transcript_replay", "live_smoke", "manual_oracle"]);
+  const allowedEvidence = orchestrationCatalog?.evidenceTypes
+    ?? new Set(["static_contract", "transcript_replay", "live_smoke", "manual_oracle"]);
   const agentIdPattern = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
   const skillIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   const slashCommandPattern = /^\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
-  const validAgents = new Set();
+  const validAgents = orchestrationCatalog?.agentIds
+    ? new Set(orchestrationCatalog.agentIds)
+    : new Set();
   const seenIds = new Set();
   const seenCategories = new Set();
 
@@ -1126,6 +1745,9 @@ function checkRouterScenarios() {
       fail(`${rel}: line ${line} invalid command_path ${value.command_path}`);
     } else {
       const commandName = value.command_path.slice(1);
+      if (orchestrationCatalog && !orchestrationCatalog.commandIds.has(commandName)) {
+        fail(`${rel}: line ${line} command_path ${value.command_path} outside selected orchestration profile`);
+      }
       const commandRel = `commands/${commandName}.md`;
       const commandPath = path.join(root, commandRel);
       if (!exists(commandRel) || !fs.lstatSync(commandPath).isFile()) {
@@ -2007,14 +2629,15 @@ function checkRoutingDeclarativoContract() {
     fail("docs/ai/harness/commands.md: missing declarative routing token Declarative routing");
   }
 
-  for (const token of [
-    "`researcher`",
-    "`reviewer`",
-    "`designer`",
-    "`specifier`",
-    "`developer`",
-    "ask the user",
-  ]) {
+  const routingTokens = (orchestrationCatalog?.routingTargets ?? [
+    "researcher",
+    "reviewer",
+    "designer",
+    "specifier",
+    "developer",
+    "ask-user",
+  ]).map((target) => target === "ask-user" ? "ask the user" : `\`${target}\``);
+  for (const token of routingTokens) {
     if (!freeSection.includes(token)) {
       fail(`docs/ai/harness/commands.md: missing declarative routing token ${token}`);
     }
@@ -2065,6 +2688,7 @@ function checkRetryPoliciesContract() {
 checkConfig();
 checkAgentsIndex();
 checkFrontmatter();
+checkOrchestrationContracts();
 checkAgentDocsCoverage();
 checkCommandDocsCoverage();
 checkLoopContract();

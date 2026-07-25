@@ -1,0 +1,891 @@
+{
+  "schema_version": 1,
+  "contract_id": "oak-orchestration",
+  "evidence_types": [
+    "live_smoke",
+    "manual_oracle",
+    "static_contract",
+    "transcript_replay"
+  ],
+  "agents": [
+    {
+      "id": "debugger",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "unspecified",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "designer",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "ask",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "developer",
+      "mode": "all",
+      "permission_invariants": {
+        "repository_write": "allow",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "evaluator",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "unspecified",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "evolver",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "unspecified",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "lead",
+      "mode": "primary",
+      "permission_invariants": {
+        "repository_write": "deny",
+        "task_default": "deny"
+      },
+      "delegates_to": [
+        "debugger",
+        "designer",
+        "developer",
+        "evaluator",
+        "evolver",
+        "researcher",
+        "reviewer",
+        "specifier"
+      ]
+    },
+    {
+      "id": "researcher",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "ask",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "review_api",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "deny",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "review_coordinator",
+      "mode": "primary",
+      "permission_invariants": {
+        "repository_write": "deny",
+        "task_default": "deny"
+      },
+      "delegates_to": [
+        "review_api",
+        "review_quality",
+        "review_security",
+        "review_tests"
+      ]
+    },
+    {
+      "id": "review_quality",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "deny",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "review_security",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "deny",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "review_tests",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "deny",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "reviewer",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "deny",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    },
+    {
+      "id": "scoper",
+      "mode": "primary",
+      "permission_invariants": {
+        "repository_write": "unspecified",
+        "task_default": "deny"
+      },
+      "delegates_to": [
+        "researcher",
+        "specifier"
+      ]
+    },
+    {
+      "id": "specifier",
+      "mode": "subagent",
+      "permission_invariants": {
+        "repository_write": "ask",
+        "task_default": "unspecified"
+      },
+      "delegates_to": []
+    }
+  ],
+  "commands": [
+    {
+      "id": "code-simplify",
+      "root_agent": "developer",
+      "subtask": false,
+      "workflow": "direct-development"
+    },
+    {
+      "id": "design",
+      "root_agent": "designer",
+      "subtask": true,
+      "workflow": "design"
+    },
+    {
+      "id": "evolve",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "evolve"
+    },
+    {
+      "id": "feature",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "feature"
+    },
+    {
+      "id": "implement",
+      "root_agent": "developer",
+      "subtask": false,
+      "workflow": "direct-development"
+    },
+    {
+      "id": "init",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "init"
+    },
+    {
+      "id": "loop",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "loop"
+    },
+    {
+      "id": "mvp-spec",
+      "root_agent": "scoper",
+      "subtask": false,
+      "workflow": "scope"
+    },
+    {
+      "id": "plan",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "plan"
+    },
+    {
+      "id": "research",
+      "root_agent": "researcher",
+      "subtask": true,
+      "workflow": "direct-research"
+    },
+    {
+      "id": "review",
+      "root_agent": "reviewer",
+      "subtask": true,
+      "workflow": "direct-review"
+    },
+    {
+      "id": "review-orchestrated",
+      "root_agent": "review_coordinator",
+      "subtask": false,
+      "workflow": "review-orchestrated"
+    },
+    {
+      "id": "review-preflight",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "review-preflight"
+    },
+    {
+      "id": "scope",
+      "root_agent": "scoper",
+      "subtask": false,
+      "workflow": "scope"
+    },
+    {
+      "id": "spec",
+      "root_agent": "specifier",
+      "subtask": true,
+      "workflow": "direct-spec"
+    },
+    {
+      "id": "test",
+      "root_agent": "developer",
+      "subtask": false,
+      "workflow": "direct-development"
+    }
+  ],
+  "routing_rules": [
+    {
+      "id": "technical-uncertainty",
+      "target": "researcher",
+      "precedence": 1
+    },
+    {
+      "id": "reviewable-change",
+      "target": "reviewer",
+      "precedence": 2
+    },
+    {
+      "id": "visual-impact",
+      "target": "designer",
+      "precedence": 3
+    },
+    {
+      "id": "specification-gap",
+      "target": "specifier",
+      "precedence": 4
+    },
+    {
+      "id": "small-clear-change",
+      "target": "developer",
+      "precedence": 5
+    },
+    {
+      "id": "routing-ambiguity",
+      "target": "ask-user",
+      "precedence": 6
+    }
+  ],
+  "retry_policies": [
+    {
+      "id": "developer-default",
+      "scope": "developer",
+      "max_attempts": 2,
+      "requires_new_evidence": true,
+      "on_exhaustion": "escalate-review"
+    },
+    {
+      "id": "loop-iterations",
+      "scope": "loop",
+      "max_attempts": 3,
+      "requires_new_evidence": true,
+      "on_exhaustion": "ask-user"
+    },
+    {
+      "id": "reviewer-default",
+      "scope": "reviewer",
+      "max_attempts": 2,
+      "requires_new_evidence": true,
+      "on_exhaustion": "block"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "design",
+      "entrypoints": [
+        "design"
+      ],
+      "stages": [
+        {
+          "agent": "designer",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "designer"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "direct-development",
+      "entrypoints": [
+        "code-simplify",
+        "implement",
+        "test"
+      ],
+      "stages": [
+        {
+          "agent": "developer",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": "developer-default",
+      "completion_authority": {
+        "kind": "result-contract",
+        "agent": null
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "direct-research",
+      "entrypoints": [
+        "research"
+      ],
+      "stages": [
+        {
+          "agent": "researcher",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "researcher"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "direct-review",
+      "entrypoints": [
+        "review"
+      ],
+      "stages": [
+        {
+          "agent": "reviewer",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": "reviewer-default",
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "reviewer"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "direct-spec",
+      "entrypoints": [
+        "spec"
+      ],
+      "stages": [
+        {
+          "agent": "specifier",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "specifier"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "evolve",
+      "entrypoints": [
+        "evolve"
+      ],
+      "stages": [
+        {
+          "agent": "lead",
+          "requirement": "required"
+        },
+        {
+          "agent": "evaluator",
+          "requirement": "required"
+        },
+        {
+          "agent": "debugger",
+          "requirement": "required"
+        },
+        {
+          "agent": "evolver",
+          "requirement": "required"
+        },
+        {
+          "agent": "developer",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "evaluator",
+          "requirement": "required"
+        },
+        {
+          "agent": "debugger",
+          "requirement": "required"
+        },
+        {
+          "agent": "reviewer",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "reviewer"
+      },
+      "required_evidence": [
+        "static_contract",
+        "transcript_replay"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "feature",
+      "entrypoints": [
+        "feature"
+      ],
+      "stages": [
+        {
+          "agent": "lead",
+          "requirement": "required"
+        },
+        {
+          "agent": "designer",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "researcher",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "specifier",
+          "requirement": "required"
+        },
+        {
+          "agent": "developer",
+          "requirement": "required"
+        },
+        {
+          "agent": "reviewer",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [
+        {
+          "id": "acceptance-before-development",
+          "before_stage": 4,
+          "authority": "specifier",
+          "condition": "acceptance-criteria-ready"
+        },
+        {
+          "id": "diff-before-review",
+          "before_stage": 5,
+          "authority": "developer",
+          "condition": "diff-reviewable"
+        },
+        {
+          "id": "research-before-spec",
+          "before_stage": 3,
+          "authority": "researcher",
+          "condition": "research-ready"
+        },
+        {
+          "id": "visual-before-spec",
+          "before_stage": 3,
+          "authority": "designer",
+          "condition": "visual-criteria-ready"
+        }
+      ],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "lead"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "freeform",
+      "entrypoints": [
+        "freeform"
+      ],
+      "stages": [
+        {
+          "agent": "lead",
+          "requirement": "required"
+        },
+        {
+          "agent": "designer",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "researcher",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "specifier",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "developer",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "reviewer",
+          "requirement": "conditional"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "lead"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": true
+    },
+    {
+      "id": "init",
+      "entrypoints": [
+        "init"
+      ],
+      "stages": [
+        {
+          "agent": "lead",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "lead"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "loop",
+      "entrypoints": [
+        "loop"
+      ],
+      "stages": [
+        {
+          "agent": "lead",
+          "requirement": "required"
+        },
+        {
+          "agent": "developer",
+          "requirement": "required"
+        },
+        {
+          "agent": "reviewer",
+          "requirement": "required"
+        },
+        {
+          "agent": "developer",
+          "requirement": "state-sync"
+        }
+      ],
+      "barriers": [
+        {
+          "id": "approval-before-write",
+          "before_stage": 1,
+          "authority": "human",
+          "condition": "approval-explicit"
+        },
+        {
+          "id": "review-before-state-sync",
+          "before_stage": 3,
+          "authority": "reviewer",
+          "condition": "review-approved"
+        }
+      ],
+      "retry_policy": "loop-iterations",
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "reviewer"
+      },
+      "required_evidence": [
+        "manual_oracle",
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "plan",
+      "entrypoints": [
+        "plan"
+      ],
+      "stages": [
+        {
+          "agent": "lead",
+          "requirement": "required"
+        },
+        {
+          "agent": "researcher",
+          "requirement": "required"
+        },
+        {
+          "agent": "specifier",
+          "requirement": "required"
+        },
+        {
+          "agent": "reviewer",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [
+        {
+          "id": "research-before-spec",
+          "before_stage": 2,
+          "authority": "researcher",
+          "condition": "research-ready"
+        },
+        {
+          "id": "spec-before-review",
+          "before_stage": 3,
+          "authority": "specifier",
+          "condition": "acceptance-criteria-ready"
+        }
+      ],
+      "retry_policy": "reviewer-default",
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "reviewer"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "review-orchestrated",
+      "entrypoints": [
+        "review-orchestrated"
+      ],
+      "stages": [
+        {
+          "agent": "review_coordinator",
+          "requirement": "required"
+        },
+        {
+          "agent": "review_api",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "review_quality",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "review_security",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "review_tests",
+          "requirement": "conditional"
+        },
+        {
+          "agent": "review_coordinator",
+          "requirement": "state-sync"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "agent",
+        "agent": "review_coordinator"
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "review-preflight",
+      "entrypoints": [
+        "review-preflight"
+      ],
+      "stages": [
+        {
+          "agent": "lead",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "result-contract",
+        "agent": null
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    },
+    {
+      "id": "scope",
+      "entrypoints": [
+        "mvp-spec",
+        "scope"
+      ],
+      "stages": [
+        {
+          "agent": "scoper",
+          "requirement": "required"
+        },
+        {
+          "agent": "researcher",
+          "requirement": "required"
+        },
+        {
+          "agent": "specifier",
+          "requirement": "required"
+        }
+      ],
+      "barriers": [
+        {
+          "id": "research-before-spec",
+          "before_stage": 2,
+          "authority": "researcher",
+          "condition": "research-ready"
+        }
+      ],
+      "retry_policy": null,
+      "completion_authority": {
+        "kind": "result-contract",
+        "agent": null
+      },
+      "required_evidence": [
+        "static_contract"
+      ],
+      "adaptive": false
+    }
+  ],
+  "profiles": {
+    "private": {
+      "agent_ids": [
+        "debugger",
+        "designer",
+        "developer",
+        "evaluator",
+        "evolver",
+        "lead",
+        "researcher",
+        "review_api",
+        "review_coordinator",
+        "review_quality",
+        "review_security",
+        "review_tests",
+        "reviewer",
+        "scoper",
+        "specifier"
+      ],
+      "command_ids": [
+        "code-simplify",
+        "design",
+        "evolve",
+        "feature",
+        "implement",
+        "init",
+        "loop",
+        "plan",
+        "research",
+        "review",
+        "review-orchestrated",
+        "review-preflight",
+        "scope",
+        "spec",
+        "test"
+      ],
+      "delegation_extensions": {
+        "scoper": [
+          "debugger"
+        ]
+      }
+    },
+    "public": {
+      "agent_ids": [
+        "debugger",
+        "designer",
+        "developer",
+        "evaluator",
+        "evolver",
+        "lead",
+        "researcher",
+        "review_api",
+        "review_coordinator",
+        "review_quality",
+        "review_security",
+        "review_tests",
+        "reviewer",
+        "scoper",
+        "specifier"
+      ],
+      "command_ids": [
+        "code-simplify",
+        "design",
+        "evolve",
+        "feature",
+        "implement",
+        "init",
+        "loop",
+        "mvp-spec",
+        "plan",
+        "research",
+        "review",
+        "review-orchestrated",
+        "review-preflight",
+        "scope",
+        "spec",
+        "test"
+      ],
+      "delegation_extensions": {}
+    }
+  }
+}

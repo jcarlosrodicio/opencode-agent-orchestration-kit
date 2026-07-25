@@ -18,6 +18,15 @@ For all bundled script tests from this public repository, run:
 npm run unit-and-script-tests
 ```
 
+Slice 3.3 adds `docs/ai/harness/orchestration-contracts.json` as the portable
+authority for mechanical relationships between agents, commands, workflows,
+barriers, retries, and evidence. The checker selects exactly one inventory
+profile (`private` or `public`), then cross-checks the contract with
+frontmatter, the routing corpus, and narrative documentation. Frontmatter
+remains the effective OpenCode configuration, while Markdown retains rules
+that do not belong in the schema. Version 1 validates only; it does not
+generate or rewrite agents, commands, or docs.
+
 The normal local check combines both paths:
 
 ```bash

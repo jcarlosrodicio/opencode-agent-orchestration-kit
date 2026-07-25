@@ -64,6 +64,386 @@ function writeRouterScenarios(cwd, scenarios) {
   );
 }
 
+const orchestrationContractRel =
+  "docs/ai/harness/orchestration-contracts.json";
+
+function readOrchestrationContract(cwd) {
+  return JSON.parse(
+    fs.readFileSync(path.join(cwd, orchestrationContractRel), "utf8"),
+  );
+}
+
+function writeOrchestrationContract(cwd, contract) {
+  write(
+    orchestrationContractRel,
+    `${JSON.stringify(contract, null, 2)}\n`,
+    cwd,
+  );
+}
+
+test("orchestration contract file is required", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, orchestrationContractRel), { force: true });
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing orchestration contract");
+    assert.match(result.stderr, /missing orchestration contract/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration contract file must be regular and non-symlink", () => {
+  const cwd = makeFixture();
+  const external = path.join(cwd, "external-contract.json");
+  try {
+    fs.writeFileSync(external, "{}\n");
+    fs.rmSync(path.join(cwd, orchestrationContractRel));
+    fs.symlinkSync(external, path.join(cwd, orchestrationContractRel));
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker followed a symlinked orchestration contract");
+    assert.match(result.stderr, /regular non-symlink/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration contract rejects an unknown top-level key", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    writeOrchestrationContract(cwd, { ...contract, scheduler: {} });
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an unknown orchestration key");
+    assert.match(result.stderr, /must contain exactly/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration contract header is closed", async (t) => {
+  for (const [label, mutate, pattern] of [
+    [
+      "schema version",
+      (contract) => ({ ...contract, schema_version: 2 }),
+      /schema_version must be 1/,
+    ],
+    [
+      "contract identity",
+      (contract) => ({ ...contract, contract_id: "other-contract" }),
+      /contract_id must be oak-orchestration/,
+    ],
+  ]) {
+    await t.test(label, () => {
+      const cwd = makeFixture();
+      try {
+        writeOrchestrationContract(cwd, mutate(readOrchestrationContract(cwd)));
+        const result = runHarness(cwd);
+        assert.notEqual(result.status, 0, `checker accepted invalid ${label}`);
+        assert.match(result.stderr, pattern);
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("orchestration contract requires the canonical evidence catalog", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    writeOrchestrationContract(cwd, {
+      ...contract,
+      evidence_types: ["static_contract"],
+    });
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an incomplete evidence catalog");
+    assert.match(result.stderr, /evidence_types must match the canonical catalog/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration contract requires every harness agent", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    writeOrchestrationContract(cwd, { ...contract, agents: [] });
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an empty agent catalog");
+    assert.match(result.stderr, /agent catalog must match harness agents/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration agent contracts match frontmatter authority", async (t) => {
+  for (const [label, mutate, pattern] of [
+    [
+      "mode",
+      (agent) => ({ ...agent, mode: "subagent" }),
+      /agent lead mode must match frontmatter/,
+    ],
+    [
+      "write permission",
+      (agent) => ({
+        ...agent,
+        permission_invariants: {
+          ...agent.permission_invariants,
+          repository_write: "allow",
+        },
+      }),
+      /agent lead repository_write must match frontmatter/,
+    ],
+    [
+      "delegation allowlist",
+      (agent) => ({
+        ...agent,
+        delegates_to: agent.delegates_to.filter((id) => id !== "developer"),
+      }),
+      /agent lead delegates_to must match selected profile/,
+    ],
+    [
+      "closed shape",
+      (agent) => ({ ...agent, prompt: "forbidden" }),
+      /agent lead must contain exactly/,
+    ],
+  ]) {
+    await t.test(label, () => {
+      const cwd = makeFixture();
+      try {
+        const contract = readOrchestrationContract(cwd);
+        contract.agents = contract.agents.map((agent) =>
+          agent.id === "lead" ? mutate(agent) : agent
+        );
+        writeOrchestrationContract(cwd, contract);
+
+        const result = runHarness(cwd);
+        assert.notEqual(result.status, 0, `checker accepted invalid agent ${label}`);
+        assert.match(result.stderr, pattern);
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("orchestration contract requires one exact inventory profile", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    writeOrchestrationContract(cwd, { ...contract, profiles: {} });
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted no inventory profile");
+    assert.match(result.stderr, /must select exactly one inventory profile/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration profile preserves surface-specific delegations", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    contract.profiles.public.delegation_extensions = {
+      scoper: ["debugger"],
+    };
+    writeOrchestrationContract(cwd, contract);
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a foreign delegation extension");
+    assert.match(result.stderr, /agent scoper delegates_to must match selected profile/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration command contracts match command frontmatter", async (t) => {
+  for (const [label, mutate, pattern] of [
+    [
+      "root agent",
+      (command) => ({ ...command, root_agent: "developer" }),
+      /command feature root_agent must match frontmatter/,
+    ],
+    [
+      "subtask",
+      (command) => ({ ...command, subtask: true }),
+      /command feature subtask must match frontmatter/,
+    ],
+    [
+      "closed shape",
+      (command) => ({ ...command, prompt: "forbidden" }),
+      /command feature must contain exactly/,
+    ],
+  ]) {
+    await t.test(label, () => {
+      const cwd = makeFixture();
+      try {
+        const contract = readOrchestrationContract(cwd);
+        contract.commands = contract.commands.map((command) =>
+          command.id === "feature" ? mutate(command) : command
+        );
+        writeOrchestrationContract(cwd, contract);
+
+        const result = runHarness(cwd);
+        assert.notEqual(result.status, 0, `checker accepted invalid command ${label}`);
+        assert.match(result.stderr, pattern);
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("orchestration workflow references declared agents", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    contract.workflows = [{
+      id: "invalid-flow",
+      entrypoints: ["freeform"],
+      stages: [{ agent: "ghost", requirement: "required" }],
+      barriers: [],
+      retry_policy: null,
+      completion_authority: { kind: "result-contract", agent: null },
+      required_evidence: ["static_contract"],
+      adaptive: true,
+    }];
+    writeOrchestrationContract(cwd, contract);
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an unknown stage agent");
+    assert.match(result.stderr, /workflow invalid-flow stage agent must reference an agent/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration retry limits are bounded", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    contract.retry_policies = [{
+      id: "developer-default",
+      scope: "developer",
+      max_attempts: 4,
+      requires_new_evidence: true,
+      on_exhaustion: "escalate-review",
+    }];
+    writeOrchestrationContract(cwd, contract);
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an unbounded retry policy");
+    assert.match(result.stderr, /retry developer-default max_attempts must be between 1 and 3/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration routing requires known targets", () => {
+  const cwd = makeFixture();
+  try {
+    const contract = readOrchestrationContract(cwd);
+    contract.routing_rules = [{
+      id: "invalid-route",
+      target: "ghost",
+      precedence: 1,
+    }];
+    writeOrchestrationContract(cwd, contract);
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an unknown routing target");
+    assert.match(result.stderr, /routing rule invalid-route target must reference an agent or ask-user/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("orchestration catalog preserves approved behavior", async (t) => {
+  for (const [label, mutate, pattern] of [
+    [
+      "command workflow",
+      (contract) => ({
+        ...contract,
+        commands: contract.commands.map((command) =>
+          command.id === "feature" ? { ...command, workflow: "plan" } : command
+        ),
+      }),
+      /command feature workflow must match its entrypoint/,
+    ],
+    [
+      "required workflow stage",
+      (contract) => ({
+        ...contract,
+        workflows: contract.workflows.map((workflow) =>
+          workflow.id === "plan"
+            ? { ...workflow, stages: workflow.stages.filter((stage) => stage.agent !== "specifier") }
+            : workflow
+        ),
+      }),
+      /workflow plan stages must match the approved sequence/,
+    ],
+    [
+      "retry invariant",
+      (contract) => ({
+        ...contract,
+        retry_policies: contract.retry_policies.map((policy) =>
+          policy.id === "developer-default" ? { ...policy, max_attempts: 3 } : policy
+        ),
+      }),
+      /retry developer-default must match the approved policy/,
+    ],
+    [
+      "routing invariant",
+      (contract) => ({
+        ...contract,
+        routing_rules: contract.routing_rules.map((rule) =>
+          rule.id === "reviewable-change" ? { ...rule, target: "developer" } : rule
+        ),
+      }),
+      /routing rule reviewable-change must match the approved rule/,
+    ],
+    [
+      "routing catalog",
+      (contract) => ({
+        ...contract,
+        routing_rules: contract.routing_rules.filter((rule) => rule.id !== "visual-impact"),
+      }),
+      /routing rule catalog must match the approved catalog/,
+    ],
+    [
+      "completion authority",
+      (contract) => ({
+        ...contract,
+        workflows: contract.workflows.map((workflow) =>
+          workflow.id === "loop"
+            ? { ...workflow, completion_authority: { kind: "agent", agent: "lead" } }
+            : workflow
+        ),
+      }),
+      /workflow loop completion authority must match the approved authority/,
+    ],
+  ]) {
+    await t.test(label, () => {
+      const cwd = makeFixture();
+      try {
+        writeOrchestrationContract(cwd, mutate(readOrchestrationContract(cwd)));
+        const result = runHarness(cwd);
+        assert.notEqual(result.status, 0, `checker accepted changed ${label}`);
+        assert.match(result.stderr, pattern);
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
 const validLoopCommand = `---
 description: Run a bounded and verifiable engineering loop.
 agent: lead

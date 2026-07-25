@@ -1,5 +1,13 @@
 # Command Contracts
 
+The mechanical relationships described here are also declared in
+`docs/ai/harness/orchestration-contracts.json`: root agent, workflow entrypoint,
+stage order, barriers, retries, completion authority, and minimum evidence.
+The checker selects the exact private or public inventory profile and compares
+the JSON with frontmatter, the routing corpus, and these narrative anchors. The
+JSON neither executes workflows nor generates Markdown; frontmatter remains
+the effective configuration and this page retains operational nuance.
+
 ## Free-form Message
 
 Contract: `lead` router -> appropriate agent.

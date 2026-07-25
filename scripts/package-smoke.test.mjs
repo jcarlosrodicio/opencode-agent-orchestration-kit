@@ -30,6 +30,7 @@ const REQUIRED = [
   "package/opencode/package.json",
   "package/opencode/package-lock.json",
   "package/opencode/agents/lead.md",
+  "package/opencode/docs/ai/harness/orchestration-contracts.json",
   "package/docs/installation.md",
   "package/LICENSE",
   "package/NOTICE.md",
@@ -108,6 +109,17 @@ test("validatePackedFileSet requires the oak entrypoint", () => {
   assert.throws(
     () => validatePackedFileSet(REQUIRED.filter((name) => name !== "package/scripts/oak.mjs")),
     /scripts\/oak\.mjs/,
+  );
+});
+
+test("validatePackedFileSet requires the orchestration contract", () => {
+  assert.throws(
+    () => validatePackedFileSet(
+      REQUIRED.filter(
+        (name) => name !== "package/opencode/docs/ai/harness/orchestration-contracts.json",
+      ),
+    ),
+    /orchestration-contracts\.json/,
   );
 });
 
