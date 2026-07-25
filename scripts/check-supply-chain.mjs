@@ -24,7 +24,7 @@ const EXACT_KEYS = {
   commit: ["commit"],
   image: ["tag", "digest"],
   version: ["version"],
-  overrides: ["@babel/core", "uuid"],
+  overrides: ["@babel/core", "brace-expansion", "uuid"],
 };
 
 const COMMIT = /^[0-9a-f]{40}$/;
@@ -115,6 +115,10 @@ export function validateSupplyChainData(data) {
   assertStableVersion(data.external_refs.pnpm.version, "external_refs.pnpm.version");
   assertStableVersion(data.external_refs.opencode_ai.version, "external_refs.opencode_ai.version");
   assertStableVersion(data.npm_overrides["@babel/core"], "npm_overrides.@babel/core");
+  assertStableVersion(
+    data.npm_overrides["brace-expansion"],
+    "npm_overrides.brace-expansion",
+  );
   assertStableVersion(data.npm_overrides.uuid, "npm_overrides.uuid");
   return data;
 }
@@ -511,6 +515,7 @@ function canonicalDocumentationPinBlock(data) {
 | pnpm | ${data.external_refs.pnpm.version} | exact version |
 | opencode-ai | ${data.external_refs.opencode_ai.version} | exact version |
 | @babel/core override | ${data.npm_overrides["@babel/core"]} | exact version |
+| brace-expansion override | ${data.npm_overrides["brace-expansion"]} | exact version |
 | uuid override | ${data.npm_overrides.uuid} | exact version |
 <!-- supply-chain-pins:end -->`;
 }
@@ -538,6 +543,7 @@ function validateDocumentation(root, data, fsOps) {
       "| pnpm |",
       "| opencode-ai |",
       "| @babel/core override |",
+      "| brace-expansion override |",
       "| uuid override |",
     ].map((row) => actualBlock.indexOf(row));
     const rowsAreOrdered = rowPositions.every(

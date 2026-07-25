@@ -215,6 +215,9 @@ if (opencodePackage.dependencies?.['@opentui/solid'] !== '0.2.5') {
 if (opencodePackage.dependencies?.['solid-js'] !== '1.9.12') {
   throw new Error('opencode/package.json must pin solid-js to 1.9.12')
 }
+if (opencodePackage.overrides?.['brace-expansion'] !== '5.0.8') {
+  throw new Error('opencode/package.json must override brace-expansion to 5.0.8')
+}
 NODE
 
 grep -q 'Lead' opencode/plugins/token-tree-usage.tsx

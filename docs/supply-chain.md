@@ -16,6 +16,7 @@ the immutable identifier consumed by the repository.
 | pnpm | 10.33.2 | exact version |
 | opencode-ai | 1.14.31 | exact version |
 | @babel/core override | 7.29.7 | exact version |
+| brace-expansion override | 5.0.8 | exact version |
 | uuid override | 14.0.0 | exact version |
 <!-- supply-chain-pins:end -->
 
@@ -29,11 +30,12 @@ script exception requires a named dependency, a documented reason, and a
 focused test. There is currently no exception.
 
 The exact overrides exist for reviewable reasons: `@babel/core` 7.29.7 removes
-the audited low-severity findings without an incompatible downgrade, and
-`uuid` 14.0.0 preserves the already tested lockfile resolution. Change an
-override and regenerate the lockfile in the same reviewed diff. Review every
-changed version, `resolved` URL, integrity value, lifecycle script, and Git or
-non-registry dependency.
+the audited low-severity findings without an incompatible downgrade,
+`brace-expansion` 5.0.8 fixes GHSA-mh99-v99m-4gvg in the transitive
+OpenTUI/Babel resolution, and `uuid` 14.0.0 preserves the already tested
+lockfile resolution. Change an override and regenerate the lockfile in the same
+reviewed diff. Review every changed version, `resolved` URL, integrity value,
+lifecycle script, and Git or non-registry dependency.
 
 If installation preserves a target's differing `package.json` or
 `package-lock.json`, the kit lockfile does not control that target. Review and
@@ -79,6 +81,8 @@ For each surface, also record:
   build/load smoke.
 - `@babel/core` override: advisory rationale, manifest/lockfile diff, low audit,
   signature audit, import, and typecheck evidence.
+- `brace-expansion` override: advisory rationale, manifest/lockfile diff, low
+  audit, signature audit, import, and full package smoke evidence.
 - `uuid` override: compatibility rationale, manifest/lockfile diff, signature
   audit, import, and typecheck evidence.
 
