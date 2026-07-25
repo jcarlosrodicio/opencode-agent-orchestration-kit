@@ -823,6 +823,7 @@ Detailed guides are available in [`docs/`](docs/):
 - [Superpowers](docs/superpowers.md)
 - [Impeccable](docs/impeccable.md)
 - [Security](docs/security.md)
+- [Threat model](docs/threat-model.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Synology notes](docs/synology.md)
 

@@ -11,6 +11,8 @@ here.
 - `evidence.md`: evidence types and required threshold by change type.
 - `checks.md`: local validation and lightweight doc gardening.
 - `skill_registry.md`: generated skill index for selective `lead` handoffs.
+- [Kit-wide threat model](../../../../docs/threat-model.md): assets, trust
+  boundaries, abuse cases, controls, evidence, and residual risks.
 - `docs/ai/evolution/`: AHE history, benchmarks, manifests, and attribution.
 
 ## Principles

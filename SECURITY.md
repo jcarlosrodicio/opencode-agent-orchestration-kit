@@ -8,6 +8,13 @@ This kit configures coding agents and an optional Open Design workbench. Treat b
 - Do not expose Open Design directly to the public Internet without authentication and network controls.
 - Keep OpenCode auth files, provider credentials, sessions, logs, and `.env` files out of git.
 
+## Threat model
+
+The canonical [threat model](docs/threat-model.md) inventories protected
+assets, trust boundaries, agent capabilities, abuse cases, controls, evidence,
+and residual risks. OpenCode permissions are policy controls, not an
+operating-system sandbox.
+
 ## Report a vulnerability
 
 Open an issue with a minimal reproduction and no secrets. If the report contains sensitive information, contact the maintainer privately before publishing details.

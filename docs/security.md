@@ -1,5 +1,9 @@
 # Security
 
+The canonical [threat model](threat-model.md) documents the system boundaries,
+abuse cases, control evidence, and residual risks. This page keeps the concise
+operational guidance.
+
 - Do not expose Open Design directly to the Internet without protection.
 - Do not commit auth files, sessions, `.env`, logs, or provider credentials.
 - Do not commit private product/design docs unless intended.

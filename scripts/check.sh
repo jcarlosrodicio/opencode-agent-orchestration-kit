@@ -27,6 +27,8 @@ scripts/check-compatibility.mjs
 scripts/check-compatibility.test.mjs
 scripts/check-supply-chain.mjs
 scripts/check-supply-chain.test.mjs
+scripts/check-threat-model.mjs
+scripts/check-threat-model.test.mjs
 scripts/package-smoke.sh
 scripts/package-smoke.mjs
 scripts/package-smoke.test.mjs
@@ -66,6 +68,7 @@ docker/open-design/docker-compose.yml
 docker/open-design/.env.example
 docker/open-design/opencode-od/opencode.json
 docs/supply-chain.md
+docs/threat-model.md
 docs/cli.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
@@ -90,6 +93,7 @@ done
 node scripts/version.mjs --check
 node scripts/check-compatibility.mjs
 node scripts/check-supply-chain.mjs
+node scripts/check-threat-model.mjs
 
 node <<'NODE'
 const fs = require('fs')

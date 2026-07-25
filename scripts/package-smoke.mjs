@@ -23,6 +23,7 @@ const REQUIRED_FILES = [
   "package/opencode/agents/lead.md",
   "package/opencode/docs/ai/harness/orchestration-contracts.json",
   "package/docs/installation.md",
+  "package/docs/threat-model.md",
   "package/LICENSE",
   "package/NOTICE.md",
 ];

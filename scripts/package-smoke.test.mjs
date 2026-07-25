@@ -32,6 +32,7 @@ const REQUIRED = [
   "package/opencode/agents/lead.md",
   "package/opencode/docs/ai/harness/orchestration-contracts.json",
   "package/docs/installation.md",
+  "package/docs/threat-model.md",
   "package/LICENSE",
   "package/NOTICE.md",
 ];
@@ -120,6 +121,15 @@ test("validatePackedFileSet requires the orchestration contract", () => {
       ),
     ),
     /orchestration-contracts\.json/,
+  );
+});
+
+test("validatePackedFileSet requires the canonical threat model", () => {
+  assert.throws(
+    () => validatePackedFileSet(
+      REQUIRED.filter((name) => name !== "package/docs/threat-model.md"),
+    ),
+    /docs\/threat-model\.md/,
   );
 });
 
