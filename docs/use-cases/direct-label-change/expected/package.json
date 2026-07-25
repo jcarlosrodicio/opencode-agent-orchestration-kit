@@ -1,0 +1,8 @@
+{
+  "name": "oak-use-case-direct-label-change",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

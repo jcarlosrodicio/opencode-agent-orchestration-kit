@@ -24,6 +24,9 @@ const REQUIRED_FILES = [
   "package/opencode/docs/ai/harness/orchestration-contracts.json",
   "package/docs/installation.md",
   "package/docs/threat-model.md",
+  "package/docs/use-cases/README.md",
+  "package/docs/use-cases/direct-label-change/case.json",
+  "package/docs/use-cases/feature-tag-normalizer/case.json",
   "package/LICENSE",
   "package/NOTICE.md",
 ];

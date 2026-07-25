@@ -1,0 +1,8 @@
+{
+  "name": "oak-use-case-feature-tag-normalizer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

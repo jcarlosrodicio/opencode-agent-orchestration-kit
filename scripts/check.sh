@@ -29,6 +29,8 @@ scripts/check-supply-chain.mjs
 scripts/check-supply-chain.test.mjs
 scripts/check-threat-model.mjs
 scripts/check-threat-model.test.mjs
+scripts/check-use-cases.mjs
+scripts/check-use-cases.test.mjs
 scripts/package-smoke.sh
 scripts/package-smoke.mjs
 scripts/package-smoke.test.mjs
@@ -69,6 +71,23 @@ docker/open-design/.env.example
 docker/open-design/opencode-od/opencode.json
 docs/supply-chain.md
 docs/threat-model.md
+docs/use-cases/README.md
+docs/use-cases/direct-label-change/README.md
+docs/use-cases/direct-label-change/case.json
+docs/use-cases/direct-label-change/before/package.json
+docs/use-cases/direct-label-change/before/src/settings-label.mjs
+docs/use-cases/direct-label-change/before/test/settings-label.test.mjs
+docs/use-cases/direct-label-change/expected/package.json
+docs/use-cases/direct-label-change/expected/src/settings-label.mjs
+docs/use-cases/direct-label-change/expected/test/settings-label.test.mjs
+docs/use-cases/feature-tag-normalizer/README.md
+docs/use-cases/feature-tag-normalizer/case.json
+docs/use-cases/feature-tag-normalizer/before/package.json
+docs/use-cases/feature-tag-normalizer/before/src/normalize-tags.mjs
+docs/use-cases/feature-tag-normalizer/before/test/normalize-tags.test.mjs
+docs/use-cases/feature-tag-normalizer/expected/package.json
+docs/use-cases/feature-tag-normalizer/expected/src/normalize-tags.mjs
+docs/use-cases/feature-tag-normalizer/expected/test/normalize-tags.test.mjs
 docs/cli.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
@@ -94,6 +113,7 @@ node scripts/version.mjs --check
 node scripts/check-compatibility.mjs
 node scripts/check-supply-chain.mjs
 node scripts/check-threat-model.mjs
+node scripts/check-use-cases.mjs
 
 node <<'NODE'
 const fs = require('fs')

@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "id": "direct-label-change",
+  "objective": "Change the exported Settings label to Account settings and update its test.",
+  "prompt": "Change the Settings label to Account settings and run the smallest relevant validation.",
+  "workflow": "direct-development",
+  "observation": {
+    "date": "2026-07-25",
+    "opencode_version": "1.18.4",
+    "same_model_selection": true,
+    "model_provider_identity": "omitted"
+  },
+  "fixture": {
+    "before": "before",
+    "expected": "expected",
+    "validation": [
+      "npm test",
+      "git diff --check"
+    ]
+  },
+  "variants": [
+    {
+      "id": "harness",
+      "command": [
+        "opencode",
+        "run",
+        "--format",
+        "json",
+        "--thinking",
+        "--dir",
+        "<case-dir>",
+        "Change the Settings label to Account settings and run the smallest relevant validation."
+      ],
+      "expected_agents": [
+        "lead",
+        "developer"
+      ],
+      "observed_agents": [
+        "developer"
+      ],
+      "human_interventions": [],
+      "top_level_invocations": 1,
+      "correction_cycles": 0,
+      "validation_results": [
+        {
+          "command": "npm test",
+          "status": "pass"
+        },
+        {
+          "command": "git diff --check",
+          "status": "pass"
+        }
+      ],
+      "tokens": {
+        "status": "unavailable",
+        "value": null,
+        "reason": "No reliable aggregate token evidence in the sanitized report."
+      },
+      "result": "fail",
+      "limitations": [
+        "Developer delegation was observable, but the primary agent identity was not emitted in portable evidence.",
+        "The wrapper did not retain the OpenCode process exit status after the completed invocation.",
+        "The repository passed validation but differed from expected because the test title was unchanged."
+      ]
+    },
+    {
+      "id": "reduced",
+      "command": [
+        "opencode",
+        "run",
+        "--agent",
+        "developer",
+        "--format",
+        "json",
+        "--thinking",
+        "--dir",
+        "<case-dir>",
+        "Change the Settings label to Account settings and run the smallest relevant validation."
+      ],
+      "expected_agents": [
+        "developer"
+      ],
+      "observed_agents": [],
+      "human_interventions": [],
+      "top_level_invocations": 1,
+      "correction_cycles": 0,
+      "validation_results": [
+        {
+          "command": "npm test",
+          "status": "pass"
+        },
+        {
+          "command": "git diff --check",
+          "status": "pass"
+        }
+      ],
+      "tokens": {
+        "status": "unavailable",
+        "value": null,
+        "reason": "No reliable aggregate token evidence in the sanitized report."
+      },
+      "result": "fail",
+      "limitations": [
+        "The selected primary agent identity was not emitted in portable evidence.",
+        "The repository passed validation but differed from expected because the test title was unchanged."
+      ]
+    }
+  ],
+  "comparison": {
+    "outcome": "Observed in these runs, both variants changed the label and assertion and passed validation, but both failed exact repository equivalence because the test title was unchanged.",
+    "orchestration": "Observed in these runs, the harness exposed one developer delegation while the reduced variant exposed no portable agent identity; both produced the same repository outcome with no correction cycle or human intervention.",
+    "evidence": "live_smoke",
+    "limitations": [
+      "One run per variant is observational evidence, not a benchmark.",
+      "Reliable aggregate token totals and complete primary-agent identity were unavailable."
+    ]
+  }
+}

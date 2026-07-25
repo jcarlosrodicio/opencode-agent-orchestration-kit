@@ -57,3 +57,9 @@ Harness-evolution evidence is classified in `opencode/docs/ai/harness/evidence.m
 - `transcript_replay`: `opencode run --format json --thinking` execution.
 - `live_smoke`: real repo, app, browser, or runtime check.
 - `manual_oracle`: documented human judgment.
+
+## Reproducible use cases
+
+Two synthetic [end-to-end cases](use-cases/README.md) compare the harness with
+a reduced direct-developer flow. They are observations from isolated opt-in
+runs, not a statistical benchmark, and never include raw session evidence.

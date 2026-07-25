@@ -33,6 +33,9 @@ const REQUIRED = [
   "package/opencode/docs/ai/harness/orchestration-contracts.json",
   "package/docs/installation.md",
   "package/docs/threat-model.md",
+  "package/docs/use-cases/README.md",
+  "package/docs/use-cases/direct-label-change/case.json",
+  "package/docs/use-cases/feature-tag-normalizer/case.json",
   "package/LICENSE",
   "package/NOTICE.md",
 ];
@@ -132,6 +135,22 @@ test("validatePackedFileSet requires the canonical threat model", () => {
     /docs\/threat-model\.md/,
   );
 });
+
+for (const required of [
+  "package/docs/use-cases/README.md",
+  "package/docs/use-cases/direct-label-change/case.json",
+  "package/docs/use-cases/feature-tag-normalizer/case.json",
+]) {
+  test(`validatePackedFileSet requires packaged use-case file ${required}`, () => {
+    assert.throws(
+      () =>
+        validatePackedFileSet(
+          REQUIRED.filter((name) => name !== required),
+        ),
+      new RegExp(required.slice("package/".length).replaceAll(".", "\\.")),
+    );
+  });
+}
 
 test("validatePackedOak requires exact metadata and executable regular file", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "oak-packed-bin-test-"));

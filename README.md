@@ -824,6 +824,7 @@ Detailed guides are available in [`docs/`](docs/):
 - [Impeccable](docs/impeccable.md)
 - [Security](docs/security.md)
 - [Threat model](docs/threat-model.md)
+- [Reproducible use cases](docs/use-cases/README.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Synology notes](docs/synology.md)
 

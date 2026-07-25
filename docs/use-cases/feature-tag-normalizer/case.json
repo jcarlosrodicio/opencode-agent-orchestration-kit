@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "id": "feature-tag-normalizer",
+  "objective": "Add a dependency-free normalizeTags function with tests for its complete public contract.",
+  "prompt": "Add normalizeTags(values): trim and lowercase values, remove empty entries and duplicates, preserve first occurrence order, do not mutate the input, add tests, and keep the public API minimal.",
+  "workflow": "feature",
+  "observation": {
+    "date": "2026-07-25",
+    "opencode_version": "1.18.4",
+    "same_model_selection": true,
+    "model_provider_identity": "omitted"
+  },
+  "fixture": {
+    "before": "before",
+    "expected": "expected",
+    "validation": [
+      "npm test",
+      "git diff --check"
+    ]
+  },
+  "variants": [
+    {
+      "id": "harness",
+      "command": [
+        "opencode",
+        "run",
+        "--command",
+        "feature",
+        "--format",
+        "json",
+        "--thinking",
+        "--dir",
+        "<case-dir>",
+        "Add normalizeTags(values): trim and lowercase values, remove empty entries and duplicates, preserve first occurrence order, do not mutate the input, add tests, and keep the public API minimal."
+      ],
+      "expected_agents": [
+        "lead",
+        "specifier",
+        "developer",
+        "reviewer"
+      ],
+      "observed_agents": [],
+      "human_interventions": [],
+      "top_level_invocations": 1,
+      "correction_cycles": 0,
+      "validation_results": [
+        {
+          "command": "npm test",
+          "status": "pass"
+        },
+        {
+          "command": "git diff --check",
+          "status": "pass"
+        }
+      ],
+      "tokens": {
+        "status": "unavailable",
+        "value": null,
+        "reason": "No reliable aggregate token evidence in the sanitized report."
+      },
+      "result": "fail",
+      "limitations": [
+        "No portable agent identity was emitted.",
+        "Two shell actions were rejected by the permission policy and the repository remained unchanged."
+      ]
+    },
+    {
+      "id": "reduced",
+      "command": [
+        "opencode",
+        "run",
+        "--agent",
+        "developer",
+        "--format",
+        "json",
+        "--thinking",
+        "--dir",
+        "<case-dir>",
+        "Add normalizeTags(values): trim and lowercase values, remove empty entries and duplicates, preserve first occurrence order, do not mutate the input, add tests, and keep the public API minimal."
+      ],
+      "expected_agents": [
+        "developer"
+      ],
+      "observed_agents": [],
+      "human_interventions": [],
+      "top_level_invocations": 1,
+      "correction_cycles": 0,
+      "validation_results": [
+        {
+          "command": "npm test",
+          "status": "pass"
+        },
+        {
+          "command": "git diff --check",
+          "status": "pass"
+        }
+      ],
+      "tokens": {
+        "status": "unavailable",
+        "value": null,
+        "reason": "No reliable aggregate token evidence in the sanitized report."
+      },
+      "result": "fail",
+      "limitations": [
+        "The selected primary agent identity was not emitted in portable evidence.",
+        "One shell action was rejected by the permission policy and the repository remained unchanged."
+      ]
+    }
+  ],
+  "comparison": {
+    "outcome": "Observed in these runs, both variants left the initial repository unchanged; its baseline tests passed, but neither result matched expected.",
+    "orchestration": "Observed in these runs, the harness encountered two permission rejections and the reduced variant encountered one; neither emitted a portable agent identity, correction cycle, or human intervention.",
+    "evidence": "live_smoke",
+    "limitations": [
+      "One run per variant is observational evidence, not a benchmark.",
+      "Reliable aggregate token totals and complete agent identity were unavailable."
+    ]
+  }
+}
