@@ -579,7 +579,11 @@ function validateDocumentation(root, data, fsOps) {
   }
 
   const documentationRequirements = new Map([
-    ["README.md", [["npm ci --ignore-scripts", "frozen install command"]]],
+    ["README.md", [
+      ["npm ci --ignore-scripts", "frozen install command"],
+      ["sqlite3", "full validation sqlite3 prerequisite"],
+      ["sudo apt-get install -y sqlite3", "Ubuntu/Debian sqlite3 install command"],
+    ]],
     ["docs/installation.md", [["npm ci --ignore-scripts", "frozen install command"]]],
     ["docs/quickstart.md", [
       ["npm ci --ignore-scripts", "frozen install command"],

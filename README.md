@@ -603,6 +603,17 @@ If your existing `tui.json` was preserved during installation, add the bundled p
 
 ## Validation
 
+Normal harness use requires Node.js, npm, and a supported OpenCode version; it
+does not require a system SQLite client.
+
+Full validation and development additionally require the external `sqlite3`
+binary because the session-evidence tests create real SQLite fixtures. On
+Ubuntu or Debian, install it with:
+
+```bash
+sudo apt-get install -y sqlite3
+```
+
 Run the normal local check with:
 
 ```bash

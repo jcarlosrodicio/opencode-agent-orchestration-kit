@@ -107,7 +107,10 @@ function writeValidDocumentation(root) {
   fs.mkdirSync(path.join(root, "docs/superpowers/plans"), { recursive: true });
   fs.mkdirSync(path.join(root, "docs/releases"), { recursive: true });
   fs.writeFileSync(path.join(root, "docs/supply-chain.md"), canonicalPolicy());
-  fs.writeFileSync(path.join(root, "README.md"), `${SUPERPOWERS_REF}\nnpm ci --ignore-scripts\n`);
+  fs.writeFileSync(
+    path.join(root, "README.md"),
+    `${SUPERPOWERS_REF}\nnpm ci --ignore-scripts\nsqlite3\nsudo apt-get install -y sqlite3\n`,
+  );
   fs.writeFileSync(path.join(root, "docs/superpowers.md"), `${SUPERPOWERS_REF}\n`);
   fs.writeFileSync(
     path.join(root, "docs/docker-open-design.md"),
@@ -750,6 +753,7 @@ for (const [relative, current, replacement, message] of [
   ["docs/docker-open-design.md", `pnpm@${VALID.external_refs.pnpm.version}`, "pnpm@10.0.0", /docker-open-design\.md.*pnpm version/i],
   ["docs/security.md", "npm audit signatures", "npm audit --omit=dev", /security\.md.*signature audit/i],
   ["docs/security.md", "package-smoked tarball", "package directory", /security\.md.*package-smoked tarball/i],
+  ["README.md", "sudo apt-get install -y sqlite3", "missing sqlite3 prerequisite", /README\.md.*sqlite3.*(prerequisite|install command)/i],
   ["docs/quickstart.md", "npm run check:release", "npm run check", /quickstart\.md.*release gate/i],
   ["docs/workflows.md", "post-publication verification", "publication", /workflows\.md.*post-publication verification/i],
 ]) {
