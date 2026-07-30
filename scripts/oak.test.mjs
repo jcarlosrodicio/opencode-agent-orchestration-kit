@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -80,6 +81,7 @@ test("[O001] command set is closed and ordered", () => {
     "doctor",
     "check",
     "replay",
+    "state",
     "uninstall",
     "rollback",
     "version",
@@ -265,7 +267,71 @@ test("[O009] replay overrides paths and preserves closed exit codes", () => {
   }
 });
 
-test("[O010] package exposes exactly one executable oak binary", () => {
+test("[O010] state delegates only an explicit loop-state command and root", () => {
+  const calls = [];
+  const deps = runnerDeps(calls);
+  const args = [
+    "state",
+    "init",
+    "--root",
+    "/tmp/oak-target",
+    "--slug",
+    "example",
+    "--contract",
+    ".opencode/loops/example.md",
+    "--git-baseline",
+    "abc123",
+    "--session-id",
+    "session-1",
+    "--action-id",
+    "approve-1",
+  ];
+
+  assert.equal(dispatchOak(args, deps), 0);
+  assert.deepEqual(calls[0].args, [OAK_ENTRYPOINTS.state, ...args.slice(1)]);
+  assert.equal(calls[0].options.cwd, "/tmp/oak-target");
+  assert.equal(calls[0].options.shell, false);
+
+  const attestationCalls = [];
+  assert.equal(dispatchOak([
+    "state",
+    "attest-review",
+    "--root",
+    "/tmp/oak-target",
+    "--slug",
+    "example",
+    "--reviewer-session-id",
+    "review-session-1",
+    "--reviewer-agent",
+    "reviewer",
+    "--reviewer-verdict",
+    "APPROVE",
+  ], runnerDeps(attestationCalls)), 0);
+  assert.deepEqual(attestationCalls[0].args.slice(1, 3), ["attest-review", "--root"]);
+
+  for (const argv of [
+    ["state"],
+    ["state", "unknown", "--root", "/tmp/oak-target"],
+    ["state", "init", "--slug", "example"],
+    ["state", "init", "--root", "/tmp/oak-target", "--root", "/tmp/other"],
+    ["state", "init", "--root"],
+  ]) {
+    assert.equal(dispatchOak(argv, runnerDeps()), 2);
+  }
+});
+
+test("[O011] symlinked oak executable runs its CLI", (t) => {
+  const root = tempRoot(t);
+  const executable = path.join(root, "oak");
+  fs.symlinkSync(path.join(REPOSITORY_ROOT, "scripts", "oak.mjs"), executable);
+
+  const result = spawnSync(executable, ["state", "--help"], { encoding: "utf8" });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /^Usage: oak state /);
+  assert.equal(result.stderr, "");
+});
+
+test("[O012] package exposes exactly one executable oak binary", () => {
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(REPOSITORY_ROOT, "package.json"), "utf8"),
   );

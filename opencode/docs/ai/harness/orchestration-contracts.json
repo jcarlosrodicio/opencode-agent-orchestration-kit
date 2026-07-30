@@ -163,6 +163,12 @@
   ],
   "commands": [
     {
+      "id": "autonomous",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "autonomous"
+    },
+    {
       "id": "code-simplify",
       "root_agent": "developer",
       "subtask": false,
@@ -293,6 +299,13 @@
   ],
   "retry_policies": [
     {
+      "id": "autonomous-iterations",
+      "scope": "autonomous",
+      "max_attempts": 6,
+      "requires_new_evidence": true,
+      "on_exhaustion": "block"
+    },
+    {
       "id": "developer-default",
       "scope": "developer",
       "max_attempts": 2,
@@ -315,6 +328,24 @@
     }
   ],
   "workflows": [
+    {
+      "id": "autonomous",
+      "entrypoints": ["autonomous"],
+      "stages": [
+        {"agent": "lead", "requirement": "required"},
+        {"agent": "developer", "requirement": "required"},
+        {"agent": "reviewer", "requirement": "required"},
+        {"agent": "developer", "requirement": "state-sync"}
+      ],
+      "barriers": [
+        {"id": "diff-before-review", "before_stage": 2, "authority": "developer", "condition": "diff-reviewable"},
+        {"id": "review-before-state-sync", "before_stage": 3, "authority": "reviewer", "condition": "review-approved"}
+      ],
+      "retry_policy": "autonomous-iterations",
+      "completion_authority": {"kind": "agent", "agent": "reviewer"},
+      "required_evidence": ["static_contract", "transcript_replay"],
+      "adaptive": false
+    },
     {
       "id": "design",
       "entrypoints": [
@@ -827,6 +858,7 @@
         "specifier"
       ],
       "command_ids": [
+        "autonomous",
         "code-simplify",
         "design",
         "evolve",
@@ -868,6 +900,7 @@
         "specifier"
       ],
       "command_ids": [
+        "autonomous",
         "code-simplify",
         "design",
         "evolve",

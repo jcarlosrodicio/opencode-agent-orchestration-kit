@@ -13,6 +13,7 @@ engines as the shell wrappers; it does not add a second implementation.
 | `oak doctor` | Run actionable environment and installation diagnostics |
 | `oak check` | Validate an installed harness with the checker shipped by this package |
 | `oak replay` | Run the packaged deterministic routing corpus and fixtures |
+| `oak state` | Run the packaged durable loop-state runtime against an explicit project root |
 | `oak uninstall` | Remove only unchanged files owned by the lifecycle manifest |
 | `oak rollback` | Reverse the most recent committed lifecycle operation |
 | `oak version` | Print the canonical package identity |
@@ -63,10 +64,37 @@ runtime and session boundary. `oak benchmark` is also excluded until the kit
 defines one canonical meaning rather than conflating metrics aggregation,
 adversarial tests, and other evaluator workflows.
 
+## Durable loop state
+
+`oak state` delegates to the packaged loop-state runtime and requires a
+non-implicit `--root PATH`. It supports `init`, `resume`, `record`, `release`,
+`inspect`, `attest-review`, `repair`, and `migrate`; its remaining flags are exactly those of
+the runtime.
+
+```bash
+oak state inspect --root /path/to/project --slug task-slug
+```
+
+The runtime keeps its JSON snapshot, append-only history, and lease lock under
+`<root>/.opencode/loops/`. It does not copy its implementation into that
+project. State operations may write those durable artifacts; they do not
+commit, publish, access the network, or execute a target-provided script.
+
+Before a loop can record `status: completed`, it needs a reviewer attestation:
+
+```bash
+oak state attest-review --root /path/to/project --slug task-slug \
+  --reviewer-session-id reviewer-session-id \
+  --reviewer-agent reviewer --reviewer-verdict APPROVE
+```
+
+This stores `<slug>.review.json`, bound to the approved contract. Completion
+fails closed unless the attestation identifies the `reviewer` subagent and an
+`APPROVE` verdict.
+
 ## Safety boundary
 
 The dispatcher uses Node directly with `shell: false`. It does not install
 dependencies, access the network, authenticate, inspect providers or models,
-read sessions, repair state, or publish artifacts. Lifecycle commands retain
-their existing confirmation, dry-run, ownership, and rollback contracts.
-
+read sessions, or publish artifacts. Lifecycle commands retain their existing
+confirmation, dry-run, ownership, and rollback contracts.

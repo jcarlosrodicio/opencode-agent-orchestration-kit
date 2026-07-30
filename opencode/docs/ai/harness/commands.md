@@ -174,6 +174,23 @@ Criteria:
 - No auto-merge, scheduling, write-enabled MCP connectors, parallel execution,
   or implicit worktree creation.
 
+## `/autonomous`
+
+Contract: explicit invocation -> `developer -> reviewer -> developer (state sync)`.
+
+`/autonomous <objective>` authorizes one local task without another human gate
+per iteration. It requires durable state, deterministic validation, new evidence
+for retries, and reviewer-only closure. It permits at most six iterations and
+stops on success, no progress, repeated failure, impossible validation, budget,
+protected changes, scope expansion, or sensitive paths. It forbids scheduling,
+parallelism, worktrees, network, write MCP, commit, push, merge, deploy, and
+publication; `/loop` retains its human gate and three-iteration bound.
+
+Use installed `oak state --root .` so consumer repositories do not need to
+contain the runtime. `lead` invokes `reviewer` only as a `task` subagent. A
+durable reviewer session-id/identity/`APPROVE` attestation is required before
+the loop can record `completed`; `opencode run --agent reviewer` is not valid.
+
 ## `/mvp-spec`
 
 Contract: `scoper -> researcher -> scoper synthesis -> specifier`.

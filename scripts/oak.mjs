@@ -13,6 +13,7 @@ export const OAK_COMMANDS = [
   "doctor",
   "check",
   "replay",
+  "state",
   "uninstall",
   "rollback",
   "version",
@@ -26,6 +27,7 @@ export const OAK_ENTRYPOINTS = Object.freeze({
   version: path.join(REPOSITORY_ROOT, "scripts", "version.mjs"),
   check: path.join(REPOSITORY_ROOT, "opencode", "scripts", "check-harness.mjs"),
   replay: path.join(REPOSITORY_ROOT, "opencode", "scripts", "replay-routing.mjs"),
+  state: path.join(REPOSITORY_ROOT, "opencode", "scripts", "loop-state.mjs"),
 });
 
 export const OAK_REPLAY_DEFAULTS = Object.freeze({
@@ -55,6 +57,7 @@ const HELP = {
   doctor: "Usage: oak doctor [--accept-preserved PATH] [--target PATH]",
   check: "Usage: oak check [--target PATH]",
   replay: "Usage: oak replay [--corpus PATH] [--fixtures PATH] [--output PATH]",
+  state: "Usage: oak state <init|resume|record|release|inspect|attest-review|repair|migrate> --root PATH [options]",
   uninstall: "Usage: oak uninstall [--dry-run] [--yes] [--target PATH]",
   rollback: "Usage: oak rollback [--dry-run] [--target PATH]",
   version: "Usage: oak version",
@@ -153,6 +156,50 @@ function dispatchReplay(args, runtime) {
   );
 }
 
+function dispatchState(args, runtime) {
+  const [action, ...options] = args;
+  const actions = new Set(["init", "resume", "record", "release", "inspect", "attest-review", "repair", "migrate"]);
+  const valueFlags = new Set([
+    "--root",
+    "--slug",
+    "--contract",
+    "--git-baseline",
+    "--session-id",
+    "--action-id",
+    "--iteration",
+    "--completed-step",
+    "--blocking-cause",
+    "--status",
+    "--approval-status",
+    "--reviewer-session-id",
+    "--reviewer-agent",
+    "--reviewer-verdict",
+  ]);
+  const booleanFlags = new Set(["--release-lock", "--truncate-tail"]);
+  if (!actions.has(action)) return invalid(runtime.stderr, "invalid state action");
+
+  let root;
+  for (let index = 0; index < options.length; index += 1) {
+    const flag = options[index];
+    if (booleanFlags.has(flag)) continue;
+    if (!valueFlags.has(flag)) return invalid(runtime.stderr, "invalid state arguments");
+    const value = options[index + 1];
+    if (!value || value.startsWith("--")) return invalid(runtime.stderr, "invalid state arguments");
+    if (flag === "--root") {
+      if (root !== undefined) return invalid(runtime.stderr, "invalid state arguments");
+      root = value;
+    }
+    index += 1;
+  }
+  if (root === undefined) return invalid(runtime.stderr, "state requires --root PATH");
+  return runNode(
+    OAK_ENTRYPOINTS.state,
+    args,
+    { cwd: path.resolve(root), env: runtime.env, label: "state" },
+    runtime,
+  );
+}
+
 export function dispatchOak(argv, deps = {}) {
   const runtime = {
     run: deps.run ?? spawnSync,
@@ -184,6 +231,7 @@ export function dispatchOak(argv, deps = {}) {
   if (command === "version") return invalid(runtime.stderr, "version accepts no arguments");
   if (command === "check") return dispatchCheck(rest, runtime);
   if (command === "replay") return dispatchReplay(rest, runtime);
+  if (command === "state") return dispatchState(rest, runtime);
   if (LIFECYCLE_COMMANDS.has(command)) {
     return runNode(
       OAK_ENTRYPOINTS.manager,
@@ -196,5 +244,5 @@ export function dispatchOak(argv, deps = {}) {
 }
 
 const isEntrypoint = process.argv[1]
-  && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+  && fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(process.argv[1]);
 if (isEntrypoint) process.exitCode = dispatchOak(process.argv.slice(2));

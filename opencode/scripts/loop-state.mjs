@@ -343,6 +343,7 @@ function pathsFor(root, slug) {
     lockOwner: path.join(loopsDir, `${slug}.lock`, "owner.json"),
     transitionLock: path.join(loopsDir, `${slug}.lock`, "transition.lock"),
     markdown: path.join(loopsDir, `${slug}.md`),
+    review: path.join(loopsDir, `${slug}.review.json`),
   };
 }
 
@@ -745,6 +746,69 @@ export function inspectLoopState({ root, slug }) {
   return structuredClone(state);
 }
 
+function validateReviewEvidence(evidence, state) {
+  requireExactKeys(
+    evidence,
+    [
+      "schema_version",
+      "slug",
+      "reviewer_session_id",
+      "reviewer_agent",
+      "reviewer_verdict",
+      "contract_hash",
+    ],
+    "review evidence",
+    "review_evidence_required",
+  );
+  if (
+    evidence.schema_version !== SCHEMA_VERSION
+    || evidence.slug !== state.slug
+    || evidence.contract_hash !== state.contract_hash
+    || evidence.reviewer_agent !== "reviewer"
+    || evidence.reviewer_verdict !== "APPROVE"
+  ) {
+    fail("review_evidence_required", "review evidence does not attest reviewer APPROVE for this contract");
+  }
+  requireString(evidence.reviewer_session_id, "reviewer_session_id");
+  return evidence;
+}
+
+function requireReviewEvidence(paths, state) {
+  let evidence;
+  try {
+    evidence = readJsonFile(paths.review, "review_evidence_required");
+  } catch (error) {
+    if (error instanceof LoopStateError && error.code === "state_missing") {
+      fail("review_evidence_required", "reviewer APPROVE evidence is required before completion");
+    }
+    throw error;
+  }
+  return validateReviewEvidence(evidence, state);
+}
+
+export function attestReview({
+  root,
+  slug,
+  reviewerSessionId,
+  reviewerAgent,
+  reviewerVerdict,
+}) {
+  requireString(reviewerSessionId, "reviewerSessionId");
+  const paths = pathsFor(root, slug);
+  const { state } = loadStateAndHistory(paths);
+  const evidence = {
+    schema_version: SCHEMA_VERSION,
+    slug: state.slug,
+    reviewer_session_id: reviewerSessionId,
+    reviewer_agent: reviewerAgent,
+    reviewer_verdict: reviewerVerdict,
+    contract_hash: state.contract_hash,
+  };
+  validateReviewEvidence(evidence, state);
+  atomicWriteJson(paths.review, evidence);
+  return structuredClone(evidence);
+}
+
 export function acquireLoop({
   root,
   slug,
@@ -869,6 +933,9 @@ export function recordLoopAction({
     }
     if (iteration < state.current_iteration) {
       fail("iteration_regression", "iteration cannot move backwards");
+    }
+    if ((status ?? state.status) === "completed") {
+      requireReviewEvidence(paths, state);
     }
     try {
       return commitTransition({
@@ -1115,6 +1182,14 @@ export function main(argv = process.argv.slice(2)) {
     result = releaseLoop(common);
   } else if (command === "inspect") {
     result = inspectLoopState(common);
+  } else if (command === "attest-review") {
+    result = attestReview({
+      root: common.root,
+      slug: common.slug,
+      reviewerSessionId: options.reviewer_session_id,
+      reviewerAgent: options.reviewer_agent,
+      reviewerVerdict: options.reviewer_verdict,
+    });
   } else if (command === "repair") {
     result = repairLoopState({
       ...common,
@@ -1126,7 +1201,7 @@ export function main(argv = process.argv.slice(2)) {
   } else {
     fail(
       "invalid_argument",
-      "command must be init, resume, record, release, inspect, repair, or migrate",
+      "command must be init, resume, record, release, inspect, attest-review, repair, or migrate",
     );
   }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

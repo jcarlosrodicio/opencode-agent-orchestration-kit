@@ -377,6 +377,7 @@ oak --help
 oak doctor
 oak check
 oak replay
+oak state inspect --root /path/to/project --slug task-slug
 ```
 
 The shell wrappers remain supported. `oak check` validates the installed target
@@ -384,6 +385,12 @@ without executing a target-provided checker, while `oak replay` defaults to the
 packaged static corpus and synthetic fixtures. See the [`oak` CLI
 guide](docs/cli.md) for commands, target precedence, exit codes, and explicit
 exclusions.
+
+`oak state` runs the packaged durable loop-state runtime against an explicit
+project root; it is intended for bounded local workflows that need a journal,
+lock, and recovery without copying harness scripts into the project.
+Its completion gate requires a durable `reviewer` subagent `APPROVE`
+attestation; see the CLI guide for the exact command.
 
 Preview an ownership-safe upgrade, then apply it:
 
@@ -639,7 +646,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.33
+node scripts/version.mjs --check-tag v1.0.34
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.

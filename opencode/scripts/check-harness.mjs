@@ -232,6 +232,7 @@ function checkOrchestrationContracts() {
     : [];
   checkSortedUniqueStrings("workflow ids", workflowIds);
   const canonicalWorkflowIds = [
+    "autonomous",
     "design",
     "direct-development",
     "direct-research",
@@ -260,6 +261,7 @@ function checkOrchestrationContracts() {
   const retryScopes = new Set();
   if (Array.isArray(contract.retry_policies)) {
     const approvedRetries = {
+      "autonomous-iterations": ["autonomous", 6, true, "block"],
       "developer-default": ["developer", 2, true, "escalate-review"],
       "loop-iterations": ["loop", 3, true, "ask-user"],
       "reviewer-default": ["reviewer", 2, true, "block"],
@@ -285,8 +287,8 @@ function checkOrchestrationContracts() {
         fail(`${orchestrationContractRel}: retry scope ${policy.scope} must be unique`);
       }
       retryScopes.add(policy.scope);
-      if (!Number.isInteger(policy.max_attempts) || policy.max_attempts < 1 || policy.max_attempts > 3) {
-        fail(`${orchestrationContractRel}: ${label} max_attempts must be between 1 and 3`);
+      if (!Number.isInteger(policy.max_attempts) || policy.max_attempts < 1 || policy.max_attempts > 6) {
+        fail(`${orchestrationContractRel}: ${label} max_attempts must be between 1 and 6`);
       }
       if (typeof policy.requires_new_evidence !== "boolean") {
         fail(`${orchestrationContractRel}: ${label} requires_new_evidence must be boolean`);
@@ -309,6 +311,12 @@ function checkOrchestrationContracts() {
   const usedEntrypoints = new Set();
   const entrypointWorkflows = new Map();
   const approvedStageSequences = {
+    autonomous: [
+      "lead:required",
+      "developer:required",
+      "reviewer:required",
+      "developer:state-sync",
+    ],
     design: ["designer:required"],
     "direct-development": ["developer:required"],
     "direct-research": ["researcher:required"],
@@ -365,6 +373,7 @@ function checkOrchestrationContracts() {
     scope: ["scoper:required", "researcher:required", "specifier:required"],
   };
   const approvedCompletionAuthorities = {
+    autonomous: ["agent", "reviewer"],
     design: ["agent", "designer"],
     "direct-development": ["result-contract", null],
     "direct-research": ["agent", "researcher"],
@@ -768,6 +777,42 @@ function checkCommandDocsCoverage() {
     if (!docs.includes(`/${command}`)) {
       fail(`docs/ai/harness/commands.md: missing documented command /${command}`);
     }
+  }
+}
+
+function checkAutonomousContract() {
+  const rel = "commands/autonomous.md";
+  if (!exists(rel)) {
+    fail(`${rel}: missing command`);
+    return;
+  }
+  const text = contractText(read(rel));
+  for (const token of [
+    "authorization: explicit_command_invocation",
+    "execution_scope: local_checkout_only",
+    "max_iterations_per_invocation: 6",
+    "completion_authority: reviewer_only",
+    "validation_gate: deterministic_per_iteration",
+    "canonical_state_path: .opencode/loops/<slug>.json",
+    "history_path: .opencode/loops/<slug>.history.jsonl",
+    "lock_path: .opencode/loops/<slug>.lock",
+    "human_view_path: .opencode/loops/<slug>.md",
+    "worktree_mode: prohibited",
+    "scheduling: prohibited",
+    "parallelism: prohibited",
+    "external_writes: prohibited",
+    "auto_commit_push_merge_deploy: prohibited",
+    "reviewer_execution: task_subagent_only",
+    "reviewer_evidence: required_subagent_attestation",
+    "oak state init --root .",
+    "task reviewer",
+    "oak state attest-review --root .",
+    "developer -> reviewer -> developer (state sync)",
+    "Do not create worktrees, schedule runs, execute parallel branches, use network",
+    "two iterations without observable progress",
+    "repeated failure",
+  ]) {
+    if (!text.includes(token)) fail(`${rel}: missing ${token}`);
   }
 }
 
@@ -2692,6 +2737,7 @@ checkOrchestrationContracts();
 checkAgentDocsCoverage();
 checkCommandDocsCoverage();
 checkLoopContract();
+checkAutonomousContract();
 checkLeadRouterContract();
 checkFeatureContract();
 checkPlanContract();

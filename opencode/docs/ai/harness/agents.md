@@ -77,6 +77,17 @@ generate or modify frontmatter.
 - `evaluator`, `debugger`, and `evolver` are optional sidecars.
 - `evolver` works only on the OpenCode harness.
 
+## Bounded local autonomy
+
+`/autonomous` uses one explicit user invocation for a local objective, not a
+general permission. It reuses durable loop state, requires deterministic
+validation per iteration, and retains `reviewer` as the only completion
+authority. It stops at six iterations or earlier for no progress, repeated
+failure, impossible validation, sensitive paths, or scope expansion. It never
+enables scheduling, parallelism, network, write MCP, worktrees, commit, push,
+merge, deploy, or publication. `reviewer` remains a subagent and its APPROVE
+attestation is required for completed state.
+
 ## Orchestrated Review
 
 `/review-preflight` is the daily path: deterministic artifacts with no AI

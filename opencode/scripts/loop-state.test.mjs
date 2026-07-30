@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   LoopStateError,
   acquireLoop,
+  attestReview,
   initLoopState,
   inspectLoopState,
   migrateLoopState,
@@ -95,6 +96,64 @@ test("acquires one durable lease and rejects a simultaneous resume", () => {
       }),
       (error) => error instanceof LoopStateError && error.code === "loop_locked",
     );
+  });
+});
+
+test("requires an independent reviewer attestation before completing a loop", () => {
+  withRepo(({ root, contractPath }) => {
+    initExample(root, contractPath);
+    acquireLoop({
+      root,
+      slug: "example",
+      contractPath,
+      sessionId: "session-1",
+      actionId: "resume-1",
+    });
+
+    assert.throws(
+      () => recordLoopAction({
+        root,
+        slug: "example",
+        sessionId: "session-1",
+        actionId: "complete-1",
+        iteration: 1,
+        completedStep: "reviewer_approved",
+        blockingCause: null,
+        status: "completed",
+      }),
+      (error) => error instanceof LoopStateError && error.code === "review_evidence_required",
+    );
+
+    attestReview({
+      root,
+      slug: "example",
+      reviewerSessionId: "review-session-1",
+      reviewerAgent: "reviewer",
+      reviewerVerdict: "APPROVE",
+    });
+    const completed = recordLoopAction({
+      root,
+      slug: "example",
+      sessionId: "session-1",
+      actionId: "complete-1",
+      iteration: 1,
+      completedStep: "reviewer_approved",
+      blockingCause: null,
+      status: "completed",
+    });
+
+    assert.equal(completed.status, "completed");
+    assert.deepEqual(JSON.parse(fs.readFileSync(
+      path.join(root, ".opencode/loops/example.review.json"),
+      "utf8",
+    )), {
+      schema_version: 1,
+      slug: "example",
+      reviewer_session_id: "review-session-1",
+      reviewer_agent: "reviewer",
+      reviewer_verdict: "APPROVE",
+      contract_hash: completed.contract_hash,
+    });
   });
 });
 
@@ -186,6 +245,14 @@ test("records actions idempotently and rejects action-id reuse with different co
     const first = recordLoopAction(action);
     const duplicate = recordLoopAction(action);
     assert.deepEqual(duplicate, first);
+
+    attestReview({
+      root,
+      slug: "example",
+      reviewerSessionId: "review-session-2",
+      reviewerAgent: "reviewer",
+      reviewerVerdict: "APPROVE",
+    });
 
     const later = recordLoopAction({
       ...action,
@@ -510,6 +577,27 @@ test("exposes the durable operations through the portable CLI", () => {
     );
     assert.equal(inspect.status, 0, inspect.stderr);
     assert.equal(JSON.parse(inspect.stdout).last_action_id, "approve-1");
+
+    const attestation = spawnSync(
+      process.execPath,
+      [
+        scriptPath,
+        "attest-review",
+        "--root",
+        root,
+        "--slug",
+        "example",
+        "--reviewer-session-id",
+        "review-session-1",
+        "--reviewer-agent",
+        "reviewer",
+        "--reviewer-verdict",
+        "APPROVE",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(attestation.status, 0, attestation.stderr);
+    assert.equal(JSON.parse(attestation.stdout).reviewer_agent, "reviewer");
   });
 });
 

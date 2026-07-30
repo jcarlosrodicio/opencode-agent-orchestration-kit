@@ -329,18 +329,13 @@ test("orchestration retry limits are bounded", () => {
   const cwd = makeFixture();
   try {
     const contract = readOrchestrationContract(cwd);
-    contract.retry_policies = [{
-      id: "developer-default",
-      scope: "developer",
-      max_attempts: 4,
-      requires_new_evidence: true,
-      on_exhaustion: "escalate-review",
-    }];
+    const policy = contract.retry_policies.find((candidate) => candidate.id === "developer-default");
+    policy.max_attempts = 7;
     writeOrchestrationContract(cwd, contract);
 
     const result = runHarness(cwd);
     assert.notEqual(result.status, 0, "checker accepted an unbounded retry policy");
-    assert.match(result.stderr, /retry developer-default max_attempts must be between 1 and 3/);
+    assert.match(result.stderr, /retry developer-default max_attempts must be between 1 and 6/);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
@@ -476,6 +471,63 @@ function writeLoopFixture(cwd, command) {
   const docsPath = path.join(cwd, "docs/ai/harness/commands.md");
   fs.appendFileSync(docsPath, "\n## `/loop`\n");
 }
+
+const validAutonomousCommand = `---
+description: Runs a bounded, local autonomous workflow.
+agent: lead
+---
+
+authorization: explicit_command_invocation
+execution_scope: local_checkout_only
+max_iterations_per_invocation: 6
+completion_authority: reviewer_only
+validation_gate: deterministic_per_iteration
+canonical_state_path: .opencode/loops/<slug>.json
+history_path: .opencode/loops/<slug>.history.jsonl
+lock_path: .opencode/loops/<slug>.lock
+human_view_path: .opencode/loops/<slug>.md
+worktree_mode: prohibited
+scheduling: prohibited
+parallelism: prohibited
+external_writes: prohibited
+auto_commit_push_merge_deploy: prohibited
+reviewer_execution: task_subagent_only
+reviewer_evidence: required_subagent_attestation
+
+developer -> reviewer -> developer (state sync)
+
+oak state init --root .
+task reviewer
+oak state attest-review --root .
+
+Do not create worktrees, schedule runs, execute parallel branches, use network or write-capable MCP connectors, or publish changes.
+two iterations without observable progress
+repeated failure
+`;
+
+function writeAutonomousFixture(cwd, command) {
+  write("commands/autonomous.md", command, cwd);
+  const docsPath = path.join(cwd, "docs/ai/harness/commands.md");
+  fs.appendFileSync(docsPath, "\n## `/autonomous`\n");
+}
+
+test("harness rejects autonomous work without reviewer-subagent attestation", () => {
+  const cwd = makeFixture();
+  try {
+    writeAutonomousFixture(
+      cwd,
+      validAutonomousCommand
+        .replace("reviewer_execution: task_subagent_only", "reviewer_execution: primary_agent")
+        .replace("reviewer_evidence: required_subagent_attestation", "reviewer_evidence: optional"),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted autonomous work without an independent reviewer attestation");
+    assert.match(result.stderr, /commands\/autonomous\.md: missing reviewer_execution: task_subagent_only/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
 
 test("adversarial corpus rejects a missing threat", () => {
   const cwd = makeFixture();
