@@ -125,7 +125,9 @@ artifact, not a parallel system.
    bounded harness changes.
 10. Re-run evaluator.
 11. Re-run debugger for attribution.
-12. Invoke reviewer against diff, manifest, and evaluation.
+12. Invoke reviewer with the task/spec, diff base, diff, manifest, evaluation,
+    and original evidence. Require `review_stage: final` and a canonical verdict
+    before deciding closure.
 13. Close with keep / improve / rollback+pivot.
 
 ## Rules

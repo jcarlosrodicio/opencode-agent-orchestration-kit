@@ -1819,3 +1819,76 @@ test("harness rejects commands.md without Retry Policies section", () => {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("harness rejects a missing canonical review profile", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(
+      path.join(cwd, "skills/code-review-and-quality/references/profiles/frontend.md"),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing frontend review profile");
+    assert.match(result.stderr, /frontend\.md: missing canonical review surface/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects strict architecture routing without explicit declaration", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "skills/code-review-and-quality/SKILL.md";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replaceAll("explicit declaration", "implicit inference")
+        .replaceAll("layout alone does not activate", "layout activates"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted implicit strict architecture routing");
+    assert.match(result.stderr, /strict architecture profile requires explicit declaration/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects reviewer without causal final authority", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "agents/reviewer.md";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replaceAll("causality: required", "causality: omitted"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted reviewer without causality");
+    assert.match(result.stderr, /agents\/reviewer\.md: missing causality: required/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects a specialist that claims a final verdict", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "agents/review_quality.md";
+    write(
+      rel,
+      fs.readFileSync(path.join(cwd, rel), "utf8")
+        .replaceAll("review_stage: partial", "review_stage: final"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a final specialist review");
+    assert.match(result.stderr, /agents\/review_quality\.md: missing review_stage: partial/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});

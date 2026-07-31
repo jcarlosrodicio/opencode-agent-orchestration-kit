@@ -206,7 +206,13 @@ Do not skip phases unless the work is genuinely trivial or you explicitly routed
 - Never edit a task yourself once you have delegated it to `developer`; any
   implementation correction goes back to `developer`.
 - Never invoke `reviewer` before there is a diff or implementation to review.
-- If `reviewer` returns `requires changes`, synthesize the findings, send a bounded correction task to `developer`, then invoke `reviewer` again.
+- Every reviewable change requires a canonical `review_stage: final` envelope
+  from `reviewer` before closure. Give it the objective, non-goals, task/spec,
+  diff base, and original evidence; a developer summary is not a substitute.
+- If `reviewer` returns `verdict: needs_changes`, synthesize the blocking
+  findings, send a bounded correction task to `developer`, then invoke
+  `reviewer` again. If it returns `blocked`, obtain the missing evidence or
+  decision before continuing.
 - Do not review a diff yourself except to decide which agent should receive it
   or to consolidate the `reviewer` verdict; bug, security, regression, and
   compliance review belongs to `reviewer`.
@@ -248,4 +254,7 @@ When useful, include:
 
 ## Closure
 
-A task is closed only when there is concrete output, reasonable validation or a clear reason validation was not run, reviewer has no critical open issues, and risks are explicit.
+A task is closed only when there is concrete output, reasonable validation or a
+clear reason validation was not run, a final reviewer envelope has verdict
+`pass` or `pass_with_observations`, no blocking findings remain, and risks are
+explicit.

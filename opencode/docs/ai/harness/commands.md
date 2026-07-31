@@ -360,6 +360,15 @@ Criteria:
 
 Contract: `reviewer`.
 
+- Runs read-only as a direct command and returns `review_stage: final`.
+- Uses the canonical core policy plus generic backend/frontend profiles that
+  match the changed surface.
+- Strict Clean/DDD/hexagonal/CQRS or layered profiles require an explicit task
+  or repository declaration; directory layout is not sufficient evidence.
+- Only introduced or worsened defects can block. Pre-existing debt is reported
+  as a non-blocking observation.
+- The real diff and original evidence are primary; a developer summary is not.
+
 Criteria:
 
 - Review `git diff`, active spec, and available evidence.
@@ -375,6 +384,7 @@ Criteria:
 - Creates `manifest.json`, `shared-review-context.md`, `patches/`, and
   `findings/` with `scripts/review-orchestrated-prepare.mjs`.
 - Runs no AI reviewer or subagent and never claims that AI review occurred.
+- Returns `review_stage: preflight` and `verdict: not_run`.
 - Reports level, risk flags, considered and filtered files, recommended
   reviewers, budgets, and workspace state.
 - `--retain` preserves artifacts; otherwise the workspace is cleaned.
@@ -383,6 +393,11 @@ Criteria:
 
 Contract: opt-in `review_coordinator`. It does not replace or make `/review`
 more expensive.
+
+This flow is evidence preparation and partial analysis only. Preflight returns
+`review_stage: preflight`; AI modes return `review_stage: partial`; every mode
+returns `verdict: not_run`. Only the general `reviewer` may issue a final
+verdict.
 
 Criteria:
 

@@ -171,6 +171,13 @@ function isDocFile(file) {
   return /\.(md|mdx|txt|rst|adoc)$/i.test(file) || /^docs\//.test(file);
 }
 
+function isOperationalMarkdown(file) {
+  return file === "AGENTS.md"
+    || /^agents\/[^/]+\.md$/i.test(file)
+    || /^commands\/[^/]+\.md$/i.test(file)
+    || /^skills\/.+\/SKILL\.md$/i.test(file);
+}
+
 function isLockfile(file) {
   return /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|Cargo\.lock|Gemfile\.lock|Pipfile\.lock|poetry\.lock|pubspec\.lock|Podfile\.lock)$/i.test(file);
 }
@@ -197,6 +204,7 @@ function isMigration(file) {
 
 function riskFlagsForFile(file) {
   const flags = [];
+  if (isOperationalMarkdown(file)) flags.push("harness_contract");
   if (isLockfile(file)) flags.push("lockfiles", "deps");
   if (isGenerated(file)) flags.push("generated");
   if (isMigration(file)) flags.push("migrations");
@@ -245,7 +253,9 @@ function classify(files, stats, riskFlags, filteredFiles, budgets, totalPatchByt
   const reviewed = files.reviewed;
   const reviewable = reviewed.filter((file) => !shouldFilterPatch(file));
   const changedLines = [...stats.values()].reduce((sum, item) => sum + item.added + item.deleted, 0);
-  const docOnly = reviewed.length > 0 && reviewed.every((file) => isDocFile(file) || shouldFilterPatch(file));
+  const docOnly = reviewed.length > 0 && reviewed.every(
+    (file) => (isDocFile(file) && !isOperationalMarkdown(file)) || shouldFilterPatch(file),
+  );
   const highRiskFlags = ["security", "auth", "permissions", "secrets", "migrations", "infra", "deps", "lockfiles"];
   const hasHighRisk = riskFlags.some((flag) => highRiskFlags.includes(flag));
   const hasReviewRisk = riskFlags.some((flag) => !["generated", "bundles", "sourcemaps", "minified"].includes(flag));
@@ -288,6 +298,8 @@ function buildExecutionPlan(classification, recommendedReviewers, options) {
   if (mode === "preflight") {
     return {
       mode,
+      review_stage: "preflight",
+      verdict: "not_run",
       dry_run_alias: options.dryRun,
       ai_review: "not_run",
       strategy: "preflight_only",
@@ -304,6 +316,8 @@ function buildExecutionPlan(classification, recommendedReviewers, options) {
     const planned = reviewer ? [reviewer] : [];
     return {
       mode,
+      review_stage: "partial",
+      verdict: "not_run",
       dry_run_alias: false,
       ai_review: planned.length > 0 ? "coordinator_focused" : "not_run",
       strategy: planned.length > 0
@@ -321,6 +335,8 @@ function buildExecutionPlan(classification, recommendedReviewers, options) {
   const planned = recommendedReviewers.slice(0, cap);
   return {
     mode,
+    review_stage: "partial",
+    verdict: "not_run",
     dry_run_alias: false,
     ai_review: planned.length > 0 ? "experimental_specialized_agents" : "not_run",
     strategy: "Experimental costly mode; run selected specialized reviewers sequentially with timeout and partial-failure reporting.",
@@ -563,6 +579,7 @@ export {
   buildExecutionPlan,
   classify,
   cleanupWorkspace,
+  isOperationalMarkdown,
   parseArgs,
   prepareReviewWorkspace,
   recordReviewerResult,

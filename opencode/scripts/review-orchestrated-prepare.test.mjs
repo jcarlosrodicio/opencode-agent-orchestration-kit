@@ -77,6 +77,55 @@ test("doc-only changes are skipped without launching reviewers", () => {
   }
 });
 
+test("operational Markdown is never skipped as doc-only", async (t) => {
+  for (const [rel, operational] of [
+    ["AGENTS.md", true],
+    ["agents/reviewer.md", true],
+    ["commands/review.md", true],
+    ["skills/code-review-and-quality/SKILL.md", true],
+    ["docs/guide.md", false],
+  ]) {
+    await t.test(rel, () => {
+      const cwd = makeRepo();
+      try {
+        writeFile(cwd, rel, "# Initial contract\n");
+        run(cwd, "git", ["add", rel]);
+        run(cwd, "git", ["commit", "-m", `add ${rel}`]);
+        writeFile(cwd, rel, "# Changed contract\n");
+
+        const manifest = prepare(cwd);
+        if (operational) {
+          assert.notEqual(manifest.classification, "skipped", `${rel} was skipped as docs`);
+          assert.ok(manifest.risk_flags.includes("harness_contract"));
+        } else {
+          assert.equal(manifest.classification, "skipped");
+          assert.ok(!manifest.risk_flags.includes("harness_contract"));
+        }
+        assert.equal(manifest.execution_plan.review_stage, "preflight");
+        assert.equal(manifest.execution_plan.verdict, "not_run");
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("review stage stays non-final in every orchestrated execution mode", () => {
+  for (const [args, stage] of [
+    [[], "preflight"],
+    [["--agents"], "partial"],
+    [["--full-agents"], "partial"],
+  ]) {
+    const plan = buildExecutionPlan(
+      "lite",
+      ["review_quality", "review_tests"],
+      parseArgs(args),
+    );
+    assert.equal(plan.review_stage, stage);
+    assert.equal(plan.verdict, "not_run");
+  }
+});
+
 test("normal implementation change selects quality reviewer", () => {
   const cwd = makeRepo();
   try {

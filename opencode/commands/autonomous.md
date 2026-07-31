@@ -7,6 +7,8 @@ authorization: explicit_command_invocation
 execution_scope: local_checkout_only
 max_iterations_per_invocation: 6
 completion_authority: reviewer_only
+canonical_review_policy: code-review-and-quality/references/review-policy.md
+final_review_authority: reviewer
 validation_gate: deterministic_per_iteration
 canonical_state_path: .opencode/loops/<slug>.json
 history_path: .opencode/loops/<slug>.history.jsonl
@@ -19,6 +21,7 @@ external_writes: prohibited
 auto_commit_push_merge_deploy: prohibited
 reviewer_execution: task_subagent_only
 reviewer_evidence: required_subagent_attestation
+final_review_attestation: review_stage_verdict_causality_evidence
 
 # /autonomous
 
@@ -41,13 +44,16 @@ developer -> reviewer -> developer (state sync)
 For at most six iterations, `developer` makes one focused change and runs at
 least one relevant deterministic validation. `lead` invokes `reviewer` only as
 a subagent with `task reviewer`; never run `opencode run --agent reviewer`.
-Only that child session's `APPROVE` may complete the objective. The state-sync
-step records it with `oak state attest-review --root .`, including the reviewer
-session id, `reviewer` identity, and `APPROVE`; `oak state record` cannot set
-`completed` without that attestation bound to the approved contract.
+Only that child session's final `pass` or `pass_with_observations` may complete
+the objective. Preserve stage, verdict, causality, and evidence. The state-sync
+step translates either successful canonical verdict to the historical runtime
+`APPROVE` attestation through `oak state attest-review --root .`; `oak state
+record` cannot set `completed` without that
+attestation bound to the approved contract.
 
-With `REJECT`, the actionable finding is the only next action. Every retry
-needs new evidence. Stop as `blocked` or `paused` on success, six iterations,
+With `needs_changes`, the blocking finding is the only next action; with
+`blocked`, pause. Every retry needs new evidence. Stop as `blocked` or `paused`
+on success, six iterations,
 two iterations without observable progress, a repeated failure, impossible
 validation, exhausted budget, protected changes, scope expansion, or a denied
 surface.

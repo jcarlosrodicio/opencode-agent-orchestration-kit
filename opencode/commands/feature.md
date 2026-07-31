@@ -53,8 +53,12 @@ turn init into technical discovery.
 8. Parallelize designer and researcher only if their results are independent.
 9. Synthesize required design/research before invoking `specifier`.
 10. Invoke `developer` only for sufficiently specified tasks.
-11. Invoke `reviewer` after implementation.
-12. If reviewer requires changes, route through lead back to developer, then review again.
+11. Invoke `reviewer` after implementation with the task/spec, diff base, and
+    original validation evidence. Require `review_stage: final` and a canonical
+    verdict before closure.
+12. If reviewer returns `needs_changes`, route the blocking findings through
+    lead back to developer, then review again. If it returns `blocked`, obtain
+    the required evidence or human decision.
 13. Close with changes, validation, and risks.
 
 AHE sidecars are optional and must not be inserted unless evidence is needed or this request changes the harness itself.

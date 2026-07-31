@@ -2,7 +2,14 @@
 
 `/review-preflight` and `/review-orchestrated` provide a local, opt-in,
 versionable flow for deterministic diff preparation and optional AI review.
-They do not replace `/review` or change its inexpensive existing contract.
+They do not replace `/review` or its final-review authority.
+
+The canonical stage contract is explicit: deterministic preparation emits
+`review_stage: preflight`; optional focused analysis emits
+`review_stage: partial`; both emit `verdict: not_run`. Only the general
+`reviewer` can consolidate the real diff and original evidence into a final
+verdict. Specialist findings follow the same causality policy: only introduced
+or worsened problems may block, while pre-existing debt is observational.
 
 The recommended daily path is `/review-preflight`: it creates inspectable
 artifacts and summarizes risk without running AI reviewers. Here,

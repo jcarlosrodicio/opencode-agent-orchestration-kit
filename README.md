@@ -167,7 +167,7 @@ Use the smallest useful flow:
 | `researcher` | Code, documentation, API, alternative, and risk investigation |
 | `specifier` | Specs, tasks, acceptance criteria, scope boundaries, and validation plans |
 | `developer` | Implementation, direct-mode changes, and focused validation |
-| `reviewer` | Diff review against scope, requirements, and evidence |
+| `reviewer` | Final, read-only review against scope, real diff, original evidence, and contextual architecture |
 | `evaluator` | Optional benchmark and smoke-test evidence collection |
 | `debugger` | Optional root-cause analysis from failures and traces |
 | `evolver` | Optional evidence-driven harness improvement proposals |
@@ -189,7 +189,7 @@ The `evaluator`, `debugger`, and `evolver` agents are optional harness-evolution
 | `/implement` | Implement approved work directly |
 | `/test` | Reproduce a bug or run focused validation |
 | `/code-simplify` | Simplify code without changing behavior |
-| `/review` | Review the current diff |
+| `/review` | Run the final read-only review of the current diff |
 | `/evolve` | Run the optional harness-evolution workflow |
 | `/init` | Initialize project-oriented context for the workflow |
 
@@ -228,6 +228,23 @@ A small request can also be written directly:
 ```text
 Change the Settings heading to Account settings and run the smallest relevant validation.
 ```
+
+### One review policy across stacks
+
+All review entry points use the same language- and framework-neutral policy.
+The reviewer checks correctness, security, contracts, architecture,
+maintainability, tests, and evidence—not only whether tests pass.
+
+Generic backend and frontend profiles adapt those checks to the changed
+surface. Strict Clean Architecture, DDD, hexagonal, CQRS, or layered profiles
+activate only when the task or repository explicitly declares that
+architecture; folder names alone do not activate them.
+
+Only problems introduced or materially worsened by the current task can block
+it. Relevant pre-existing debt is reported separately as a non-blocking
+observation. `/review-preflight` remains deterministic, and focused
+`/review-orchestrated` modes remain partial; only the general `/review` agent
+emits a final verdict.
 
 For this kind of request, `lead` should choose the direct path and delegate to `developer` without invoking the full feature workflow.
 

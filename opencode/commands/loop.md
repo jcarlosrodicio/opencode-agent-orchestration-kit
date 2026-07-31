@@ -17,6 +17,8 @@ automation.
 approval_gate: explicit_before_writes
 max_iterations_per_invocation: 3
 completion_authority: reviewer_only
+canonical_review_policy: code-review-and-quality/references/review-policy.md
+final_review_authority: reviewer
 canonical_state_path: .opencode/loops/<slug>.json
 history_path: .opencode/loops/<slug>.history.jsonl
 lock_path: .opencode/loops/<slug>.lock
@@ -123,22 +125,25 @@ For each available iteration:
 2. `developer` makes one focused change, runs reasonable validation, and records
    evidence in state. It cannot expand scope or declare the objective complete.
 3. Send the diff, contract, and Verification Envelope to `reviewer`.
-4. `reviewer` returns exactly `APPROVE`, `REJECT`, or `ESCALATE_HUMAN`, with
-   evidence and an assessment of every success criterion.
+4. `reviewer` returns `review_stage: final` and exactly `pass`,
+   `pass_with_observations`, `needs_changes`, or `blocked`, with causality,
+   evidence, and an assessment of every success criterion.
 5. Delegate only verdict/state synchronization back to `developer`. This
    administrative write does not consume an iteration and cannot include
    implementation changes. It updates the Markdown view and records the
    canonical transition with a new `action_id`.
-6. On `REJECT`, make the actionable findings the only next action. On
-   `ESCALATE_HUMAN`, pause immediately.
+6. On `needs_changes`, make the blocking findings the only next action. On
+   `blocked`, pause immediately.
 7. Mark `completed` only when every criterion passes and `reviewer` returns
-   `APPROVE`. A `developer` completion claim is never sufficient.
+   `pass` or `pass_with_observations`. If runtime state requires historical
+   `APPROVE`, record it only as a translation of either successful canonical
+   verdict. A `developer` completion claim is never sufficient.
 
 ## Stop conditions
 
 Stop, synchronize state, and provide a human handoff when any condition occurs:
 
-- objective completed with `APPROVE`;
+- objective completed with final `pass` or `pass_with_observations`;
 - three iterations consumed in the invocation;
 - two consecutive iterations without observable progress;
 - approved scope must expand;
@@ -148,8 +153,7 @@ Stop, synchronize state, and provide a human handoff when any condition occurs:
 - any change to `.env`, secrets, credentials, authentication, authorization,
   payments, billing, PII, migrations, Terraform, Kubernetes, or production.
 
-For sensitive paths use `blocked` or `paused` and `ESCALATE_HUMAN`; never create
-a silent exception.
+For sensitive paths use `blocked` or `paused`; never create a silent exception.
 
 ## First-version boundaries
 

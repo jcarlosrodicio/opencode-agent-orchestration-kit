@@ -231,7 +231,7 @@
     {
       "id": "review",
       "root_agent": "reviewer",
-      "subtask": true,
+      "subtask": false,
       "workflow": "direct-review"
     },
     {

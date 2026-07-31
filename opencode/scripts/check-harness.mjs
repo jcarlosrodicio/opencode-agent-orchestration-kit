@@ -908,6 +908,107 @@ function checkFrontmatter() {
   }
 }
 
+function checkCanonicalReviewPolicy() {
+  const policyRel = "skills/code-review-and-quality/references/review-policy.md";
+  const skillRel = "skills/code-review-and-quality/SKILL.md";
+  const profiles = [
+    ["backend", "skills/code-review-and-quality/references/profiles/backend.md"],
+    ["backend-clean-ddd-cqrs", "skills/code-review-and-quality/references/profiles/backend-clean-ddd-cqrs.md"],
+    ["frontend", "skills/code-review-and-quality/references/profiles/frontend.md"],
+    ["frontend-clean-layered", "skills/code-review-and-quality/references/profiles/frontend-clean-layered.md"],
+  ];
+
+  for (const rel of [policyRel, ...profiles.map(([, rel]) => rel)]) {
+    if (!exists(rel)) {
+      fail(`${rel}: missing canonical review surface`);
+      continue;
+    }
+    const stat = fs.lstatSync(path.join(root, rel));
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      fail(`${rel}: must be a regular non-symlink file`);
+    }
+  }
+
+  if (exists(policyRel)) {
+    const policy = read(policyRel);
+    for (const heading of [
+      "## Seven Review Gates",
+      "## Independent Verification",
+      "## Causality",
+      "## Findings Contract",
+      "## Review Stage And Verdict",
+      "## Blocking Rules",
+      "## Pre-existing Debt",
+      "## Specialist And Coordinator Limits",
+      "## Final Review Output",
+    ]) {
+      if (!policy.includes(heading)) fail(`${policyRel}: missing heading ${heading}`);
+    }
+    const normalized = contractText(policy);
+    for (const token of [
+      "introduced | worsened | pre_existing | unknown",
+      "blocking | non_blocking | pre_existing | needs_human_verification",
+      "review_stage: preflight | partial | final",
+      "verdict: not_run | pass | pass_with_observations | needs_changes | blocked",
+      "Never block solely because hypothetical external callers may exist",
+      "Only the general reviewer can consolidate evidence",
+    ]) {
+      if (!normalized.includes(token)) fail(`${policyRel}: missing canonical token ${token}`);
+    }
+  }
+
+  const skill = exists(skillRel) ? read(skillRel) : "";
+  for (const [profile] of profiles) {
+    if (!skill.includes(`references/profiles/${profile}.md`)) {
+      fail(`${skillRel}: missing profile routing ${profile}`);
+    }
+  }
+  if (!contractText(skill).includes("explicit declaration") || !contractText(skill).includes("layout alone does not activate")) {
+    fail(`${skillRel}: strict architecture profile requires explicit declaration`);
+  }
+
+  const reviewerRel = "agents/reviewer.md";
+  const reviewer = read(reviewerRel);
+  for (const token of [
+    "canonical_policy: required",
+    "primary_evidence: diff_and_original_artifacts",
+    "developer_summary_is_not_evidence",
+    "causality: required",
+    "review_stage: final",
+    "final_verdict_authority: reviewer",
+    "pre_existing_debt: non_blocking",
+  ]) {
+    if (!reviewer.includes(token)) fail(`${reviewerRel}: missing ${token}`);
+  }
+  if (!frontmatterBlock(reviewerRel).includes('"code-review-and-quality": allow')) {
+    fail(`${reviewerRel}: missing canonical review skill permission`);
+  }
+
+  for (const rel of [
+    "agents/review_quality.md",
+    "agents/review_security.md",
+    "agents/review_tests.md",
+    "agents/review_api.md",
+  ]) {
+    const text = read(rel);
+    for (const token of [
+      "canonical_policy: required",
+      "causality: required",
+      "review_stage: partial",
+      "verdict: not_run",
+      "integral_verdict: forbidden",
+      "disposition",
+      "causality",
+      "profiles",
+      "categories",
+      "read_scope",
+      "omitted_coverage",
+    ]) {
+      if (!text.includes(token)) fail(`${rel}: missing ${token}`);
+    }
+  }
+}
+
 function checkOrchestratedReviewContract() {
   const preflightCommandRel = "commands/review-preflight.md";
   const commandRel = "commands/review-orchestrated.md";
@@ -921,7 +1022,15 @@ function checkOrchestratedReviewContract() {
 
   if (exists("commands/review.md")) {
     const review = read("commands/review.md");
-    for (const token of ["agent: reviewer", "Review the current diff", "git diff"]) {
+    for (const token of [
+      "agent: reviewer",
+      "subtask: false",
+      "Review the current diff",
+      "git diff",
+      "canonical_policy: required",
+      "review_stage: final",
+      "final_verdict_authority: reviewer",
+    ]) {
       if (!review.includes(token)) fail(`commands/review.md: existing /review contract changed or missing ${token}`);
     }
     if (review.includes("review_coordinator") || review.includes("review-orchestrated")) {
@@ -934,7 +1043,7 @@ function checkOrchestratedReviewContract() {
     for (const token of [
       "agent: lead",
       "recommended daily path",
-      "rtk node scripts/review-orchestrated-prepare.mjs --dry-run",
+      "OPENCODE_CONFIG_DIR",
       "manifest.json",
       "shared-review-context.md",
       "patches/",
@@ -942,6 +1051,8 @@ function checkOrchestratedReviewContract() {
       "Do not invoke reviewers",
       "Do not claim an AI review was performed",
       "Do not ask follow-up questions",
+      "review_stage: preflight",
+      "verdict: not_run",
     ]) {
       if (!command.includes(token)) fail(`${preflightCommandRel}: missing ${token}`);
     }
@@ -951,7 +1062,7 @@ function checkOrchestratedReviewContract() {
     const command = read(commandRel);
     for (const token of [
       "agent: review_coordinator",
-      "node scripts/review-orchestrated-prepare.mjs $ARGUMENTS",
+      "OPENCODE_CONFIG_DIR",
       "manifest.json",
       "shared-review-context.md",
       "patches/",
@@ -972,6 +1083,8 @@ function checkOrchestratedReviewContract() {
       "Always enumerate `review_quality`",
       "skipped",
       "lite",
+      "review_stage: partial",
+      "verdict: not_run",
     ]) {
       if (!command.includes(token)) fail(`${commandRel}: missing ${token}`);
     }
@@ -1012,11 +1125,9 @@ function checkOrchestratedReviewContract() {
       fail("agents/review_coordinator.md: harmless preparer existence checks must not abort --agents");
     }
     for (const token of [
-      "node scripts/review-orchestrated-prepare.mjs*",
-      "node ./scripts/review-orchestrated-prepare.mjs*",
       "node *scripts/review-orchestrated-prepare.mjs*",
-      "Use a relative path",
-      "Call the preparer exactly once",
+      "OPENCODE_CONFIG_DIR",
+      "Call it once",
       "execution_plan.mode",
       "preflight_only",
       "--agents",
@@ -1026,7 +1137,7 @@ function checkOrchestratedReviewContract() {
       "at most one finding",
       "Do not run `git diff`",
       "timed_out",
-      "always enumerate all four reviewers",
+      "Always enumerate all four reviewers",
     ]) {
       if (!coordinator.includes(token)) fail(`agents/review_coordinator.md: missing preparer permission/routing token ${token}`);
     }
@@ -2757,6 +2868,7 @@ checkCommandContracts();
 checkSkillRegistryPresence();
 checkLeadSkillResolution();
 checkAgentSkillLoading();
+checkCanonicalReviewPolicy();
 checkSkillRegistryGenerator();
 checkInitCommand();
 checkAutoForecastContract();

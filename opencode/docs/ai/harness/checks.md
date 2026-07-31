@@ -138,6 +138,9 @@ The harness check validates:
 - `/review-preflight` exists as the deterministic daily path and runs no AI.
 - `/review-orchestrated` exposes explicit `--agents` and experimental
   `--full-agents` modes without changing `/review`.
+- The canonical review policy and backend/frontend profiles are present;
+  strict architecture profiles require explicit declaration, partial reviews
+  cannot pass, and only introduced or worsened findings may block.
 - The orchestrated-review contract covers the temporary workspace,
   anti-injection boundary, classification, budgets, filtered lockfiles and
   generated files, timeout, partial failure, cleanup/retention, and deferred
