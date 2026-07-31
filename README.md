@@ -674,7 +674,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.34
+node scripts/version.mjs --check-tag v1.0.35
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.
