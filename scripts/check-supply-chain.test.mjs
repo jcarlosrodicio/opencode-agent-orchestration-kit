@@ -46,7 +46,7 @@ const VALID = {
   },
   npm_overrides: {
     "@babel/core": "7.29.7",
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     uuid: "14.0.0",
   },
 };
@@ -185,7 +185,7 @@ function withSurfaceFixture(callback) {
         },
         "node_modules/brace-expansion": {
           version: VALID.npm_overrides["brace-expansion"],
-          resolved: "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.8.tgz",
+          resolved: "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.9.tgz",
           integrity: "sha512-braceexpansion",
         },
         "node_modules/uuid": {
@@ -320,7 +320,7 @@ test("requires exact canonical versions without ranges", () => {
     "npm_overrides.@babel/core",
   );
   expectInvalid(
-    (data) => { data.npm_overrides["brace-expansion"] = "^5.0.8"; },
+    (data) => { data.npm_overrides["brace-expansion"] = "^5.0.9"; },
     "npm_overrides.brace-expansion",
   );
   expectInvalid(
@@ -681,7 +681,7 @@ for (const [dependency, mutation] of [
   ["@babel/core range", (packageData) => { packageData.overrides["@babel/core"] = "^7.29.7"; }],
   ["@babel/core wrong version", (packageData) => { packageData.overrides["@babel/core"] = "7.29.6"; }],
   ["brace-expansion", (packageData) => { delete packageData.overrides["brace-expansion"]; }],
-  ["brace-expansion range", (packageData) => { packageData.overrides["brace-expansion"] = "^5.0.8"; }],
+  ["brace-expansion range", (packageData) => { packageData.overrides["brace-expansion"] = "^5.0.9"; }],
   ["brace-expansion wrong version", (packageData) => { packageData.overrides["brace-expansion"] = "5.0.7"; }],
   ["uuid", (packageData) => { delete packageData.overrides.uuid; }],
   ["uuid range", (packageData) => { packageData.overrides.uuid = "^14.0.0"; }],
@@ -716,7 +716,7 @@ test("surface validation rejects a lockfile not regenerated to the brace-expansi
     fs.writeFileSync(path.join(root, relative), `${JSON.stringify(lock)}\n`);
     assert.throws(
       () => checkSupplyChain(root),
-      /package-lock\.json brace-expansion must resolve to 5\.0\.8/,
+      /package-lock\.json brace-expansion must resolve to 5\.0\.9/,
     );
   });
 });

@@ -16,7 +16,7 @@ the immutable identifier consumed by the repository.
 | pnpm | 10.33.2 | exact version |
 | opencode-ai | 1.14.31 | exact version |
 | @babel/core override | 7.29.7 | exact version |
-| brace-expansion override | 5.0.8 | exact version |
+| brace-expansion override | 5.0.9 | exact version |
 | uuid override | 14.0.0 | exact version |
 <!-- supply-chain-pins:end -->
 
@@ -31,7 +31,7 @@ focused test. There is currently no exception.
 
 The exact overrides exist for reviewable reasons: `@babel/core` 7.29.7 removes
 the audited low-severity findings without an incompatible downgrade,
-`brace-expansion` 5.0.8 fixes GHSA-mh99-v99m-4gvg in the transitive
+`brace-expansion` 5.0.9 fixes GHSA-mh99-v99m-4gvg and GHSA-rgw5-rvv9-x895 in the transitive
 OpenTUI/Babel resolution, and `uuid` 14.0.0 preserves the already tested
 lockfile resolution. Change an override and regenerate the lockfile in the same
 reviewed diff. Review every changed version, `resolved` URL, integrity value,
