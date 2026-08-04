@@ -156,6 +156,9 @@ Use the smallest useful flow:
 - `/feature` when the work deserves full orchestration.
 - `/loop` when you want an approved, resumable implementation-review cycle with
   crash-recoverable structured state and a three-iteration cap.
+- `/autonomous` for one explicitly requested local task with a task-specific
+  one-to-six-iteration budget, a hard ceiling of six, durable state, and
+  reviewer-only closure. Final approval stops the cycle immediately.
 
 ## Included agents
 
@@ -674,7 +677,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.35
+node scripts/version.mjs --check-tag v1.0.36
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.

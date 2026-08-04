@@ -79,6 +79,7 @@ function initializeLoop(rootDir) {
     gitBaseline: "abc123",
     sessionId: "session-1",
     actionId: "approve-1",
+    plannedIterations: 1,
   });
   return contractPath;
 }
@@ -141,6 +142,7 @@ const handlers = {
             gitBaseline: "abc123",
             sessionId: "session-1",
             actionId: "approve-1",
+            plannedIterations: 1,
           }),
           (error) => error instanceof LoopStateError && error.code === "unsafe_path",
         );
@@ -159,8 +161,9 @@ const handlers = {
           slug: "../escape",
           contractPath,
           gitBaseline: "abc123",
-          sessionId: "session-1",
-          actionId: "approve-1",
+            sessionId: "session-1",
+            actionId: "approve-1",
+            plannedIterations: 1,
         }),
         (error) => error instanceof LoopStateError && error.code === "invalid_argument",
       );

@@ -57,7 +57,7 @@ const HELP = {
   doctor: "Usage: oak doctor [--accept-preserved PATH] [--target PATH]",
   check: "Usage: oak check [--target PATH]",
   replay: "Usage: oak replay [--corpus PATH] [--fixtures PATH] [--output PATH]",
-  state: "Usage: oak state <init|resume|record|release|inspect|attest-review|repair|migrate> --root PATH [options]",
+  state: "Usage: oak state <init|resume|record|release|inspect|repair|migrate> --root PATH [options]",
   uninstall: "Usage: oak uninstall [--dry-run] [--yes] [--target PATH]",
   rollback: "Usage: oak rollback [--dry-run] [--target PATH]",
   version: "Usage: oak version",
@@ -158,7 +158,7 @@ function dispatchReplay(args, runtime) {
 
 function dispatchState(args, runtime) {
   const [action, ...options] = args;
-  const actions = new Set(["init", "resume", "record", "release", "inspect", "attest-review", "repair", "migrate"]);
+  const actions = new Set(["init", "resume", "record", "release", "inspect", "repair", "migrate"]);
   const valueFlags = new Set([
     "--root",
     "--slug",
@@ -166,14 +166,12 @@ function dispatchState(args, runtime) {
     "--git-baseline",
     "--session-id",
     "--action-id",
+    "--planned-iterations",
     "--iteration",
     "--completed-step",
     "--blocking-cause",
     "--status",
     "--approval-status",
-    "--reviewer-session-id",
-    "--reviewer-agent",
-    "--reviewer-verdict",
   ]);
   const booleanFlags = new Set(["--release-lock", "--truncate-tail"]);
   if (!actions.has(action)) return invalid(runtime.stderr, "invalid state action");

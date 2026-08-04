@@ -9,7 +9,6 @@ import { fileURLToPath } from "node:url";
 import {
   LoopStateError,
   acquireLoop,
-  attestReview,
   initLoopState,
   inspectLoopState,
   migrateLoopState,
@@ -32,7 +31,7 @@ function withRepo(callback) {
   }
 }
 
-function initExample(root, contractPath) {
+function initExample(root, contractPath, plannedIterations = 6) {
   return initLoopState({
     root,
     slug: "example",
@@ -40,15 +39,16 @@ function initExample(root, contractPath) {
     gitBaseline: "abc123",
     sessionId: "session-1",
     actionId: "approve-1",
+    plannedIterations,
   });
 }
 
 test("initializes canonical state and append-only history without replacing markdown", () => {
   withRepo(({ root, contractPath }) => {
     const markdown = fs.readFileSync(contractPath, "utf8");
-    const state = initExample(root, contractPath);
+    const state = initExample(root, contractPath, 1);
 
-    assert.equal(state.schema_version, 1);
+    assert.equal(state.schema_version, 2);
     assert.equal(state.slug, "example");
     assert.match(state.contract_hash, /^sha256:[a-f0-9]{64}$/);
     assert.equal(state.approval.status, "approved");
@@ -58,6 +58,7 @@ test("initializes canonical state and append-only history without replacing mark
     assert.equal(state.lease, null);
     assert.equal(state.status, "approved");
     assert.equal(state.current_iteration, 0);
+    assert.equal(state.planned_iterations, 1);
     assert.equal(state.last_completed_step, null);
     assert.equal(state.blocking_cause, null);
     assert.equal(state.last_action_id, "approve-1");
@@ -99,9 +100,9 @@ test("acquires one durable lease and rejects a simultaneous resume", () => {
   });
 });
 
-test("requires an independent reviewer attestation before completing a loop", () => {
+test("rejects action records above the persisted iteration budget", () => {
   withRepo(({ root, contractPath }) => {
-    initExample(root, contractPath);
+    initExample(root, contractPath, 1);
     acquireLoop({
       root,
       slug: "example",
@@ -115,45 +116,13 @@ test("requires an independent reviewer attestation before completing a loop", ()
         root,
         slug: "example",
         sessionId: "session-1",
-        actionId: "complete-1",
-        iteration: 1,
-        completedStep: "reviewer_approved",
+        actionId: "iteration-2",
+        iteration: 2,
+        completedStep: "developer_change",
         blockingCause: null,
-        status: "completed",
       }),
-      (error) => error instanceof LoopStateError && error.code === "review_evidence_required",
+      (error) => error instanceof LoopStateError && error.code === "iteration_budget_exceeded",
     );
-
-    attestReview({
-      root,
-      slug: "example",
-      reviewerSessionId: "review-session-1",
-      reviewerAgent: "reviewer",
-      reviewerVerdict: "APPROVE",
-    });
-    const completed = recordLoopAction({
-      root,
-      slug: "example",
-      sessionId: "session-1",
-      actionId: "complete-1",
-      iteration: 1,
-      completedStep: "reviewer_approved",
-      blockingCause: null,
-      status: "completed",
-    });
-
-    assert.equal(completed.status, "completed");
-    assert.deepEqual(JSON.parse(fs.readFileSync(
-      path.join(root, ".opencode/loops/example.review.json"),
-      "utf8",
-    )), {
-      schema_version: 1,
-      slug: "example",
-      reviewer_session_id: "review-session-1",
-      reviewer_agent: "reviewer",
-      reviewer_verdict: "APPROVE",
-      contract_hash: completed.contract_hash,
-    });
   });
 });
 
@@ -245,14 +214,6 @@ test("records actions idempotently and rejects action-id reuse with different co
     const first = recordLoopAction(action);
     const duplicate = recordLoopAction(action);
     assert.deepEqual(duplicate, first);
-
-    attestReview({
-      root,
-      slug: "example",
-      reviewerSessionId: "review-session-2",
-      reviewerAgent: "reviewer",
-      reviewerVerdict: "APPROVE",
-    });
 
     const later = recordLoopAction({
       ...action,
@@ -494,6 +455,7 @@ test("migrates a schema v0 snapshot only with explicit renewed approval", () => 
         sessionId: "session-2",
         actionId: "migrate-1",
         approvalStatus: "pending",
+        plannedIterations: 3,
       }),
       (error) => error instanceof LoopStateError && error.code === "approval_required",
     );
@@ -505,12 +467,55 @@ test("migrates a schema v0 snapshot only with explicit renewed approval", () => 
       sessionId: "session-2",
       actionId: "migrate-1",
       approvalStatus: "approved",
+      plannedIterations: 3,
     });
-    assert.equal(migrated.schema_version, 1);
+    assert.equal(migrated.schema_version, 2);
+    assert.equal(migrated.planned_iterations, 3);
     assert.equal(migrated.current_iteration, 2);
     assert.equal(migrated.last_completed_step, "reviewer_rejected");
     assert.equal(migrated.approval.status, "approved");
     assert.equal(migrated.status, "approved");
+  });
+});
+
+test("migrates schema v1 only with renewed approval and an explicit budget", () => {
+  withRepo(({ root, contractPath }) => {
+    initExample(root, contractPath);
+    const statePath = path.join(root, ".opencode/loops/example.json");
+    const historyPath = path.join(root, ".opencode/loops/example.history.jsonl");
+    const legacyState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    legacyState.schema_version = 1;
+    delete legacyState.planned_iterations;
+    fs.writeFileSync(statePath, `${JSON.stringify(legacyState)}\n`);
+    const [legacyEvent] = fs.readFileSync(historyPath, "utf8").trim().split("\n").map(JSON.parse);
+    legacyEvent.schema_version = 1;
+    legacyEvent.state_after = legacyState;
+    fs.writeFileSync(historyPath, `${JSON.stringify(legacyEvent)}\n`);
+
+    assert.throws(
+      () => migrateLoopState({
+        root,
+        slug: "example",
+        contractPath,
+        sessionId: "session-2",
+        actionId: "migrate-1",
+        approvalStatus: "approved",
+      }),
+      (error) => error instanceof LoopStateError && error.code === "invalid_argument",
+    );
+
+    const migrated = migrateLoopState({
+      root,
+      slug: "example",
+      contractPath,
+      sessionId: "session-2",
+      actionId: "migrate-1",
+      approvalStatus: "approved",
+      plannedIterations: 3,
+    });
+    assert.equal(migrated.schema_version, 2);
+    assert.equal(migrated.planned_iterations, 3);
+    assert.equal(inspectLoopState({ root, slug: "example" }).planned_iterations, 3);
   });
 });
 
@@ -564,11 +569,14 @@ test("exposes the durable operations through the portable CLI", () => {
         "session-1",
         "--action-id",
         "approve-1",
+        "--planned-iterations",
+        "1",
       ],
       { encoding: "utf8" },
     );
     assert.equal(init.status, 0, init.stderr);
-    assert.equal(JSON.parse(init.stdout).schema_version, 1);
+    assert.equal(JSON.parse(init.stdout).schema_version, 2);
+    assert.equal(JSON.parse(init.stdout).planned_iterations, 1);
 
     const inspect = spawnSync(
       process.execPath,
@@ -577,27 +585,6 @@ test("exposes the durable operations through the portable CLI", () => {
     );
     assert.equal(inspect.status, 0, inspect.stderr);
     assert.equal(JSON.parse(inspect.stdout).last_action_id, "approve-1");
-
-    const attestation = spawnSync(
-      process.execPath,
-      [
-        scriptPath,
-        "attest-review",
-        "--root",
-        root,
-        "--slug",
-        "example",
-        "--reviewer-session-id",
-        "review-session-1",
-        "--reviewer-agent",
-        "reviewer",
-        "--reviewer-verdict",
-        "APPROVE",
-      ],
-      { encoding: "utf8" },
-    );
-    assert.equal(attestation.status, 0, attestation.stderr);
-    assert.equal(JSON.parse(attestation.stdout).reviewer_agent, "reviewer");
   });
 });
 
@@ -620,6 +607,7 @@ test("rejects a symlinked state ancestor that escapes the root", () => {
         gitBaseline: "abc123",
         sessionId: "session-1",
         actionId: "approve-1",
+        plannedIterations: 1,
       }),
       (error) => error instanceof LoopStateError && error.code === "unsafe_path",
     );
@@ -654,6 +642,7 @@ test("does not follow a broken history symlink during initialization", () => {
         gitBaseline: "abc123",
         sessionId: "session-1",
         actionId: "approve-1",
+        plannedIterations: 1,
       }),
       (error) => error instanceof LoopStateError && error.code === "state_exists",
     );

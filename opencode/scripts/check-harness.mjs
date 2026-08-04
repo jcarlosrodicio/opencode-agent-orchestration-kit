@@ -791,6 +791,8 @@ function checkAutonomousContract() {
     "authorization: explicit_command_invocation",
     "execution_scope: local_checkout_only",
     "max_iterations_per_invocation: 6",
+    "planned_iteration_budget: task_specific_1_to_6",
+    "hard_safety_ceiling: 6",
     "completion_authority: reviewer_only",
     "validation_gate: deterministic_per_iteration",
     "canonical_state_path: .opencode/loops/<slug>.json",
@@ -811,6 +813,8 @@ function checkAutonomousContract() {
     "Do not create worktrees, schedule runs, execute parallel branches, use network",
     "two iterations without observable progress",
     "repeated failure",
+    "Final reviewer approval stops the cycle immediately.",
+    "An explicit schema migration requires renewed human approval before `oak state resume`",
   ]) {
     if (!text.includes(token)) fail(`${rel}: missing ${token}`);
   }

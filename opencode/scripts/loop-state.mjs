@@ -5,7 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
+const LEGACY_SCHEMA_VERSION = 1;
 const slugPattern = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const approvalStatuses = new Set(["approved"]);
@@ -48,7 +49,8 @@ function requireExactKeys(value, keys, label, corruptCode = "state_corrupt") {
   }
 }
 
-function validateState(state) {
+function validateState(state, { allowLegacy = false } = {}) {
+  const isLegacy = state?.schema_version === LEGACY_SCHEMA_VERSION;
   requireExactKeys(
     state,
     [
@@ -61,13 +63,14 @@ function validateState(state) {
       "lease",
       "status",
       "current_iteration",
+      ...(isLegacy ? [] : ["planned_iterations"]),
       "last_completed_step",
       "blocking_cause",
       "last_action_id",
     ],
     "state",
   );
-  if (state.schema_version !== SCHEMA_VERSION) {
+  if (state.schema_version !== SCHEMA_VERSION && !(allowLegacy && isLegacy)) {
     fail("schema_unsupported", `unsupported schema_version ${state.schema_version}`);
   }
   requireString(state.slug, "state.slug", slugPattern);
@@ -99,6 +102,9 @@ function validateState(state) {
   if (!Number.isInteger(state.current_iteration) || state.current_iteration < 0) {
     fail("state_corrupt", "state.current_iteration must be a non-negative integer");
   }
+  if (!isLegacy && (!Number.isInteger(state.planned_iterations) || state.planned_iterations < 1 || state.planned_iterations > 6)) {
+    fail("state_corrupt", "state.planned_iterations must be an integer from 1 through 6");
+  }
   requireNullableString(state.last_completed_step, "state.last_completed_step");
   requireNullableString(state.blocking_cause, "state.blocking_cause");
   requireString(state.last_action_id, "state.last_action_id");
@@ -121,7 +127,7 @@ function validateEvent(event, expectedSequence) {
     `history event ${expectedSequence}`,
     "history_corrupt",
   );
-  if (event.schema_version !== SCHEMA_VERSION || event.sequence !== expectedSequence) {
+  if (![LEGACY_SCHEMA_VERSION, SCHEMA_VERSION].includes(event.schema_version) || event.sequence !== expectedSequence) {
     fail("history_corrupt", `history event ${expectedSequence} has invalid sequence or schema`);
   }
   if (
@@ -138,7 +144,7 @@ function validateEvent(event, expectedSequence) {
     fail("history_corrupt", `history event ${expectedSequence} is invalid`);
   }
   try {
-    validateState(event.state_after);
+    validateState(event.state_after, { allowLegacy: true });
   } catch (error) {
     if (error instanceof LoopStateError) {
       fail("history_corrupt", `history event ${expectedSequence}: ${error.message}`);
@@ -147,6 +153,9 @@ function validateEvent(event, expectedSequence) {
   }
   if (event.state_after.last_action_id !== event.action_id) {
     fail("history_corrupt", `history event ${expectedSequence} action mismatch`);
+  }
+  if (event.state_after.schema_version !== event.schema_version) {
+    fail("history_corrupt", `history event ${expectedSequence} state schema mismatch`);
   }
   return event;
 }
@@ -181,10 +190,13 @@ function validateHistoryContinuity(events, expectedSlug) {
   } else {
     requireExactKeys(
       first.payload,
-      ["from_schema_version"],
+      ["from_schema_version", "planned_iterations"],
       "history event 1 payload",
       "history_corrupt",
     );
+    if (first.state_after.planned_iterations !== first.payload.planned_iterations) {
+      fail("history_corrupt", "initial migration iteration budget mismatch");
+    }
   }
   const immutable = {
     slug: first.state_after.slug,
@@ -206,7 +218,31 @@ function validateHistoryContinuity(events, expectedSlug) {
     if (index === 0) continue;
     const previous = events[index - 1].state_after;
     let expected;
-    if (event.type === "resumed") {
+    if (event.type === "migrated") {
+      requireExactKeys(
+        event.payload,
+        ["from_schema_version", "planned_iterations"],
+        `history event ${index + 1} payload`,
+        "history_corrupt",
+      );
+      if (
+        previous.schema_version !== LEGACY_SCHEMA_VERSION
+        || event.payload.from_schema_version !== LEGACY_SCHEMA_VERSION
+        || previous.lease !== null
+        || event.state_after.planned_iterations !== event.payload.planned_iterations
+      ) {
+        fail("history_corrupt", `invalid migration transition at event ${index + 1}`);
+      }
+      expected = {
+        ...previous,
+        schema_version: SCHEMA_VERSION,
+        planned_iterations: event.payload.planned_iterations,
+        session_id: event.session_id,
+        lease: null,
+        status: "approved",
+        last_action_id: event.action_id,
+      };
+    } else if (event.type === "resumed") {
       requireExactKeys(
         event.payload,
         ["contract_hash"],
@@ -237,6 +273,7 @@ function validateHistoryContinuity(events, expectedSlug) {
       if (
         previous.lease?.session_id !== event.session_id
         || event.payload.iteration < previous.current_iteration
+        || event.payload.iteration > previous.planned_iterations
       ) {
         fail("history_corrupt", `invalid action transition at event ${index + 1}`);
       }
@@ -281,7 +318,7 @@ function validateHistoryContinuity(events, expectedSlug) {
     } else {
       fail("history_corrupt", `unexpected event type at event ${index + 1}`);
     }
-    if (JSON.stringify(event.state_after) !== JSON.stringify(expected)) {
+    if (JSON.stringify(stable(event.state_after)) !== JSON.stringify(stable(expected))) {
       fail("history_corrupt", `state transition mismatch at event ${index + 1}`);
     }
   }
@@ -343,7 +380,6 @@ function pathsFor(root, slug) {
     lockOwner: path.join(loopsDir, `${slug}.lock`, "owner.json"),
     transitionLock: path.join(loopsDir, `${slug}.lock`, "transition.lock"),
     markdown: path.join(loopsDir, `${slug}.md`),
-    review: path.join(loopsDir, `${slug}.review.json`),
   };
 }
 
@@ -694,10 +730,14 @@ export function initLoopState({
   gitBaseline,
   sessionId,
   actionId,
+  plannedIterations,
 }) {
   requireString(gitBaseline, "gitBaseline");
   requireString(sessionId, "sessionId");
   requireString(actionId, "actionId");
+  if (!Number.isInteger(plannedIterations) || plannedIterations < 1 || plannedIterations > 6) {
+    fail("invalid_argument", "plannedIterations must be an integer from 1 through 6");
+  }
   const paths = pathsFor(root, slug);
   ensureLoopsDir(paths);
   const hash = contractHash(contractPath, paths.root);
@@ -718,6 +758,7 @@ export function initLoopState({
     lease: null,
     status: "approved",
     current_iteration: 0,
+    planned_iterations: plannedIterations,
     last_completed_step: null,
     blocking_cause: null,
     last_action_id: actionId,
@@ -744,69 +785,6 @@ export function inspectLoopState({ root, slug }) {
     fail("snapshot_stale", "snapshot is behind append-only history; run repair");
   }
   return structuredClone(state);
-}
-
-function validateReviewEvidence(evidence, state) {
-  requireExactKeys(
-    evidence,
-    [
-      "schema_version",
-      "slug",
-      "reviewer_session_id",
-      "reviewer_agent",
-      "reviewer_verdict",
-      "contract_hash",
-    ],
-    "review evidence",
-    "review_evidence_required",
-  );
-  if (
-    evidence.schema_version !== SCHEMA_VERSION
-    || evidence.slug !== state.slug
-    || evidence.contract_hash !== state.contract_hash
-    || evidence.reviewer_agent !== "reviewer"
-    || evidence.reviewer_verdict !== "APPROVE"
-  ) {
-    fail("review_evidence_required", "review evidence does not attest reviewer APPROVE for this contract");
-  }
-  requireString(evidence.reviewer_session_id, "reviewer_session_id");
-  return evidence;
-}
-
-function requireReviewEvidence(paths, state) {
-  let evidence;
-  try {
-    evidence = readJsonFile(paths.review, "review_evidence_required");
-  } catch (error) {
-    if (error instanceof LoopStateError && error.code === "state_missing") {
-      fail("review_evidence_required", "reviewer APPROVE evidence is required before completion");
-    }
-    throw error;
-  }
-  return validateReviewEvidence(evidence, state);
-}
-
-export function attestReview({
-  root,
-  slug,
-  reviewerSessionId,
-  reviewerAgent,
-  reviewerVerdict,
-}) {
-  requireString(reviewerSessionId, "reviewerSessionId");
-  const paths = pathsFor(root, slug);
-  const { state } = loadStateAndHistory(paths);
-  const evidence = {
-    schema_version: SCHEMA_VERSION,
-    slug: state.slug,
-    reviewer_session_id: reviewerSessionId,
-    reviewer_agent: reviewerAgent,
-    reviewer_verdict: reviewerVerdict,
-    contract_hash: state.contract_hash,
-  };
-  validateReviewEvidence(evidence, state);
-  atomicWriteJson(paths.review, evidence);
-  return structuredClone(evidence);
 }
 
 export function acquireLoop({
@@ -934,8 +912,8 @@ export function recordLoopAction({
     if (iteration < state.current_iteration) {
       fail("iteration_regression", "iteration cannot move backwards");
     }
-    if ((status ?? state.status) === "completed") {
-      requireReviewEvidence(paths, state);
+    if (iteration > state.planned_iterations) {
+      fail("iteration_budget_exceeded", "iteration exceeds the planned iteration budget");
     }
     try {
       return commitTransition({
@@ -1079,27 +1057,49 @@ export function migrateLoopState({
   sessionId,
   actionId,
   approvalStatus,
+  plannedIterations,
 }) {
   if (approvalStatus !== "approved") {
     fail("approval_required", "migration requires renewed explicit approval");
   }
   requireString(sessionId, "sessionId");
   requireString(actionId, "actionId");
+  if (!Number.isInteger(plannedIterations) || plannedIterations < 1 || plannedIterations > 6) {
+    fail("invalid_argument", "plannedIterations must be an integer from 1 through 6");
+  }
   const paths = pathsFor(root, slug);
   ensureLoopsDir(paths);
   let legacy = null;
   if (lstatIfPresent(paths.state) !== null) {
     legacy = readJsonFile(paths.state, "state_corrupt");
-    if (!isObject(legacy) || legacy.schema_version !== 0) {
-      fail("schema_unsupported", "migrate accepts only schema_version 0 or markdown-only state");
+    if (!isObject(legacy) || ![0, LEGACY_SCHEMA_VERSION].includes(legacy.schema_version)) {
+      fail("schema_unsupported", "migrate accepts only schema_version 0, 1, or markdown-only state");
     }
   }
   const baseline = legacy?.git_baseline ?? gitBaseline;
   requireString(baseline, "gitBaseline");
-  if (lstatIfPresent(paths.history) !== null) {
+  const historyPresent = lstatIfPresent(paths.history) !== null;
+  if (historyPresent && legacy?.schema_version !== LEGACY_SCHEMA_VERSION) {
     fail("history_exists", "migration refuses to replace existing append-only history");
   }
+  let legacyHistory = null;
+  if (legacy?.schema_version === LEGACY_SCHEMA_VERSION) {
+    legacyHistory = readHistory(paths);
+    if (JSON.stringify(stable(legacyHistory.events.at(-1).state_after)) !== JSON.stringify(stable(legacy))) {
+      fail("snapshot_stale", "snapshot is behind append-only history; run repair before migration");
+    }
+    if (legacy.lease !== null || lstatIfPresent(paths.lock) !== null) {
+      fail("loop_locked", "migration requires a released schema v1 loop");
+    }
+  }
   const hash = contractHash(contractPath, paths.root);
+  if (legacy?.schema_version === LEGACY_SCHEMA_VERSION && hash !== legacy.contract_hash) {
+    fail("contract_mismatch", "renewed approval contract hash must match schema v1 history");
+  }
+  const currentIteration = legacy?.current_iteration ?? 0;
+  if (currentIteration > plannedIterations) {
+    fail("invalid_argument", "plannedIterations cannot be below the current iteration");
+  }
   const state = validateState({
     schema_version: SCHEMA_VERSION,
     slug,
@@ -1109,18 +1109,22 @@ export function migrateLoopState({
     approval: { status: "approved", contract_hash: hash },
     lease: null,
     status: legacy?.status ?? "approved",
-    current_iteration: legacy?.current_iteration ?? 0,
+    current_iteration: currentIteration,
+    planned_iterations: plannedIterations,
     last_completed_step: legacy?.last_completed_step ?? null,
     blocking_cause: legacy?.blocking_cause ?? null,
     last_action_id: actionId,
   });
   const event = {
     schema_version: SCHEMA_VERSION,
-    sequence: 1,
+    sequence: legacyHistory ? legacyHistory.events.length + 1 : 1,
     action_id: actionId,
     type: "migrated",
     session_id: sessionId,
-    payload: { from_schema_version: legacy?.schema_version ?? "markdown" },
+    payload: {
+      from_schema_version: legacy?.schema_version ?? "markdown",
+      planned_iterations: plannedIterations,
+    },
     recorded_at: new Date().toISOString(),
     state_after: state,
   };
@@ -1159,6 +1163,9 @@ function cliOptions(options) {
     sessionId: options.session_id,
     actionId: options.action_id,
     approvalStatus: options.approval_status,
+    plannedIterations: options.planned_iterations === undefined
+      ? undefined
+      : Number(options.planned_iterations),
   };
 }
 
@@ -1182,14 +1189,6 @@ export function main(argv = process.argv.slice(2)) {
     result = releaseLoop(common);
   } else if (command === "inspect") {
     result = inspectLoopState(common);
-  } else if (command === "attest-review") {
-    result = attestReview({
-      root: common.root,
-      slug: common.slug,
-      reviewerSessionId: options.reviewer_session_id,
-      reviewerAgent: options.reviewer_agent,
-      reviewerVerdict: options.reviewer_verdict,
-    });
   } else if (command === "repair") {
     result = repairLoopState({
       ...common,
@@ -1201,7 +1200,7 @@ export function main(argv = process.argv.slice(2)) {
   } else {
     fail(
       "invalid_argument",
-      "command must be init, resume, record, release, inspect, attest-review, repair, or migrate",
+      "command must be init, resume, record, release, inspect, repair, or migrate",
     );
   }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

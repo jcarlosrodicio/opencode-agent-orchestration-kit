@@ -180,8 +180,12 @@ Contract: explicit invocation -> `developer -> reviewer -> developer (state sync
 
 `/autonomous <objective>` authorizes one local task without another human gate
 per iteration. It requires durable state, deterministic validation, new evidence
-for retries, and reviewer-only closure. It permits at most six iterations and
-stops on success, no progress, repeated failure, impossible validation, budget,
+for retries, and reviewer-only closure. Before starting, `lead` sets a
+task-specific planned iteration budget from 1 to 6; six remains the hard safety
+ceiling rather than a target. Final reviewer approval stops the cycle
+immediately. An explicit schema migration requires renewed human approval
+before `oak state resume`; earlier approval cannot be reused. It permits at
+most the planned iteration budget and stops on success, no progress, repeated failure, impossible validation, budget,
 protected changes, scope expansion, or sensitive paths. It forbids scheduling,
 parallelism, worktrees, network, write MCP, commit, push, merge, deploy, and
 publication; `/loop` retains its human gate and three-iteration bound.
