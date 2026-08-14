@@ -94,6 +94,19 @@ test("orchestration contract file is required", () => {
   }
 });
 
+test("shell export guard surfaces are required", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "plugins/shell-export-guard.ts"));
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing shell export guard");
+    assert.match(result.stderr, /plugins\/shell-export-guard\.ts: missing shell export guard surface/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("orchestration contract file must be regular and non-symlink", () => {
   const cwd = makeFixture();
   const external = path.join(cwd, "external-contract.json");

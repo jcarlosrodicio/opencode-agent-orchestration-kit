@@ -47,8 +47,12 @@ opencode/.gitignore
 opencode/package.json
 opencode/package-lock.json
 opencode/plugins/token-tree-usage.tsx
+opencode/plugins/shell-export-guard.ts
 opencode/tools/open_design.ts
 opencode/scripts/check-harness.mjs
+opencode/scripts/shell-export-policy.mjs
+opencode/scripts/shell-export-policy.d.mts
+opencode/scripts/shell-export-policy.test.mjs
 opencode/commands/loop.md
 opencode/commands/plan.md
 opencode/commands/test.md
