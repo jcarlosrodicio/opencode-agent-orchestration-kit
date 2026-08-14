@@ -2845,6 +2845,74 @@ function checkRetryPoliciesContract() {
   }
 }
 
+function checkShellExportGuardContract() {
+  const policyRel = "scripts/shell-export-policy.mjs";
+  const policyTestRel = "scripts/shell-export-policy.test.mjs";
+  const pluginRel = "plugins/shell-export-guard.ts";
+
+  for (const rel of [policyRel, policyTestRel, pluginRel]) {
+    if (!exists(rel)) fail(`${rel}: missing shell export guard surface`);
+  }
+
+  if (!exists(policyRel) || !exists(policyTestRel) || !exists(pluginRel)) return;
+
+  const policy = read(policyRel);
+  for (const token of [
+    "classifyShellExport",
+    "shell-export-environment-enumeration",
+    "shell-export-sensitive-name",
+    "shell-export-secret-source",
+    "-p",
+  ]) {
+    if (!policy.includes(token)) {
+      fail(`${policyRel}: missing shell export guard token ${token}`);
+    }
+  }
+
+  const plugin = read(pluginRel);
+  for (const token of [
+    "tool.execute.before",
+    "classifyShellExport",
+    "shell-export-guard",
+    "bash",
+    "shell",
+  ]) {
+    if (!plugin.includes(token)) {
+      fail(`${pluginRel}: missing shell export guard token ${token}`);
+    }
+  }
+  if (/\$\{?command\}?/.test(plugin)) {
+    fail(`${pluginRel}: shell export guard must not include the raw command in diagnostics`);
+  }
+
+  const policyTests = read(policyTestRel);
+  for (const token of [
+    "export",
+    "API_KEY",
+    "PATH",
+    "NODE_ENV",
+    "pi --export",
+    "quoted prose",
+  ]) {
+    if (!policyTests.includes(token)) {
+      fail(`${policyTestRel}: missing shell export policy scenario ${token}`);
+    }
+  }
+
+  const checksDocs = read("docs/ai/harness/checks.md");
+  const readmeDocs = read("docs/ai/harness/README.md");
+  for (const [rel, text] of [
+    ["docs/ai/harness/checks.md", checksDocs],
+    ["docs/ai/harness/README.md", readmeDocs],
+  ]) {
+    for (const token of ["shell-export", "defense in depth", "sandbox"]) {
+      if (!text.includes(token)) {
+        fail(`${rel}: missing shell export policy documentation token ${token}`);
+      }
+    }
+  }
+}
+
 checkConfig();
 checkAgentsIndex();
 checkFrontmatter();
@@ -2884,6 +2952,7 @@ checkOrchestratedReviewContract();
 checkHitlDurableContract();
 checkRoutingDeclarativoContract();
 checkRetryPoliciesContract();
+checkShellExportGuardContract();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");

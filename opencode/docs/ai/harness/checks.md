@@ -122,6 +122,12 @@ The harness check validates:
 - `node --test scripts/adversarial-harness.test.mjs` verifies review
   boundaries, paths and symlinks, shell/network permissions, durable approval,
   canaries, supply-chain rules, and corrupt or repeated events;
+- `scripts/shell-export-policy.mjs`, its test suite, and
+  `plugins/shell-export-guard.ts` provide defense in depth at the shell
+  boundary against environment enumeration and high-risk exports. The policy
+  allows ordinary setup such as `PATH` and `NODE_ENV`, never logs commands or
+  values, is not a sandbox, and keeps its rule IDs aligned with the derived Pi
+  extension;
 - presence of `docs/ai/harness/skill_registry.md` (soft check; warns when missing);
 - `agents/lead.md` contains `Skill Resolution` or a registry reference;
 - `developer`, `researcher`, `specifier`, `reviewer`, `designer`, and `scoper`

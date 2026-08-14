@@ -22,6 +22,9 @@ here.
 - A repeated or fragile rule should become a mechanical check.
 - Harness changes need evidence proportional to risk.
 - Sidecars add observability, not mandatory bureaucracy.
+- Shell hooks are defense in depth: `shell-export-guard` blocks only
+  high-signal secret enumeration and propagation, keeps ordinary setup allowed,
+  and never substitutes for a sandbox.
 
 ## Done Criteria
 
