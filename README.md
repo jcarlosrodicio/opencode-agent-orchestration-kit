@@ -300,6 +300,58 @@ export OPENCODE_EVOLVER_MODEL="$OPENCODE_MODEL"
 
 You can use one model for every role or assign different models depending on cost, speed, and task complexity.
 
+### Interactive OpenCode model switching
+
+The repository also includes `oc-switch`, a standalone TUI for changing the
+OpenCode default model, small/title model, and per-agent overrides. It builds
+its provider list from OpenCode itself and reads the local model catalog from
+`opencode models --pure`, so it only shows providers configured in your
+OpenCode installation. Startup is cache-first; press `r` when you want an
+explicit remote catalog refresh through `--refresh`. It does not share a
+catalog with Pi.
+
+From this checkout, run:
+
+```bash
+npm run oc-switch
+```
+
+To install the command globally with npm from the cloned checkout:
+
+```bash
+npm install --global .
+oc-switch
+```
+
+After a tagged release is published, you can install the same CLI directly
+from GitHub without keeping a checkout:
+
+```bash
+npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.38"
+oc-switch
+```
+
+The package exposes `oc-switch` through its npm `bin` entry; no separate
+wrapper or shell alias is required. Keep `~/.npm-global/bin` (or your npm
+global bin directory) on `PATH` if npm is configured with a user prefix.
+
+#### `oc-switch` quick guide
+
+- `↑`/`↓` moves through `Default`, `Small/title`, and the agent rows.
+- `Enter` or `/` opens the model picker for the focused row.
+- Type to filter the current OpenCode catalog; `q`, `r`, and `s` are search
+  characters while the picker is open. `Backspace` deletes one character.
+- `Enter` applies the highlighted model. `Space` marks several agent rows so
+  one selection can be applied to all of them.
+- `s` saves. `q` saves and exits. `Esc` returns to the assignment list, and
+  `r` explicitly refreshes OpenCode's catalog.
+
+The selected values are persisted in the OpenCode model-switcher state and in
+the managed model block of `.zshrc` or `.bashrc`.
+
+Pi has its own independent `pi-switch`; its catalog comes only from Pi's
+`pi --list-models` command.
+
 ### 3. Install local plugin dependencies
 
 ```bash
@@ -680,7 +732,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.37
+node scripts/version.mjs --check-tag v1.0.38
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.

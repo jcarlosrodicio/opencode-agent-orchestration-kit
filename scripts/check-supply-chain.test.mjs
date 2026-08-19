@@ -161,7 +161,7 @@ function withSurfaceFixture(callback) {
     fs.writeFileSync(path.join(root, "supply-chain.json"), `${JSON.stringify(VALID)}\n`);
     fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
       files: PACKAGE_FILES,
-      bin: { oak: "scripts/oak.mjs" },
+      bin: { oak: "scripts/oak.mjs", "oc-switch": "scripts/oc-switch.mjs" },
       scripts: {
         "dependency-audit": "npm --prefix opencode audit --omit=dev --audit-level=low",
         "dependency-signature-audit": "npm --prefix opencode audit signatures",
@@ -222,7 +222,7 @@ function withCliFixture(inventory, callback) {
         writeValidDocumentation(root);
         fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
           files: PACKAGE_FILES,
-          bin: { oak: "scripts/oak.mjs" },
+          bin: { oak: "scripts/oak.mjs", "oc-switch": "scripts/oc-switch.mjs" },
           scripts: {
             "dependency-audit": "npm --prefix opencode audit --omit=dev --audit-level=low",
             "dependency-signature-audit": "npm --prefix opencode audit signatures",
@@ -341,11 +341,12 @@ test("surface validation accepts exact overrides, regenerated lock entries, and 
   });
 });
 
-test("surface validation requires exactly the canonical oak bin", () => {
+test("surface validation requires exactly the canonical oak and oc-switch bins", () => {
   for (const [bin, expected] of [
     [undefined, /package\.json bin/i],
-    [{ oak: "scripts/other.mjs" }, /bin\.oak/i],
-    [{ oak: "scripts/oak.mjs", other: "scripts/other.mjs" }, /keys must be exactly/i],
+    [{ oak: "scripts/other.mjs", "oc-switch": "scripts/oc-switch.mjs" }, /bin\.oak/i],
+    [{ oak: "scripts/oak.mjs", "oc-switch": "scripts/other.mjs" }, /bin\.oc-switch/i],
+    [{ oak: "scripts/oak.mjs", "oc-switch": "scripts/oc-switch.mjs", other: "scripts/other.mjs" }, /keys must be exactly/i],
   ]) {
     withSurfaceFixture((root) => {
       const packagePath = path.join(root, "package.json");

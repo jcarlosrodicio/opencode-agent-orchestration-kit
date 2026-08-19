@@ -17,13 +17,14 @@ import {
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const HASH = "a".repeat(64);
-const BASENAME = "opencode-agent-orchestration-kit-1.0.37.tgz";
+const BASENAME = "opencode-agent-orchestration-kit-1.0.38.tgz";
 const REQUIRED = [
   "package/package.json",
   "package/supply-chain.json",
   "package/install.sh",
   "package/scripts/manage-installation.mjs",
   "package/scripts/oak.mjs",
+  "package/scripts/oc-switch.mjs",
   "package/scripts/package-smoke.sh",
   "package/scripts/package-smoke.mjs",
   "package/opencode/opencode.json",
@@ -157,20 +158,21 @@ test("validatePackedOak requires exact metadata and executable regular file", (t
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, "scripts"));
   fs.writeFileSync(path.join(root, "scripts/oak.mjs"), "#!/usr/bin/env node\n", { mode: 0o755 });
+  fs.writeFileSync(path.join(root, "scripts/oc-switch.mjs"), "#!/usr/bin/env node\n", { mode: 0o755 });
   assert.doesNotThrow(() => validatePackedOak({
-    packed: { bin: { oak: "scripts/oak.mjs" } },
+    packed: { bin: { oak: "scripts/oak.mjs", "oc-switch": "scripts/oc-switch.mjs" } },
     packedRoot: root,
   }));
   for (const bin of [
     undefined,
     { oak: "scripts/other.mjs" },
-    { oak: "scripts/oak.mjs", other: "scripts/other.mjs" },
+    { oak: "scripts/oak.mjs", "oc-switch": "scripts/oc-switch.mjs", other: "scripts/other.mjs" },
   ]) {
     assert.throws(() => validatePackedOak({ packed: { bin }, packedRoot: root }), /bin/i);
   }
   fs.chmodSync(path.join(root, "scripts/oak.mjs"), 0o644);
   assert.throws(() => validatePackedOak({
-    packed: { bin: { oak: "scripts/oak.mjs" } },
+    packed: { bin: { oak: "scripts/oak.mjs", "oc-switch": "scripts/oc-switch.mjs" } },
     packedRoot: root,
   }), /executable/i);
 });
@@ -208,7 +210,7 @@ test("smokeTarball validates both archive listings before extraction", async () 
   await assert.rejects(
     smokeTarball({
       repositoryRoot: ROOT,
-      tarball: "/public/opencode-agent-orchestration-kit-1.0.37.tgz",
+      tarball: "/public/opencode-agent-orchestration-kit-1.0.38.tgz",
       captureTarball(_source, destination) {
         fs.writeFileSync(destination, "fixture");
         return { size: 1 };

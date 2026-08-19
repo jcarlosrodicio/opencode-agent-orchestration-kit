@@ -122,8 +122,8 @@ node scripts/check-use-cases.mjs
 node <<'NODE'
 const fs = require('fs')
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
-if (JSON.stringify(packageJson.bin) !== JSON.stringify({ oak: 'scripts/oak.mjs' })) {
-  throw new Error('package.json must expose exactly bin.oak = scripts/oak.mjs')
+if (JSON.stringify(packageJson.bin) !== JSON.stringify({ oak: 'scripts/oak.mjs', 'oc-switch': 'scripts/oc-switch.mjs' })) {
+  throw new Error('package.json must expose exactly bin.oak and bin.oc-switch')
 }
 NODE
 

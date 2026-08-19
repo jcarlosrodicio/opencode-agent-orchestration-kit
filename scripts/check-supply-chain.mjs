@@ -191,9 +191,12 @@ function validatePackages(root, data, fsOps) {
   if (JSON.stringify(rootPackage.files) !== JSON.stringify(PACKAGE_FILES)) {
     throw invalid(`package.json files must be exactly: ${PACKAGE_FILES.join(", ")}`);
   }
-  assertExactKeys(rootPackage.bin, ["oak"], "package.json bin");
+  assertExactKeys(rootPackage.bin, ["oak", "oc-switch"], "package.json bin");
   if (rootPackage.bin.oak !== "scripts/oak.mjs") {
     throw invalid("package.json bin.oak must be scripts/oak.mjs");
+  }
+  if (rootPackage.bin["oc-switch"] !== "scripts/oc-switch.mjs") {
+    throw invalid("package.json bin.oc-switch must be scripts/oc-switch.mjs");
   }
   for (const [script, command] of [
     ["dependency-audit", "npm --prefix opencode audit --omit=dev --audit-level=low"],

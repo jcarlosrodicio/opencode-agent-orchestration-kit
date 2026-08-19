@@ -1,11 +1,12 @@
 {
   "name": "opencode-agent-orchestration-kit",
-  "version": "1.0.37",
+  "version": "1.0.38",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "oak": "scripts/oak.mjs"
+    "oak": "scripts/oak.mjs",
+    "oc-switch": "scripts/oc-switch.mjs"
   },
   "files": [
     "CODE_OF_CONDUCT.md",
@@ -40,6 +41,7 @@
     "dependency-signature-audit": "npm --prefix opencode audit signatures",
     "installation-smoke": "bash scripts/install-smoke.sh",
     "package-smoke": "bash scripts/package-smoke.sh",
+    "oc-switch": "node scripts/oc-switch.mjs",
     "check:quick": "npm run contract-check",
     "check": "npm run contract-check && npm run unit-and-script-tests",
     "check:release": "npm --prefix opencode ci --ignore-scripts && npm run check && npm run typecheck && npm run dependency-audit && npm run dependency-signature-audit && npm run installation-smoke && npm run package-smoke",

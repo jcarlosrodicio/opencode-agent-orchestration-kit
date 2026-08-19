@@ -317,13 +317,20 @@ test("[O011] symlinked oak executable runs its CLI", (t) => {
   assert.equal(result.stderr, "");
 });
 
-test("[O012] package exposes exactly one executable oak binary", () => {
+test("[O012] package exposes the executable oak and oc-switch binaries", () => {
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(REPOSITORY_ROOT, "package.json"), "utf8"),
   );
-  assert.deepEqual(packageJson.bin, { oak: "scripts/oak.mjs" });
+  assert.deepEqual(packageJson.bin, {
+    oak: "scripts/oak.mjs",
+    "oc-switch": "scripts/oc-switch.mjs",
+  });
   const stat = fs.lstatSync(path.join(REPOSITORY_ROOT, packageJson.bin.oak));
   assert.equal(stat.isFile(), true);
   assert.equal(stat.isSymbolicLink(), false);
   assert.notEqual(stat.mode & 0o111, 0);
+  const switchStat = fs.lstatSync(path.join(REPOSITORY_ROOT, packageJson.bin["oc-switch"]));
+  assert.equal(switchStat.isFile(), true);
+  assert.equal(switchStat.isSymbolicLink(), false);
+  assert.notEqual(switchStat.mode & 0o111, 0);
 });

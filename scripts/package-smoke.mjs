@@ -15,6 +15,7 @@ const REQUIRED_FILES = [
   "package/install.sh",
   "package/scripts/manage-installation.mjs",
   "package/scripts/oak.mjs",
+  "package/scripts/oc-switch.mjs",
   "package/scripts/package-smoke.sh",
   "package/scripts/package-smoke.mjs",
   "package/opencode/opencode.json",
@@ -123,10 +124,11 @@ export function validatePackedOak({ packed, packedRoot, fsOps = fs }) {
     !packed?.bin
     || typeof packed.bin !== "object"
     || Array.isArray(packed.bin)
-    || JSON.stringify(Object.keys(packed.bin).sort()) !== JSON.stringify(["oak"])
+    || JSON.stringify(Object.keys(packed.bin).sort()) !== JSON.stringify(["oak", "oc-switch"])
     || packed.bin.oak !== "scripts/oak.mjs"
+    || packed.bin["oc-switch"] !== "scripts/oc-switch.mjs"
   ) {
-    throw smokeError("packed package bin must expose exactly oak at scripts/oak.mjs");
+    throw smokeError("packed package bin must expose oak and oc-switch at their scripts entrypoints");
   }
   let stat;
   try {
@@ -139,6 +141,18 @@ export function validatePackedOak({ packed, packedRoot, fsOps = fs }) {
   }
   if ((stat.mode & 0o111) === 0) {
     throw smokeError("packed oak entrypoint must be executable");
+  }
+  let switchStat;
+  try {
+    switchStat = fsOps.lstatSync(path.join(packedRoot, packed.bin["oc-switch"]));
+  } catch {
+    throw smokeError("packed oc-switch entrypoint is missing");
+  }
+  if (switchStat.isSymbolicLink() || !switchStat.isFile()) {
+    throw smokeError("packed oc-switch entrypoint must be a regular non-symlink file");
+  }
+  if ((switchStat.mode & 0o111) === 0) {
+    throw smokeError("packed oc-switch entrypoint must be executable");
   }
 }
 
