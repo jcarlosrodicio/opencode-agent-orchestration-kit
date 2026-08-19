@@ -1,8 +1,11 @@
 # OpenCode Agent Orchestration Kit
 
-[![Check](https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/actions/workflows/check.yml/badge.svg)](https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/actions/workflows/check.yml)
-[![License](https://img.shields.io/github/license/jcarlosrodicio/opencode-agent-orchestration-kit)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/jcarlosrodicio/opencode-agent-orchestration-kit)](https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/releases)
+<p align="center">
+  <a href="https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/actions/workflows/check.yml"><img src="https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/actions/workflows/check.yml/badge.svg" alt="Check"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jcarlosrodicio/opencode-agent-orchestration-kit" alt="License"></a>
+  <a href="https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/releases"><img src="https://img.shields.io/github/v/release/jcarlosrodicio/opencode-agent-orchestration-kit" alt="Latest release"></a>
+  <a href="https://github.com/sponsors/jcarlosrodicio"><img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
+</p>
 
 A reproducible product-development workflow for OpenCode.
 
