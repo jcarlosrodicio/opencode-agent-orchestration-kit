@@ -935,6 +935,8 @@ definitions, exact pins, evidence, and scope.
 
 Contributions are welcome.
 
+Found a bug or have an idea? [Open an issue](https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/issues/new/choose) · [Browse existing issues](https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/issues)
+
 Good contributions include:
 
 - Clearer documentation.
