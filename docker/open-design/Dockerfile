@@ -37,6 +37,8 @@ NODE
 RUN pnpm --filter @open-design/daemon build \
   && (pnpm build || pnpm -r build)
 
+COPY entrypoint.mjs /usr/local/bin/open-design-entrypoint.mjs
+
 ENV OD_HOST=0.0.0.0
 ENV OD_PORT=7456
 ENV OPENCODE_CONFIG_DIR=/home/opencode/.config/opencode
@@ -47,4 +49,4 @@ RUN mkdir -p /home/opencode/.config/opencode /home/opencode/.local/share/opencod
 USER opencode
 EXPOSE 7456
 
-CMD ["sh", "-lc", "node apps/daemon/dist/cli.js --port ${OD_PORT:-7456} --no-open"]
+ENTRYPOINT ["node", "/usr/local/bin/open-design-entrypoint.mjs"]

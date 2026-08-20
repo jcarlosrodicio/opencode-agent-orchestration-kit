@@ -45,6 +45,11 @@ The compose file mounts:
 
 Do not commit `data` or `opencode-auth`.
 
+`OD_PORT` must be a decimal TCP port from `1` to `65535`; it defaults to
+`7456`. The image validates this value before starting the daemon and passes it
+as a separate argument without a shell. Invalid values stop the container with
+a deterministic startup error.
+
 ## HTTP LAN and crypto.randomUUID
 
 Some browser APIs require a secure context. If Open Design frontend code calls `crypto.randomUUID` and your browser blocks it over HTTP LAN, prefer HTTPS. Only patch upstream frontend code as a local operational workaround.
