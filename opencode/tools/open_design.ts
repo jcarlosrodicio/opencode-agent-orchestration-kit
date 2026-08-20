@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
+import { requestJson, streamOpenDesignChat } from "./open-design-http.mjs"
 
 type RuntimeGlobals = {
   process?: { env?: Record<string, string | undefined> }
@@ -44,31 +45,6 @@ function baseUrl(input?: string) {
   }
 
   return url
-}
-
-async function requestJson(base: string, path: string, init: RequestInit = {}) {
-  const res = await fetch(`${base}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers || {}),
-    },
-  })
-
-  const text = await res.text()
-  let body: unknown = text
-
-  try {
-    body = text ? JSON.parse(text) : null
-  } catch {
-    body = text
-  }
-
-  if (!res.ok) {
-    throw new Error(`Open Design ${path} failed (${res.status}): ${JSON.stringify(body, null, 2)}`)
-  }
-
-  return body
 }
 
 function safeSlug(input: string) {
@@ -124,83 +100,6 @@ function composeSystemPrompt(input: {
       ? `## Active design system: ${input.designSystemId}\n\n${input.designSystemBody}`
       : "## Active design system\n\nNo explicit design system selected. Use a restrained, professional default.",
   ].join("\n")
-}
-
-function parseSseFrames(buffer: string) {
-  const frames: Array<{ event: string; data: any }> = []
-  let rest = buffer
-
-  while (true) {
-    const idx = rest.indexOf("\n\n")
-    if (idx === -1) break
-    const raw = rest.slice(0, idx)
-    rest = rest.slice(idx + 2)
-
-    let event = "message"
-    let data = ""
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("event: ")) event = line.slice(7).trim()
-      if (line.startsWith("data: ")) data += line.slice(6)
-    }
-
-    try {
-      frames.push({ event, data: JSON.parse(data) })
-    } catch {
-      frames.push({ event, data })
-    }
-  }
-
-  return { frames, rest }
-}
-
-async function streamOpenDesignChat(base: string, body: unknown) {
-  const res = await fetch(`${base}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-
-  if (!res.ok || !res.body) {
-    const text = await res.text().catch(() => "")
-    throw new Error(`Open Design chat failed (${res.status}): ${text}`)
-  }
-
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ""
-  let stdout = ""
-  let stderr = ""
-  let end: any = null
-  let eventsCount = 0
-
-  while (true) {
-    const { value, done } = await reader.read()
-    if (done) break
-
-    buffer += decoder.decode(value, { stream: true })
-    const parsed = parseSseFrames(buffer)
-    buffer = parsed.rest
-
-    for (const frame of parsed.frames) {
-      eventsCount += 1
-      if (frame.event === "stdout") stdout += String(frame.data?.chunk ?? "")
-      if (frame.event === "stderr") stderr += String(frame.data?.chunk ?? "")
-      if (frame.event === "agent") {
-        if (typeof frame.data?.delta === "string") stdout += frame.data.delta
-        if (typeof frame.data?.text === "string") stdout += frame.data.text
-      }
-      if (frame.event === "end") end = frame.data
-      if (frame.event === "error") {
-        throw new Error(`Open Design agent error: ${String(frame.data?.message ?? JSON.stringify(frame.data))}`)
-      }
-    }
-  }
-
-  if (end && typeof end.code === "number" && end.code !== 0) {
-    throw new Error(`Open Design agent exited with code ${end.code}\n${stderr.slice(-1000)}`)
-  }
-
-  return { stdout, stderr, end, eventsCount }
 }
 
 export const health = tool({
