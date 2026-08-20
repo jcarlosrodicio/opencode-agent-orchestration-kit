@@ -49,6 +49,8 @@ opencode/package-lock.json
 opencode/plugins/token-tree-usage.tsx
 opencode/plugins/shell-export-guard.ts
 opencode/tools/open_design.ts
+opencode/tools/open-design-http.mjs
+opencode/tools/open-design-http.d.mts
 opencode/scripts/check-harness.mjs
 opencode/scripts/shell-export-policy.mjs
 opencode/scripts/shell-export-policy.d.mts
