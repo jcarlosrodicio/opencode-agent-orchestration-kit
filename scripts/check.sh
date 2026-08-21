@@ -55,6 +55,7 @@ opencode/tools/open-design-http.mjs
 opencode/tools/open-design-http.d.mts
 opencode/scripts/check-harness.mjs
 opencode/scripts/mission-runtime-observer.mjs
+opencode/scripts/mission-runtime-observer.d.mts
 opencode/scripts/mission-runtime.test.mjs
 opencode/scripts/mission-status.mjs
 opencode/scripts/mission-status.test.mjs

@@ -12,6 +12,7 @@ const REQUIRED_FILES = [
   "opencode/docs/ai/specs/mission-runtime.md",
   "opencode/plugins/mission-runtime.ts",
   "opencode/scripts/mission-runtime-observer.mjs",
+  "opencode/scripts/mission-runtime-observer.d.mts",
   "opencode/scripts/mission-status.mjs",
   "opencode/scripts/runtime-permission-policy.mjs",
 ];
