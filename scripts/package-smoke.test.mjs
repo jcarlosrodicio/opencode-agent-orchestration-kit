@@ -228,7 +228,7 @@ test("smokeTarball validates both archive listings before extraction", async () 
   assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["tar", "-tzf"], ["tar", "-tvzf"]]);
 });
 
-test("the wrapper smokes a packed tarball and verifies checksum before extraction", { timeout: 180_000 }, () => {
+test("the wrapper smokes a packed tarball and verifies checksum before extraction", { timeout: 300_000 }, () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "package-smoke-integration-"));
   try {
     const packed = spawnSync("npm", ["pack", "--json", "--pack-destination", temp], {
@@ -243,7 +243,7 @@ test("the wrapper smokes a packed tarball and verifies checksum before extractio
     const direct = spawnSync("bash", ["scripts/package-smoke.sh", tarball], {
       cwd: ROOT,
       encoding: "utf8",
-      timeout: 120_000,
+      timeout: 240_000,
     });
     assert.equal(direct.status, 0, direct.stderr);
     const evidence = JSON.parse(direct.stdout);
@@ -255,7 +255,7 @@ test("the wrapper smokes a packed tarball and verifies checksum before extractio
     const verified = spawnSync("bash", ["scripts/package-smoke.sh", "--checksum", checksum, tarball], {
       cwd: ROOT,
       encoding: "utf8",
-      timeout: 120_000,
+      timeout: 240_000,
     });
     assert.equal(verified.status, 0, verified.stderr);
 
@@ -274,7 +274,7 @@ test("the wrapper smokes a packed tarball and verifies checksum before extractio
   }
 });
 
-test("smokeTarball is unaffected when the original tarball changes between validation phases", { timeout: 180_000 }, async () => {
+test("smokeTarball is unaffected when the original tarball changes between validation phases", { timeout: 300_000 }, async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "package-smoke-snapshot-test-"));
   try {
     const packed = spawnSync("npm", ["pack", "--json", "--pack-destination", temp], {

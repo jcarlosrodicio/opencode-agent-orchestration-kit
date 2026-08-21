@@ -20,6 +20,7 @@ import {
   parseCliArgs,
   resolveTarget,
   validateManifest,
+  validateReleaseProvenance,
   validateTransaction,
 } from "./manage-installation.mjs";
 
@@ -52,6 +53,8 @@ function capture() {
 
 const HASH_A = "a".repeat(64);
 const HASH_B = "b".repeat(64);
+const COMMIT_A = "a".repeat(40);
+const COMMIT_B = "b".repeat(40);
 const REPOSITORY_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 function validManifest(overrides = {}) {
@@ -1041,6 +1044,39 @@ test("[V015] manifest digest includes kit version", () => {
     manifestDigest(validManifest({ kit_version: "1.0.26" })),
     manifestDigest(validManifest({ kit_version: "1.0.27" })),
   );
+});
+
+test("release provenance is optional for old state and bound to new payloads", async (t) => {
+  const provenance = {
+    source_commit: COMMIT_A,
+    public_commit: COMMIT_B,
+    kit_version: "1.0.27",
+    payload_sha256: HASH_A,
+    checks_result: "passed",
+  };
+  validateReleaseProvenance(provenance, { kitVersion: "1.0.27", payloadSha256: HASH_A });
+  validateManifest(validManifest({ release_provenance: provenance }));
+  assert.throws(() => validateManifest(validManifest({
+    release_provenance: { ...provenance, payload_sha256: HASH_B },
+  })), /payload_sha256 does not match manifest/i);
+  assert.throws(() => validateManifest(validManifest({
+    release_provenance: { ...provenance, checks_result: "failed" },
+  })), /checks_result/i);
+
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const result = await managerFixture(sourceRoot, {
+    releaseProvenance: {
+      source_commit: COMMIT_A,
+      public_commit: COMMIT_B,
+      checks_result: "passed",
+    },
+  }).run("install", { targetRoot });
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(result.plan.nextManifest.release_provenance, {
+    ...provenance,
+    payload_sha256: result.plan.nextManifest.payload_sha256,
+  });
 });
 
 test("[V016] a newer source version commits a manifest-only upgrade", async (t) => {
