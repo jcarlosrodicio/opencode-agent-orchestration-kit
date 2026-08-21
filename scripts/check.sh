@@ -34,6 +34,8 @@ scripts/check-use-cases.test.mjs
 scripts/package-smoke.sh
 scripts/package-smoke.mjs
 scripts/package-smoke.test.mjs
+scripts/benchmark-tool-paths.mjs
+scripts/benchmark-tool-paths.test.mjs
 scripts/opencode-compat-smoke.sh
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
@@ -87,6 +89,7 @@ docker/open-design/docker-compose.yml
 docker/open-design/.env.example
 docker/open-design/opencode-od/opencode.json
 docs/supply-chain.md
+docs/performance/native-tools-benchmark.md
 docs/threat-model.md
 docs/use-cases/README.md
 docs/use-cases/direct-label-change/README.md
