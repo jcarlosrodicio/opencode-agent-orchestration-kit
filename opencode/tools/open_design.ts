@@ -40,7 +40,7 @@ function baseUrl(input?: string) {
   }
 
   const url = raw.replace(/\/+$/, "")
-  if (/\/projects\//.test(url)) {
+  if (/\/projects(?:\/|$)/.test(url)) {
     throw new Error("OPEN_DESIGN_URL must be the Open Design base URL, not a project or file URL.")
   }
 

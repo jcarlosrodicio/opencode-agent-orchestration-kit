@@ -16,6 +16,8 @@ automation.
 ```text
 approval_gate: explicit_before_writes
 max_iterations_per_invocation: 3
+planned_iteration_budget: task_specific_1_to_6
+hard_safety_ceiling: 6
 completion_authority: reviewer_only
 canonical_review_policy: code-review-and-quality/references/review-policy.md
 final_review_authority: reviewer
@@ -25,6 +27,12 @@ lock_path: .opencode/loops/<slug>.lock
 human_view_path: .opencode/loops/<slug>.md
 worktree_mode: explicit_opt_in
 ```
+
+The three-iteration value limits one invocation. The persisted
+`planned_iteration_budget` (`planned_iterations` in canonical state) is the total budget for the mission and may not
+exceed the hard ceiling of six; `current_iteration` may never exceed that
+budget. Once the total budget is exhausted, the loop must stop as `blocked` or
+`completed` rather than injecting another continuation.
 
 The durable `handoff_packet` (`.opencode/handoffs/<slug>.md` with
 `approval_status`) persists human approval to survive session restarts. `/loop`

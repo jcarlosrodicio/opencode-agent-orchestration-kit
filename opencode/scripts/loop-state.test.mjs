@@ -12,6 +12,7 @@ import {
   initLoopState,
   inspectLoopState,
   migrateLoopState,
+  readLoopHistory,
   recordLoopAction,
   releaseLoop,
   repairLoopState,
@@ -585,6 +586,18 @@ test("exposes the durable operations through the portable CLI", () => {
     );
     assert.equal(inspect.status, 0, inspect.stderr);
     assert.equal(JSON.parse(inspect.stdout).last_action_id, "approve-1");
+  });
+});
+
+test("readLoopHistory returns validated append-only events without changing state", () => {
+  withRepo(({ root, contractPath }) => {
+    const before = initExample(root, contractPath, 1);
+    const history = readLoopHistory({ root, slug: "example" });
+
+    assert.equal(history.length, 1);
+    assert.equal(history[0].type, "initialized");
+    assert.equal(history[0].state_after.last_action_id, before.last_action_id);
+    assert.deepEqual(inspectLoopState({ root, slug: "example" }), before);
   });
 });
 

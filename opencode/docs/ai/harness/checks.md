@@ -64,6 +64,12 @@ Slice 2.4 adds durable structured state for `/loop`. Run its focused tests with:
 node --test scripts/loop-state.test.mjs
 ```
 
+The mission runtime projection is read-only: `mission-status.mjs` validates
+the canonical snapshot and history, while `mission-runtime` observes ephemeral
+events without writing an alternative state. The Open Design boundary requires
+`OPEN_DESIGN_URL` to be a base URL and rejects project or file URLs; the checker
+also rejects private endpoints and UUID-specific crypto dependencies.
+
 The dependency-free runtime maintains a JSON snapshot, append-only JSONL
 history, and exclusive lock. Tests cover crash recovery, same-session
 contention, symlink boundaries, journal continuity, migration, and explicit

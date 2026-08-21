@@ -2,6 +2,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
+import {
+  AGENT_IDS as RUNTIME_AGENT_IDS,
+  AGENT_POLICIES,
+  POLICY_OPERATIONS,
+  decideToolAccess,
+} from "./runtime-permission-policy.mjs";
 
 const root = process.cwd();
 const errors = [];
@@ -2913,6 +2919,108 @@ function checkShellExportGuardContract() {
   }
 }
 
+function checkRuntimePermissionPolicy() {
+  const actualAgentIds = listMarkdown("agents")
+    .map(stripMarkdownExtension)
+    .sort();
+  const expectedAgentIds = [...RUNTIME_AGENT_IDS].sort();
+  if (JSON.stringify(actualAgentIds) !== JSON.stringify(expectedAgentIds)) {
+    fail("runtime permission policy: agent catalog must match configured agents");
+  }
+
+  for (const agentId of RUNTIME_AGENT_IDS) {
+    const policy = AGENT_POLICIES[agentId];
+    if (!policy) {
+      fail(`runtime permission policy: missing policy for ${agentId}`);
+      continue;
+    }
+    for (const operation of POLICY_OPERATIONS) {
+      const decision = operation === "delegate"
+        ? decideToolAccess({ agentId, operation, target: "unknown" })
+        : decideToolAccess({ agentId, operation });
+      if (!["allow", "ask", "deny"].includes(decision)) {
+        fail(`runtime permission policy: invalid ${agentId}/${operation} decision`);
+      }
+    }
+
+    const rel = `agents/${agentId}.md`;
+    if (!exists(rel)) continue;
+    const declared = parsePortableAgentPermissions(rel);
+    if (declared.repositoryWrite !== policy.repository_write) {
+      fail(`runtime permission policy: ${agentId} repository_write diverges from frontmatter`);
+    }
+    if (declared.taskDefault !== policy.task_default) {
+      fail(`runtime permission policy: ${agentId} task_default diverges from frontmatter`);
+    }
+  }
+
+  if (decideToolAccess({ agentId: "unknown", operation: "write" }) !== "deny") {
+    fail("runtime permission policy: unknown agent must deny");
+  }
+  if (decideToolAccess({ agentId: "developer", operation: "unknown" }) !== "deny") {
+    fail("runtime permission policy: unknown operation must deny");
+  }
+}
+
+function checkOpenDesignToolContract() {
+  const rel = "tools/open_design.ts";
+  if (!exists(rel)) {
+    fail(`${rel}: missing Open Design tool`);
+    return;
+  }
+
+  const source = read(rel);
+  for (const [label, present] of [
+    ["base URL environment", source.includes("OPEN_DESIGN_URL")],
+    ["base URL argument", source.includes("baseUrl: tool.schema.string().optional()")],
+    ["trailing slash normalization", source.includes('raw.replace(/\\/+$/, "")')],
+    ["project-path guard", source.includes("projects(?:\\/|$)")],
+  ]) {
+    if (!present) fail(`${rel}: missing Open Design ${label}`);
+  }
+
+  if (/randomUUID|node:crypto/.test(source)) {
+    fail(`${rel}: Open Design tool must not depend on randomUUID or node:crypto`);
+  }
+  if (/juancanas|synology|\/Users\/|\/home\//i.test(source)) {
+    fail(`${rel}: Open Design tool contains a private endpoint or local path`);
+  }
+}
+
+function checkMissionRuntimeContract() {
+  const required = [
+    "scripts/mission-status.mjs",
+    "scripts/mission-runtime-observer.mjs",
+    "scripts/mission-runtime.test.mjs",
+    "plugins/mission-runtime.ts",
+    "plugins/mission-runtime.test.mjs",
+    "commands/loop-status.md",
+    "docs/ai/specs/mission-runtime.md",
+  ];
+  for (const rel of required) {
+    if (!exists(rel)) fail(`${rel}: missing mission runtime surface`);
+  }
+  if (!required.every(exists)) return;
+
+  const status = read("scripts/mission-status.mjs");
+  for (const token of ["inspectLoopState", "readLoopHistory", "--json", "next_action"]) {
+    if (!status.includes(token)) fail(`${required[0]}: missing mission status token ${token}`);
+  }
+
+  const observer = read("scripts/mission-runtime-observer.mjs");
+  for (const token of ["session.status", "session.compacted", "session.error", "child_session_ids"]) {
+    if (!observer.includes(token)) fail(`${required[1]}: missing observer token ${token}`);
+  }
+
+  const plugin = read("plugins/mission-runtime.ts");
+  for (const token of ["event:", "chat.message", "showToast", "mission-runtime-observer.mjs"]) {
+    if (!plugin.includes(token)) fail(`${required[3]}: missing plugin token ${token}`);
+  }
+  if (/writeFile|appendFile|rename|\.opencode\/loops/.test(`${observer}\n${plugin}`)) {
+    fail("mission runtime observer: must not write durable loop state");
+  }
+}
+
 checkConfig();
 checkAgentsIndex();
 checkFrontmatter();
@@ -2953,6 +3061,9 @@ checkHitlDurableContract();
 checkRoutingDeclarativoContract();
 checkRetryPoliciesContract();
 checkShellExportGuardContract();
+checkRuntimePermissionPolicy();
+checkOpenDesignToolContract();
+checkMissionRuntimeContract();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");
