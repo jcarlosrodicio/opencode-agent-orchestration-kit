@@ -37,6 +37,7 @@ const SKIP_DIRS = new Set([
 
 const STACK_RULES = [
   { file: "package.json", id: "node", confidence: "high" },
+  { glob: "scripts/*.mjs", id: "node", confidence: "medium" },
   { file: "tsconfig.json", id: "typescript", confidence: "high" },
   { file: "next.config.mjs", id: "nextjs", confidence: "high" },
   { file: "next.config.js", id: "nextjs", confidence: "high" },
@@ -241,7 +242,7 @@ export function detectStacks(repoRoot) {
   const seen = new Map();
 
   for (const rule of STACK_RULES) {
-    const matches = matchGlobs(files, [rule.file]);
+    const matches = matchGlobs(files, [rule.file ?? rule.glob]);
     if (matches.length > 0) {
       const existing = seen.get(rule.id);
       if (!existing) {

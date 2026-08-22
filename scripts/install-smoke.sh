@@ -19,6 +19,9 @@ cd "$root"
 expected_version="$(node -p "require('./package.json').version")"
 expected_line="opencode-agent-orchestration-kit $expected_version"
 
+mkdir -p "$target"
+printf '%s\n' '{"default_agent":"lead"}' > "$target/opencode.json"
+
 for wrapper in install.sh upgrade.sh doctor.sh uninstall.sh rollback.sh; do
   test "$("./$wrapper" --version)" = "$expected_line"
 done
@@ -29,6 +32,7 @@ const [, , sourceRoot, targetRoot] = process.argv
 const result = await createInstallationManager({
   sourceRoot,
   versionProvider: () => "1.0.26",
+  releaseProvenance: null,
 }).run("install", { targetRoot })
 if (result.exitCode !== 0) throw result.error ?? new Error("smoke install failed")
 NODE
@@ -38,6 +42,7 @@ test -f "$target/opencode.json"
 test -f "$target/scripts/check-harness.mjs"
 test -f "$target/.oak/manifest.json"
 test -f "$target/.oak/rollback/transaction.json"
+test "$(cat "$target/opencode.json")" = '{"default_agent":"lead"}'
 
 node --input-type=module - "$target" <<'NODE'
 import fs from "node:fs"
@@ -66,6 +71,18 @@ const rollback = JSON.parse(fs.readFileSync(path.join(target, ".oak", "rollback"
 if (manifest.kit_version !== expected) throw new Error("upgraded manifest version mismatch")
 if (rollback.previous_manifest?.kit_version !== "1.0.26" || rollback.next_manifest?.kit_version !== expected) {
   throw new Error("upgrade snapshot version mismatch")
+}
+if (process.env.OAK_RELEASE_SOURCE_COMMIT) {
+  const provenance = manifest.release_provenance
+  if (!provenance
+    || provenance.source_commit !== process.env.OAK_RELEASE_SOURCE_COMMIT
+    || provenance.public_commit !== process.env.OAK_RELEASE_PUBLIC_COMMIT
+    || provenance.kit_version !== expected
+    || provenance.payload_sha256 !== manifest.payload_sha256
+    || provenance.payload_sha256 !== process.env.OAK_RELEASE_PAYLOAD_SHA256
+    || provenance.checks_result !== process.env.OAK_RELEASE_CHECKS_RESULT) {
+    throw new Error("release provenance mismatch")
+  }
 }
 NODE
 

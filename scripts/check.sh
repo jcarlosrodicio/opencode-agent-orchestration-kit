@@ -34,6 +34,8 @@ scripts/check-use-cases.test.mjs
 scripts/package-smoke.sh
 scripts/package-smoke.mjs
 scripts/package-smoke.test.mjs
+scripts/benchmark-tool-paths.mjs
+scripts/benchmark-tool-paths.test.mjs
 scripts/opencode-compat-smoke.sh
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
@@ -48,14 +50,24 @@ opencode/package.json
 opencode/package-lock.json
 opencode/plugins/token-tree-usage.tsx
 opencode/plugins/shell-export-guard.ts
+opencode/plugins/mission-runtime.ts
+opencode/plugins/mission-runtime.test.mjs
 opencode/tools/open_design.ts
 opencode/tools/open-design-http.mjs
 opencode/tools/open-design-http.d.mts
 opencode/scripts/check-harness.mjs
+opencode/scripts/mission-runtime-observer.mjs
+opencode/scripts/mission-runtime-observer.d.mts
+opencode/scripts/mission-runtime.test.mjs
+opencode/scripts/mission-status.mjs
+opencode/scripts/mission-status.test.mjs
+opencode/scripts/runtime-permission-policy.mjs
+opencode/scripts/runtime-permission-policy.test.mjs
 opencode/scripts/shell-export-policy.mjs
 opencode/scripts/shell-export-policy.d.mts
 opencode/scripts/shell-export-policy.test.mjs
 opencode/commands/loop.md
+opencode/commands/loop-status.md
 opencode/commands/plan.md
 opencode/commands/test.md
 opencode/commands/code-simplify.md
@@ -65,6 +77,7 @@ opencode/docs/ai/harness/commands.md
 opencode/docs/ai/harness/evidence.md
 opencode/docs/ai/harness/checks.md
 opencode/docs/ai/harness/orchestration-contracts.json
+opencode/docs/ai/specs/mission-runtime.md
 opencode/docs/ai/evolution/README.md
 opencode/docs/ai/evolution/evolution_history.md
 opencode/docs/ai/evolution/mechanisms.jsonl
@@ -76,6 +89,7 @@ docker/open-design/docker-compose.yml
 docker/open-design/.env.example
 docker/open-design/opencode-od/opencode.json
 docs/supply-chain.md
+docs/performance/native-tools-benchmark.md
 docs/threat-model.md
 docs/use-cases/README.md
 docs/use-cases/direct-label-change/README.md
@@ -230,16 +244,7 @@ grep -q 'Lead' opencode/plugins/token-tree-usage.tsx
 grep -q 'Subagents' opencode/plugins/token-tree-usage.tsx
 grep -q 'Partial total' opencode/plugins/token-tree-usage.tsx
 
-private_re="$(printf '%s|%s|%s|%s' '/''Users/' 'synology''\\.me' 'auth''\\.json' 'OPENAI''_API_KEY')"
-if grep -R -nE "$private_re" . \
-  --exclude-dir=.git \
-  --exclude-dir=node_modules \
-  --exclude='.git' \
-  --exclude='check.sh' \
-  --exclude='.gitignore'; then
-  echo 'Potential private data found' >&2
-  exit 1
-fi
+node scripts/check-public-boundary.mjs
 
 grep -q 'Apache License' LICENSE
 grep -q 'OpenCode' NOTICE.md

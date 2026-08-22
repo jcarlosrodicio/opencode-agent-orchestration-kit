@@ -787,6 +787,11 @@ export function inspectLoopState({ root, slug }) {
   return structuredClone(state);
 }
 
+export function readLoopHistory({ root, slug }) {
+  const paths = pathsFor(root, slug);
+  return structuredClone(readHistory(paths).events);
+}
+
 export function acquireLoop({
   root,
   slug,

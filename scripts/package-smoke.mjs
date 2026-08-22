@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = path.dirname(path.dirname(SCRIPT_PATH));
@@ -218,7 +218,7 @@ function hashFile(file) {
   };
 }
 
-function safeEnvironment(tempRoot) {
+function safeEnvironment(tempRoot, extra = {}) {
   const home = path.join(tempRoot, "home");
   const cache = path.join(tempRoot, "npm-cache");
   fs.mkdirSync(home);
@@ -231,6 +231,44 @@ function safeEnvironment(tempRoot) {
     npm_config_userconfig: path.join(home, ".npmrc"),
     CI: "true",
     LANG: process.env.LANG ?? "C",
+    ...extra,
+  };
+}
+
+function readGitCommit(repositoryRoot) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
+  const commit = result.status === 0 ? result.stdout.trim() : "";
+  if (!/^[0-9a-f]{40}$/.test(commit)) throw smokeError("release provenance requires a checked-out public commit");
+  return commit;
+}
+
+function readProjectionSourceCommit(repositoryRoot) {
+  let boundary;
+  try {
+    boundary = fs.readFileSync(path.join(repositoryRoot, "docs", "sync-boundary.md"), "utf8");
+  } catch {
+    throw smokeError("release provenance source commit marker is missing");
+  }
+  const match = boundary.match(/<!--\s*projection-source-commit:\s*([0-9a-f]{40})\s*-->/);
+  if (!match) throw smokeError("release provenance source commit marker is invalid");
+  return match[1];
+}
+
+function readReleaseProvenance(repositoryRoot) {
+  const sourceCommit = process.env.OAK_RELEASE_SOURCE_COMMIT ?? readProjectionSourceCommit(repositoryRoot);
+  const publicCommit = process.env.OAK_RELEASE_PUBLIC_COMMIT ?? readGitCommit(repositoryRoot);
+  const checksResult = process.env.OAK_RELEASE_CHECKS_RESULT ?? "passed";
+  if (!/^[0-9a-f]{40}$/.test(sourceCommit) || !/^[0-9a-f]{40}$/.test(publicCommit)) {
+    throw smokeError("release provenance commit identities are invalid");
+  }
+  if (checksResult !== "passed") throw smokeError("release provenance checks result must be passed");
+  return {
+    OAK_RELEASE_SOURCE_COMMIT: sourceCommit,
+    OAK_RELEASE_PUBLIC_COMMIT: publicCommit,
+    OAK_RELEASE_CHECKS_RESULT: checksResult,
   };
 }
 
@@ -278,6 +316,7 @@ export async function smokeTarball(options = {}) {
   const run = options.run ?? ((command, args, commandOptions = {}) => runCommand(command, args, commandOptions));
 
   const canonical = readRootPackage(repositoryRoot);
+  const releaseProvenance = readReleaseProvenance(repositoryRoot);
   const expectedBasename = `${canonical.name}-${canonical.version}.tgz`;
   if (basename !== expectedBasename) throw smokeError(`tarball filename must be ${expectedBasename}`);
 
@@ -308,7 +347,7 @@ export async function smokeTarball(options = {}) {
 
     const extracted = path.join(temporary.root, "extracted");
     fs.mkdirSync(extracted);
-    const environment = safeEnvironment(temporary.root);
+    const environment = safeEnvironment(temporary.root, releaseProvenance);
     run("tar", ["-xzf", capturedTarball, "-C", extracted], { label: "archive extraction failed" });
 
     let packed;
@@ -324,6 +363,9 @@ export async function smokeTarball(options = {}) {
     const packedRoot = path.join(extracted, "package");
     validatePackedOak({ packed, packedRoot });
     const opencodeRoot = path.join(packedRoot, "opencode");
+    const { inventorySource } = await import(pathToFileURL(path.join(packedRoot, "scripts", "manage-installation.mjs")).href);
+    const packedPayload = inventorySource(opencodeRoot).payloadSha256;
+    environment.OAK_RELEASE_PAYLOAD_SHA256 = packedPayload;
     run("npm", ["ci", "--ignore-scripts"], {
       cwd: opencodeRoot,
       env: environment,
@@ -371,6 +413,13 @@ export async function smokeTarball(options = {}) {
       sha256: hashes.sha256,
       sha1: hashes.sha1,
       sha512: hashes.sha512,
+      release_provenance: {
+        source_commit: releaseProvenance.OAK_RELEASE_SOURCE_COMMIT,
+        public_commit: releaseProvenance.OAK_RELEASE_PUBLIC_COMMIT,
+        kit_version: canonical.version,
+        payload_sha256: packedPayload,
+        checks_result: releaseProvenance.OAK_RELEASE_CHECKS_RESULT,
+      },
     };
   } finally {
     removeTempRoot(temporary.parent, temporary.root);

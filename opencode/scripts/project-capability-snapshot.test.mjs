@@ -224,6 +224,23 @@ test("repo with go.mod detects go stack", () => {
   }
 });
 
+test("repo with Node scripts detects node stack without a package manifest", () => {
+  const tmp = makeRepoWith({
+    "scripts/tool.mjs": "#!/usr/bin/env node\nconsole.log('ok');\n",
+  });
+  try {
+    const result = runSnapshot(tmp);
+    const snapshot = parseOutput(result);
+
+    const node = snapshot.stacks_detected.find((stack) => stack.id === "node");
+    assert.ok(node, "should detect node stack");
+    assert.equal(node.confidence, "medium");
+    assert.ok(node.evidence.includes("scripts/tool.mjs"));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 // ── Test 11: Custom repo with test files detects testing domain ─────────
 
 test("repo with test files detects testing domain", () => {

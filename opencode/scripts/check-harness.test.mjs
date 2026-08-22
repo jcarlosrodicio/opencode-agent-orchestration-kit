@@ -17,7 +17,7 @@ function makeFixture() {
       const rel = path.relative(root, source);
       if (rel === ".git" || rel.startsWith(`.git${path.sep}`)) return false;
       if (rel === ".codegraph" || rel.startsWith(`.codegraph${path.sep}`)) return false;
-      if (rel === "node_modules" || rel.startsWith(`node_modules${path.sep}`)) return false;
+      if (rel.split(path.sep).includes("node_modules")) return false;
       return true;
     },
   });
@@ -106,6 +106,42 @@ test("shell export guard surfaces are required", () => {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+for (const [label, mutate, diagnostic] of [
+  [
+    "missing the Open Design project URL guard",
+    (source) => source.replace(
+      'if (/\\/projects(?:\\/|$)/.test(url)) {',
+      "if (false) {",
+    ),
+    /tools\/open_design\.ts: missing Open Design project-path guard/,
+  ],
+  [
+    "using randomUUID",
+    (source) => `${source}\nconst randomUUID = true\n`,
+    /tools\/open_design\.ts: Open Design tool must not depend on randomUUID/,
+  ],
+  [
+    "containing a private endpoint",
+    (source) => `${source}\nconst endpoint = "https://private.synology.example"\n`,
+    /tools\/open_design\.ts: Open Design tool contains a private endpoint or local path/,
+  ],
+]) {
+  test(`Open Design contract rejects ${label}`, () => {
+    const cwd = makeFixture();
+    try {
+      const rel = "tools/open_design.ts";
+      const source = fs.readFileSync(path.join(cwd, rel), "utf8");
+      write(rel, mutate(source), cwd);
+
+      const result = runHarness(cwd);
+      assert.notEqual(result.status, 0, `checker accepted Open Design source ${label}`);
+      assert.match(result.stderr, diagnostic);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+}
 
 test("orchestration contract file must be regular and non-symlink", () => {
   const cwd = makeFixture();

@@ -211,6 +211,12 @@
       "workflow": "loop"
     },
     {
+      "id": "loop-status",
+      "root_agent": "lead",
+      "subtask": false,
+      "workflow": "loop"
+    },
+    {
       "id": "mvp-spec",
       "root_agent": "scoper",
       "subtask": false,
@@ -643,7 +649,8 @@
     {
       "id": "loop",
       "entrypoints": [
-        "loop"
+        "loop",
+        "loop-status"
       ],
       "stages": [
         {
@@ -908,6 +915,7 @@
         "implement",
         "init",
         "loop",
+        "loop-status",
         "mvp-spec",
         "plan",
         "research",

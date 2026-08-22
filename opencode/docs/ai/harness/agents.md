@@ -83,6 +83,14 @@ generate or modify frontmatter.
 - `evaluator`, `debugger`, and `evolver` are optional sidecars.
 - `evolver` works only on the OpenCode harness.
 
+## Mission runtime projection
+
+`mission-status` is a read-only view over the durable loop snapshot and
+append-only history. It validates canonical state before displaying progress
+and never becomes a second authority. The runtime observer is ephemeral; it
+may report activity, but durable transitions still require the loop state
+runtime and its locks.
+
 ## Bounded local autonomy
 
 `/autonomous` uses one explicit user invocation for a local objective, not a

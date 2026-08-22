@@ -174,6 +174,16 @@ Criteria:
 - No auto-merge, scheduling, write-enabled MCP connectors, parallel execution,
   or implicit worktree creation.
 
+## `/loop-status`
+
+Contract: `lead` read-only projection.
+
+`/loop-status --slug <slug>` inspects the canonical snapshot and append-only
+history without acquiring a write lock or changing files. Use
+`node scripts/mission-status.mjs --root /absolute/repository --slug <slug>`
+when an explicit repository root is needed. If state is missing, stale, or
+corrupt, report the durable error and do not repair or resume automatically.
+
 ## `/autonomous`
 
 Contract: explicit invocation -> `developer -> reviewer -> developer (state sync)`.

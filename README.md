@@ -407,6 +407,12 @@ An explicit `--target` wins over a non-empty `OPENCODE_CONFIG_DIR`, which wins o
 
 The installer inventories the payload, computes a complete plan, and tracks ownership in `TARGET/.oak/manifest.json`. A dry run performs no writes. A real operation recomputes the plan under an exclusive lock and commits through a durable journal with one rollback generation.
 
+Release packages also record a safe `release_provenance` block in that manifest:
+the source projection commit, public commit, canonical kit version, packaged
+payload digest, and a passed-checks marker. Existing manifests without that
+optional block remain readable; the release package smoke requires it for new
+release evidence and never stores paths, provider settings, or credentials.
+
 The root `package.json` is the canonical kit-version source. Display the same
 identity through the manager or any lifecycle wrapper:
 
@@ -724,7 +730,10 @@ This runs the fast contract checker and every bundled `node:test` suite. For a
 fast structural check while editing documentation or contracts, use
 `npm run check:quick`. Before a release, use `npm run check:release`; it performs
 a frozen dependency install and also runs typechecking, dependency integrity,
-audit/signature checks, installation smoke, and the exact package smoke.
+audit/signature checks, installation smoke, and the exact package smoke. The
+package smoke extracts the tarball, recomputes the packaged OpenCode payload
+digest, uses an isolated `OPENCODE_CONFIG_DIR`, preserves a user configuration,
+and exercises `doctor` plus rollback before reporting release provenance.
 Publication remains separately authorized; follow the reviewed artifact and
 checksum procedure in [the supply-chain policy](docs/supply-chain.md).
 

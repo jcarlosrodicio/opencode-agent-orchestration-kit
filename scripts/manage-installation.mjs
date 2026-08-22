@@ -310,14 +310,21 @@ export function assertSafeTarget({ targetRoot, repositoryRoot, sourceRoot, fsOps
   return target;
 }
 
-function assertExactKeys(value, expected, label) {
+function assertExactKeys(value, expected, label, options = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid(`${label} must be an object`);
   const actual = Object.keys(value).sort();
   const wanted = [...expected].sort();
+  const optional = new Set(options.optional ?? []);
   const unknown = actual.filter((key) => !wanted.includes(key));
-  const missing = wanted.filter((key) => !actual.includes(key));
+  const missing = wanted.filter((key) => !actual.includes(key) && !optional.has(key));
   if (unknown.length > 0) throw invalid(`${label} has unknown field: ${unknown[0]}`);
   if (missing.length > 0) throw invalid(`${label} is missing field: ${missing[0]}`);
+}
+
+function assertCommit(value, label) {
+  if (typeof value !== "string" || !/^[0-9a-f]{40}$/.test(value)) {
+    throw invalid(`${label} must be a lowercase Git commit`);
+  }
 }
 
 function assertHash(value, label) {
@@ -336,6 +343,11 @@ const MANIFEST_KEYS = [
   "schema_version", "manager", "kit_version", "payload_sha256", "created_at", "updated_at",
   "last_transaction_id", "owned_files", "preserved_files",
 ];
+const OPTIONAL_MANIFEST_KEYS = ["release_provenance"];
+const RELEASE_CONTEXT_KEYS = ["source_commit", "public_commit", "checks_result"];
+const RELEASE_PROVENANCE_KEYS = [
+  "source_commit", "public_commit", "kit_version", "payload_sha256", "checks_result",
+];
 const OWNED_KEYS = ["path", "sha256", "mode"];
 const PRESERVED_KEYS = [
   "path", "observed_sha256", "observed_mode", "source_sha256", "source_mode",
@@ -346,7 +358,7 @@ const ACK_KEYS = [
 ];
 
 export function validateManifest(manifest) {
-  assertExactKeys(manifest, MANIFEST_KEYS, "manifest");
+  assertExactKeys(manifest, [...MANIFEST_KEYS, ...OPTIONAL_MANIFEST_KEYS], "manifest", { optional: OPTIONAL_MANIFEST_KEYS });
   if (manifest.schema_version !== SCHEMA_VERSION) throw invalid("manifest schema_version must be 1");
   if (manifest.manager !== "opencode-agent-orchestration-kit") throw invalid("manifest manager is invalid");
   try {
@@ -362,6 +374,12 @@ export function validateManifest(manifest) {
   }
   if (!Array.isArray(manifest.owned_files) || !Array.isArray(manifest.preserved_files)) {
     throw invalid("manifest ownership lists must be arrays");
+  }
+  if (manifest.release_provenance !== undefined) {
+    validateReleaseProvenance(manifest.release_provenance, {
+      kitVersion: manifest.kit_version,
+      payloadSha256: manifest.payload_sha256,
+    });
   }
 
   const allPaths = new Set();
@@ -405,6 +423,46 @@ export function validateManifest(manifest) {
     }
   }
   return manifest;
+}
+
+export function validateReleaseProvenance(provenance, expected = {}) {
+  assertExactKeys(provenance, RELEASE_PROVENANCE_KEYS, "release_provenance");
+  assertCommit(provenance.source_commit, "release_provenance source_commit");
+  assertCommit(provenance.public_commit, "release_provenance public_commit");
+  try {
+    parseStableVersion(provenance.kit_version);
+  } catch (error) {
+    throw invalid(`release_provenance kit_version is invalid: ${error.message}`);
+  }
+  assertHash(provenance.payload_sha256, "release_provenance payload_sha256");
+  if (provenance.checks_result !== "passed") {
+    throw invalid("release_provenance checks_result must be passed");
+  }
+  if (expected.kitVersion !== undefined && provenance.kit_version !== expected.kitVersion) {
+    throw invalid("release_provenance kit_version does not match manifest");
+  }
+  if (expected.payloadSha256 !== undefined && provenance.payload_sha256 !== expected.payloadSha256) {
+    throw invalid("release_provenance payload_sha256 does not match manifest");
+  }
+  return provenance;
+}
+
+function readReleaseContext(environment) {
+  const values = {
+    source_commit: environment.OAK_RELEASE_SOURCE_COMMIT,
+    public_commit: environment.OAK_RELEASE_PUBLIC_COMMIT,
+    checks_result: environment.OAK_RELEASE_CHECKS_RESULT,
+  };
+  const present = Object.values(values).some((value) => value !== undefined && value !== "");
+  if (!present) return null;
+  assertExactKeys(values, RELEASE_CONTEXT_KEYS, "release context");
+  if (RELEASE_CONTEXT_KEYS.some((key) => typeof values[key] !== "string" || values[key].length === 0)) {
+    throw invalid("release context must provide source, public, and checks identities");
+  }
+  assertCommit(values.source_commit, "release context source_commit");
+  assertCommit(values.public_commit, "release context public_commit");
+  if (values.checks_result !== "passed") throw invalid("release context checks_result must be passed");
+  return values;
 }
 
 export function canonicalManifestBytes(manifest) {
@@ -653,10 +711,11 @@ function preservedEntry(source, target, reason) {
 
 function makeNextManifest({ inspection, ownedFiles, preservedFiles, options }) {
   const now = (options.clock?.() ?? new Date()).toISOString();
-  return {
+  const kitVersion = parseStableVersion(options.kitVersion).canonical;
+  const manifest = {
     schema_version: SCHEMA_VERSION,
     manager: "opencode-agent-orchestration-kit",
-    kit_version: parseStableVersion(options.kitVersion).canonical,
+    kit_version: kitVersion,
     payload_sha256: inspection.source.payloadSha256,
     created_at: inspection.manifest?.created_at ?? now,
     updated_at: now,
@@ -664,6 +723,19 @@ function makeNextManifest({ inspection, ownedFiles, preservedFiles, options }) {
     owned_files: ownedFiles.sort((left, right) => left.path.localeCompare(right.path)),
     preserved_files: preservedFiles.sort((left, right) => left.path.localeCompare(right.path)),
   };
+  if (options.releaseProvenance) {
+    const releaseProvenance = {
+      ...options.releaseProvenance,
+      kit_version: kitVersion,
+      payload_sha256: inspection.source.payloadSha256,
+    };
+    validateReleaseProvenance(releaseProvenance, {
+      kitVersion,
+      payloadSha256: inspection.source.payloadSha256,
+    });
+    manifest.release_provenance = releaseProvenance;
+  }
+  return manifest;
 }
 
 function classifyVersionState(sourceVersion, manifest, sourcePayloadSha256) {
@@ -1025,6 +1097,17 @@ export function createInstallationManager(options) {
   const versionProvider = options.versionProvider ?? (() => {
     throw invalid("canonical kit version provider is required");
   });
+  const releaseProvenance = Object.hasOwn(options, "releaseProvenance")
+    ? options.releaseProvenance
+    : readReleaseContext(options.environment ?? process.env);
+  if (releaseProvenance !== null && releaseProvenance !== undefined) {
+    assertExactKeys(releaseProvenance, RELEASE_CONTEXT_KEYS, "release context");
+    assertCommit(releaseProvenance.source_commit, "release context source_commit");
+    assertCommit(releaseProvenance.public_commit, "release context public_commit");
+    if (releaseProvenance.checks_result !== "passed") {
+      throw invalid("release context checks_result must be passed");
+    }
+  }
 
   function currentKitVersion() {
     return parseStableVersion(versionProvider()).canonical;
@@ -1915,7 +1998,7 @@ export function createInstallationManager(options) {
       const transactionId = newTransactionId();
       const inspection = inspectInstallation({ sourceRoot, targetRoot, deps: { fsOps } });
       const kitVersion = currentKitVersion();
-      const plan = buildPlan({ command, inspection, options: { ...runOptions, clock, transactionId, kitVersion } });
+      const plan = buildPlan({ command, inspection, options: { ...runOptions, clock, transactionId, kitVersion, releaseProvenance } });
       if (!plan.canApply) return { exitCode: 1, plan };
       if (runOptions.dryRun) return { exitCode: 0, plan };
       if (command === "upgrade" && !plan.hasWork) return { exitCode: 0, plan };
@@ -1923,7 +2006,7 @@ export function createInstallationManager(options) {
       acquireLock(targetRoot, transactionId, command);
       invocationLockOwned = true;
       const lockedInspection = inspectInstallation({ sourceRoot, targetRoot, deps: { fsOps } });
-      const lockedPlan = buildPlan({ command, inspection: lockedInspection, options: { ...runOptions, clock, transactionId, kitVersion } });
+      const lockedPlan = buildPlan({ command, inspection: lockedInspection, options: { ...runOptions, clock, transactionId, kitVersion, releaseProvenance } });
       if (lockedPlan.fingerprint !== plan.fingerprint || !lockedPlan.canApply) {
         releaseLock(targetRoot);
         return { exitCode: 1, plan: lockedPlan };
