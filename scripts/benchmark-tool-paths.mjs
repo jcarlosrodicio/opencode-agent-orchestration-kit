@@ -143,7 +143,7 @@ async function benchmarkFixture(fixture, iterations, temporaryRoot) {
         const result = await createInstallationManager({
           sourceRoot: fixture.sourceRoot,
           repositoryRoot: fixture.root,
-          versionProvider: () => "1.0.39",
+          versionProvider: () => "1.0.40",
         }).run("install", { targetRoot });
         if (result.exitCode !== 0) throw invalid(`installation benchmark failed for ${fixture.id}`);
       } finally {

@@ -1,6 +1,6 @@
 {
   "name": "opencode-agent-orchestration-kit",
-  "version": "1.0.39",
+  "version": "1.0.40",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
