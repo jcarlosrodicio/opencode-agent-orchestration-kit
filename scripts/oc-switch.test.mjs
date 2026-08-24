@@ -139,6 +139,44 @@ test("OpenCode TUI changes the default model and persists on q", async () => {
   assert.match(output.writes.join(""), /Loading models/);
 });
 
+test("OpenCode TUI changes the focused agent model", async () => {
+  const input = createTuiInput();
+  const output = { isTTY: true, rows: 30, writes: [], write(chunk) { this.writes.push(String(chunk)); } };
+  const saved = [];
+  const state = {
+    schemaVersion: 1,
+    defaultModel: "nan/model-a",
+    smallModel: "nan/model-a",
+    agents: Object.fromEntries(AGENT_IDS.map((agent) => [agent, "nan/model-a"])),
+  };
+  const running = runTerminalOcSwitcher({
+    input,
+    output,
+    initialState: state,
+    initialModels: ["nan/model-a", "openai/model-b"],
+    refreshModels: async () => ["nan/model-a", "openai/model-b"],
+    saveState: async (nextState) => {
+      saved.push(nextState);
+      return nextState;
+    },
+  });
+
+  await nextTick();
+  emitKey(input, "down");
+  emitKey(input, "down");
+  emitKey(input, "return", "\r");
+  await nextTick();
+  emitKey(input, "down");
+  emitKey(input, "return", "\r");
+  await nextTick();
+  emitKey(input, "q");
+  const result = await running;
+
+  assert.equal(result.status, "saved");
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].agents.lead, "openai/model-b");
+});
+
 test("OpenCode search treats shortcut letters as query text", async () => {
   const input = createTuiInput();
   const output = { isTTY: true, rows: 30, writes: [], write(chunk) { this.writes.push(String(chunk)); } };

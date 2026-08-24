@@ -411,7 +411,8 @@ export async function runTerminalOcSwitcher({ input = process.stdin, output = pr
         const targetAgents = pickerTarget.kind === "agent"
           ? [...(selectedAgents.size ? selectedAgents : new Set([pickerTarget.key]))]
           : [];
-        state = applyModelSelection(state, { target: pickerTarget.key, agents: targetAgents, modelRef: available[pickerFocusedIndex] });
+        const target = pickerTarget.kind === "agent" ? "agents" : pickerTarget.key;
+        state = applyModelSelection(state, { target, agents: targetAgents, modelRef: available[pickerFocusedIndex] });
         dirty = true; selectedAgents.clear(); screen = "main"; status = "Change pending save.";
       } else if (name === "escape") { screen = "main"; pickerQuery = ""; }
       else if (name === "backspace") { pickerQuery = pickerQuery.slice(0, -1); pickerFocusedIndex = 0; }

@@ -17,7 +17,7 @@ import {
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const HASH = "a".repeat(64);
-const BASENAME = "opencode-agent-orchestration-kit-1.0.40.tgz";
+const BASENAME = "opencode-agent-orchestration-kit-1.0.41.tgz";
 const REQUIRED = [
   "package/package.json",
   "package/supply-chain.json",
@@ -210,7 +210,7 @@ test("smokeTarball validates both archive listings before extraction", async () 
   await assert.rejects(
     smokeTarball({
       repositoryRoot: ROOT,
-      tarball: "/public/opencode-agent-orchestration-kit-1.0.40.tgz",
+      tarball: "/public/opencode-agent-orchestration-kit-1.0.41.tgz",
       captureTarball(_source, destination) {
         fs.writeFileSync(destination, "fixture");
         return { size: 1 };
