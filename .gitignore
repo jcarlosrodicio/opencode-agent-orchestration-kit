@@ -12,6 +12,8 @@ node_modules/
 .worktrees/
 dist/
 build/
+.codegraph/
+.seo-cache/
 .DS_Store
 .backup.*
 *.backup

@@ -16,7 +16,15 @@ export OPENCODE_REVIEWER_MODEL="openai/gpt-5.5"
 
 ## Interactive switching
 
-Run `npm run oc-switch` from a checkout, or install the CLI globally with npm:
+Run `npm run oc-switch` from a checkout, or install the published CLI globally
+with npm:
+
+```bash
+npm install --global opencode-agent-orchestration-kit
+oc-switch
+```
+
+To install the current checkout instead:
 
 ```bash
 npm install --global .
@@ -26,7 +34,7 @@ oc-switch
 Once a release tag exists, a checkout is optional:
 
 ```bash
-npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.41"
+npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.42"
 oc-switch
 ```
 

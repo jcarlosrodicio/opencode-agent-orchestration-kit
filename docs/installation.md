@@ -4,6 +4,26 @@ Prerequisites include Node.js `^22.9.0 || ^24.0.0` and npm. See the
 [compatibility matrix](compatibility.md) for supported OpenCode versions,
 platform status, exact integration pins, and evidence.
 
+## Install the published CLI package
+
+The npm package exposes the dependency-free `oak` lifecycle CLI and the
+`oc-switch` model selector:
+
+```bash
+npm install --global opencode-agent-orchestration-kit
+oak version
+oak install --dry-run
+oak install
+```
+
+`npm install` does not mutate OpenCode configuration: the package declares no
+`preinstall`, `install`, or `postinstall` lifecycle script. `oak install`
+remains an explicit operation with the ownership, collision, backup, and
+rollback rules documented below.
+
+Installing from a cloned checkout remains supported through `./install.sh` or
+`npm install --global .` followed by `oak install`.
+
 ## Test without a global install
 
 ```bash

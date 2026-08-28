@@ -7,14 +7,24 @@
   <a href="https://github.com/sponsors/jcarlosrodicio"><img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
-A reproducible product-development workflow for OpenCode.
+**An open-source multi-agent orchestration harness for OpenCode.**
 
-Turn OpenCode into a structured team of specialized agents that can research, design, specify, implement, review, and validate software changes — without building every agent, command, skill, tool, and workflow convention from scratch.
+OpenCode Agent Orchestration Kit (OAK) turns OpenCode into a structured
+software-engineering team of specialized agents for research, design,
+specification, implementation, review, and validation. It keeps OpenCode agent
+orchestration local, inspectable, version-controlled, and reproducible.
 
-Built for developers and small teams who want more structure than a single general-purpose coding agent, while keeping the setup local, inspectable, version-controlled, and adaptable.
+Unlike systems designed primarily around large parallel worker pools, OAK
+focuses on bounded engineering workflows with durable state, explicit
+handoffs, independent review, validation evidence, and optional human approval
+gates. It is model-agnostic within OpenCode: each role can use the default
+model or an explicit provider/model available in the user's OpenCode setup.
+
+**Apache-2.0 · Local-first · OpenCode-native · Model-agnostic**
 
 > [!NOTE]
-> This project is a configuration and workflow kit for OpenCode. It is not a hosted platform, a fully autonomous software factory, or a replacement for engineering judgment.
+> This software-engineering agent harness is not a hosted platform, a fully
+> autonomous software factory, or a replacement for engineering judgment.
 
 ## Why this exists
 
@@ -61,6 +71,28 @@ The goal is not to force every request through a heavy process. Small, clear, lo
 | Optional token visibility | TUI plugin for lead and subagent token usage when OpenCode exposes session trees |
 | Versioned documentation | Agent, command, evidence, and validation contracts stored alongside the configuration |
 
+### Bounded autonomous execution
+
+OAK supports explicitly requested autonomous local work without turning it
+into unlimited or unattended execution:
+
+- `/loop` requires an approved task contract before writes, allows at most
+  three iterations per invocation within a task-specific one-to-six iteration
+  budget, and can resume from durable state. Worktrees are explicit opt-in.
+- `/autonomous` is local-checkout-only, uses a task-specific one-to-six
+  iteration budget, runs deterministic validation in every iteration, and
+  stops as soon as an independent `reviewer` approves the result.
+- Both workflows use a schema-versioned JSON snapshot, append-only JSONL
+  history, an exclusive lock, contract hashing, idempotent action IDs, and
+  explicit recovery for interrupted writes.
+
+The `/autonomous` contract prohibits network access, worktrees, parallel
+execution, scheduling, write-enabled connectors, commits, pushes, merges,
+deployments, releases, and publication. Sensitive or expanded scope stops for
+human review. See the [`/loop`](opencode/commands/loop.md) and
+[`/autonomous`](opencode/commands/autonomous.md) contracts for the exact
+boundaries.
+
 ## Built around
 
 This kit builds on and integrates with the following projects:
@@ -92,6 +124,51 @@ This kit may not be the right fit if you:
 - Want a hosted multi-agent platform with queues, dashboards, billing, and team administration.
 - Need autonomous parallel execution across many repositories or worktrees.
 - Expect every request to be fully automated without human oversight.
+
+## How OAK compares
+
+OpenCode orchestration projects optimize for different operating models. This
+summary describes their documented emphasis; it is not a universal ranking.
+
+| Approach | Documented emphasis | Consider it when |
+|---|---|---|
+| **OAK** | Versioned software-engineering workflows, specialized phase roles, durable bounded loops, independent review, and local safety contracts | You want research → specification → implementation → review with explicit scope and evidence |
+| [`opencode-orchestrator`](https://github.com/agnusdei1207/opencode-orchestrator) | A persisted mission runtime with Commander, Planner, Worker, and Reviewer roles, local memory, and configurable agent concurrency | You want runtime-governed mission execution and a larger concurrent worker pool |
+| [`oh-my-openagent`](https://github.com/code-yeongyu/oh-my-openagent) | A broad multi-model agent harness with specialized agents, integrated tools, background agents, and opt-in parallel Team Mode | You want an extensive agent/tool ecosystem and optional parallel teams |
+| [`opencode-agent-tree`](https://github.com/beremaran/opencode-agent-tree) | A plugin that makes an orchestrator decompose and delegate every request, with hands-on tools blocked and configurable delegation depth | You want enforced delegation trees and parallel fan-out of independent subtasks |
+
+### Choose OAK when
+
+- You want OpenCode to behave like a structured engineering team.
+- You want research, specification, implementation, validation, and independent review to remain distinct.
+- You need durable, resumable workflows with explicit scope and acceptance criteria.
+- You prefer bounded autonomy and inspectable local contracts over unconstrained agent loops.
+
+### Consider another orchestration approach when
+
+- Your primary goal is maximizing parallel worker throughput.
+- You need autonomous execution across many worktrees or repositories.
+- You need a hosted orchestration or control-plane product.
+- You want an unattended software factory rather than bounded engineering workflows.
+
+See [OpenCode Agent Orchestration Approaches](docs/comparison.md) for the
+comparison method, architectural distinctions, limitations, and source links.
+
+## Engineering quality
+
+OAK's reproducibility and safety claims are backed by checked repository
+artifacts rather than a maturity label:
+
+- 1,000+ automated unit and script tests across the package and shipped harness.
+- Mechanical validation of agent, command, workflow, evidence, and routing contracts.
+- Type checking plus dependency vulnerability, integrity, and signature audits.
+- Isolated installation and exact-package smoke tests for the `oak` and `oc-switch` CLIs.
+- Compatibility checks across the declared OpenCode and Node.js boundaries.
+- Durable-state recovery, corruption, idempotency, and adversarial fixtures.
+- Public/private configuration boundary checks and release-provenance validation.
+
+The [Validation](#validation) section explains the normal and release-grade
+checks and their limits.
 
 ## How it works
 
@@ -316,7 +393,14 @@ From this checkout, run:
 npm run oc-switch
 ```
 
-To install the command globally with npm from the cloned checkout:
+To install the command globally from the published npm package:
+
+```bash
+npm install --global opencode-agent-orchestration-kit
+oc-switch
+```
+
+To install the current cloned checkout instead:
 
 ```bash
 npm install --global .
@@ -327,7 +411,7 @@ After a tagged release is published, you can install the same CLI directly
 from GitHub without keeping a checkout:
 
 ```bash
-npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.41"
+npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.42"
 oc-switch
 ```
 
@@ -382,9 +466,24 @@ Try one of these commands:
 /feature Add a small settings page with a saved theme preference
 ```
 
-## Install globally
+## Install from npm or a checkout
 
-Once you are happy with the workflow, preview and install it into your OpenCode configuration directory:
+The published package can be installed directly from npm:
+
+```bash
+npm install --global opencode-agent-orchestration-kit
+oak version
+oak install --dry-run
+oak install
+```
+
+The npm install only places the `oak` and `oc-switch` commands on `PATH`. It
+has no install lifecycle script and does not modify OpenCode configuration
+until `oak install` is explicitly run. Previewing first preserves the same
+ownership, collision, and rollback rules as the shell wrappers.
+
+From a cloned checkout, preview and install the harness into your OpenCode
+configuration directory:
 
 ```bash
 ./install.sh --dry-run
@@ -741,7 +840,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.41
+node scripts/version.mjs --check-tag v1.0.42
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.
@@ -919,6 +1018,7 @@ Detailed guides are available in [`docs/`](docs/):
 - [Agents](docs/agents.md)
 - [Commands](docs/commands.md)
 - [Workflows](docs/workflows.md)
+- [Comparison with other OpenCode orchestration approaches](docs/comparison.md)
 - [Models](docs/models.md)
 - [Open Design](docs/open-design.md)
 - [Docker Open Design](docs/docker-open-design.md)
@@ -929,6 +1029,7 @@ Detailed guides are available in [`docs/`](docs/):
 - [Reproducible use cases](docs/use-cases/README.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Synology notes](docs/synology.md)
+- [Awesome OpenCode submission draft](docs/distribution/awesome-opencode-submission.md)
 
 ## Compatibility and scope
 

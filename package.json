@@ -1,7 +1,30 @@
 {
   "name": "opencode-agent-orchestration-kit",
-  "version": "1.0.41",
+  "version": "1.0.42",
   "private": false,
+  "description": "Open-source multi-agent orchestration harness for OpenCode with specialized agents, durable workflows, review gates, and reproducible software-engineering processes.",
+  "keywords": [
+    "opencode",
+    "opencode-orchestrator",
+    "agent-orchestration",
+    "multi-agent",
+    "multi-agent-orchestration",
+    "coding-agents",
+    "coding-agent-orchestration",
+    "ai-agents",
+    "agent-harness",
+    "agentic-development",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git"
+  },
+  "homepage": "https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit#readme",
+  "bugs": {
+    "url": "https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit/issues"
+  },
+  "author": "jcarlosrodicio",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
