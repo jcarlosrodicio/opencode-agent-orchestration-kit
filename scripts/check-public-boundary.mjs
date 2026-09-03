@@ -21,6 +21,7 @@ const REQUIRED_FILES = [
 // from fragments so this scanner does not trip over its own rules.
 const PRIVATE_MARKERS = [
   ["/", "Users", "/"].join(""),
+  ["juancan", "as"].join(""),
   ["synology", ".", "me"].join(""),
   ["auth", ".", "json"].join(""),
   ["OPENAI", "_", "API", "_", "KEY"].join(""),

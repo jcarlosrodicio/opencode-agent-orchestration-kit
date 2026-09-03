@@ -240,6 +240,15 @@ Use the smallest useful flow:
   one-to-six-iteration budget, a hard ceiling of six, durable state, and
   reviewer-only closure. Final approval stops the cycle immediately.
 
+### Small-gate fast path
+
+A declared `small` change of at most two files may skip final review when it
+does not touch protected surfaces (auth, secrets, public API, migrations, CI,
+or the harness itself), is not destructive, and does not require new tests.
+`lead` then records `review_skipped_reason: small_gate_pass`. Medium and large
+work, and any sensitive surface, still get a full `reviewer` verdict. The
+unique gate definition lives in `opencode/docs/ai/harness/agents.md`.
+
 ## Included agents
 
 | Agent | Responsibility |
@@ -892,7 +901,6 @@ node scripts/check-harness.mjs
 │   ├── quickstart.md
 │   ├── security.md
 │   ├── superpowers.md
-│   ├── synology.md
 │   ├── troubleshooting.md
 │   └── workflows.md
 ├── opencode/
@@ -1028,7 +1036,6 @@ Detailed guides are available in [`docs/`](docs/):
 - [Threat model](docs/threat-model.md)
 - [Reproducible use cases](docs/use-cases/README.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [Synology notes](docs/synology.md)
 - [Awesome OpenCode submission draft](docs/distribution/awesome-opencode-submission.md)
 
 ## Compatibility and scope

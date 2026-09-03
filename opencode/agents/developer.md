@@ -145,6 +145,14 @@ objective, decisions made, files read/touched, validation state, blockers, and
 next action. If there are long outputs, reference the artifact path instead of
 copying the log into context.
 
+Small-scope exemption: if the handoff includes the condensed 6-field card
+(objective, success, validation, diff base, constraints, output) and the task
+meets the small-gate defined uniquely in `docs/ai/harness/agents.md`, work
+against that card without expanding the full Task Contract or `handoff_packet`.
+In that case the card's `output` absorbs the essentials of the Result Contract
+and Verification Envelope in a short summary; otherwise the full blocks above
+and below remain mandatory.
+
 ## Result Contract and Verification Envelope
 
 When closing a non-trivial implementation, add a compact `Result Contract`:

@@ -577,3 +577,154 @@ test("streamSqliteJson rejects on sqlite3 runtime error (non-zero exit)", async 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /sqlite3 runtime error|session/);
 });
+
+test("execution trees expose phase-0 telemetry with paired handoff timestamps and turn correlation", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+
+    const telemetry = tree.telemetry;
+    assert.ok(telemetry, "tree must carry phase-0 telemetry");
+    assert.equal(telemetry.method_version, 1);
+    assert.deepEqual(telemetry.request_turns, [
+      { turn_id: "ses_root_1:t1", t_start: 1000 },
+    ]);
+
+    assert.equal(telemetry.handoffs.length, 2);
+    const [handoffOne, handoffTwo] = telemetry.handoffs;
+    assert.deepEqual(handoffOne, {
+      sequence: 1,
+      agent: "researcher",
+      session_id: "ses_child_1",
+      request_turn_id: "ses_root_1:t1",
+      t_handoff_start: 1000,
+      t_handoff_end: 1100,
+      gap_ms: 100,
+      t_spawn: 1100,
+      t_complete: 2100,
+    });
+    // paired spawn -> completion of predecessor; overlap shows up as negative gap
+    assert.deepEqual(handoffTwo, {
+      sequence: 2,
+      agent: "reviewer",
+      session_id: "ses_grandchild_1",
+      request_turn_id: "ses_root_1:t1",
+      t_handoff_start: 2100,
+      t_handoff_end: 1150,
+      gap_ms: -950,
+      t_spawn: 1150,
+      t_complete: 2200,
+    });
+
+    assert.deepEqual(telemetry.diff_size, {
+      available: false,
+      files_changed: null,
+      insertions: null,
+      deletions: null,
+      captured_at: "collection",
+    });
+    assert.equal(telemetry.review_skipped_reason, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("phase-0 telemetry maps spawns to the latest root user turn", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    run("sqlite3", [
+      dbPath,
+      `
+      insert into message (id, session_id, time_created, time_updated, data) values
+        ('msg_user_root_1b', 'ses_root_1', 1500, 1500, '{"role":"user","time":{"created":1500}}'),
+        ('msg_user_child_2', 'ses_child_1', 1600, 1600, '{"role":"user","time":{"created":1600}}');
+      insert into part (id, message_id, session_id, time_created, time_updated, data) values
+        ('prt_user_root_1b', 'msg_user_root_1b', 'ses_root_1', 1500, 1500, '{"type":"text","text":"Follow-up request on the harness issue."}'),
+        ('prt_user_child_2', 'msg_user_child_2', 'ses_child_1', 1600, 1600, '{"type":"text","text":"Second research pass."}');
+      insert into session (
+        id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, path, agent, model, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write
+      ) values (
+        'ses_child_2', 'proj_1', 'ses_root_1', 'bold-otter', '/tmp/repo', 'Research follow-up (@researcher subagent)', '1.15.12', 1700, 1900, '', 'researcher',
+        '{"id":"synthetic-model","providerID":"synthetic-provider","variant":"synthetic-variant"}', 0.1, 10, 5, 0, 0, 0
+      );
+      `,
+    ]);
+
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+
+    assert.deepEqual(tree.telemetry.request_turns, [
+      { turn_id: "ses_root_1:t1", t_start: 1000 },
+      { turn_id: "ses_root_1:t2", t_start: 1500 },
+    ]);
+    const bySession = new Map(
+      tree.telemetry.handoffs.map((handoff) => [handoff.session_id, handoff]),
+    );
+    assert.equal(bySession.get("ses_child_1").request_turn_id, "ses_root_1:t1");
+    assert.equal(bySession.get("ses_grandchild_1").request_turn_id, "ses_root_1:t1");
+    assert.equal(bySession.get("ses_child_2").request_turn_id, "ses_root_1:t2");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("phase-0 telemetry captures enum-valid review_skipped_reason and rejects unknown tokens", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    run("sqlite3", [
+      dbPath,
+      `update part set data = json_object('type','text','text','Closed with review skipped. review_skipped_reason: small_gate_pass')
+       where id = 'prt_assistant_root_1';`,
+    ]);
+
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+    assert.equal(tree.telemetry.review_skipped_reason, "small_gate_pass");
+
+    run("sqlite3", [
+      dbPath,
+      `update part set data = json_object('type','text','text','review_skipped_reason: because_i_said_so')
+       where id = 'prt_assistant_root_1';`,
+    ]);
+    const rejectTree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+    assert.equal(rejectTree.telemetry.review_skipped_reason, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("phase-0 telemetry measures diff size for a real local git repo", async () => {
+  const tmp = makeTempDir();
+  try {
+    const repoDir = path.join(tmp, "repo");
+    fs.mkdirSync(repoDir, { recursive: true });
+    run("git", ["init", "-q", repoDir]);
+    run("git", ["-C", repoDir, "config", "user.email", "test@example.invalid"]);
+    run("git", ["-C", repoDir, "config", "user.name", "Test"]);
+    fs.writeFileSync(path.join(repoDir, "a.txt"), "one\n");
+    run("git", ["-C", repoDir, "add", "."]);
+    run("git", ["-C", repoDir, "commit", "-qm", "base"]);
+    fs.writeFileSync(path.join(repoDir, "a.txt"), "one\ntwo\nthree\n");
+    fs.writeFileSync(path.join(repoDir, "b.txt"), "new\n");
+
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    run("sqlite3", [dbPath, `update session set directory = '${repoDir}' where id in ('ses_root_1','ses_child_1','ses_grandchild_1');`]);
+
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+    assert.deepEqual(tree.telemetry.diff_size, {
+      available: true,
+      files_changed: 2,
+      insertions: 2,
+      deletions: 0,
+      captured_at: "collection",
+    });
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

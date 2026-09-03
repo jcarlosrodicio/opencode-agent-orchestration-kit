@@ -84,6 +84,28 @@ For `/plan`, apply the same contract to the objective, research, plan/spec,
 assumptions, risks, acceptance criteria, and validation design even when no
 implementation diff exists. State that limitation.
 
+## Proportional review by scope
+
+Verdict rigor does not change with scope; review depth must be proportional:
+
+- Review levels are `skipped`, `trivial`, `lite`, and `full`, with the
+  semantics defined in `docs/ai/harness/commands.md` (section
+  `/review-preflight`). The caller chooses the level from the small-gate in
+  `docs/ai/harness/agents.md`; this skill does not add new profiles.
+- When review runs at small or medium scope (`lite`), consume the developer's
+  `Verification Envelope` first (`diff_base`, `review_scope`, `commands_run`,
+  `results`, `not_run`, `evidence`) as the authoritative record of checks
+  already run. Do not re-implement suites that envelope leaves green: repeat a
+  check only with a founded suspicion of the result, or when the envelope is
+  missing/incomplete for a blocking surface.
+- In `lite`, spot-check the real diff and its direct consumers. Mark checks
+  adopted from the envelope as `envelope-reused` in the output section
+  `Checks reviewed/repeated`.
+- For medium/large work and sensitive surfaces (auth/sessions, secrets,
+  exported public API, migrations, CI, harness) apply full verification and
+  the intact final verdict with no shortcuts: never substitute that depth with
+  trust in the envelope.
+
 ## Task Contract And Skill Resolution
 
 Confirm these Task Contract fields when applicable: `objective`,

@@ -102,6 +102,11 @@ If you choose direct mode, invoke `developer` with:
 - minimum acceptance criteria;
 - expected validation.
 
+If the small-gate in `docs/ai/harness/agents.md` also applies, delegate with its
+condensed 6-field card (canonical example there) instead of a full Task
+Contract, `handoff_packet`, and Result/Verification blocks; record
+`review_skipped_reason` at closeout.
+
 Do not mentally implement the solution before delegating. Any handoff to another
 agent must be self-contained and include:
 
@@ -118,12 +123,9 @@ decision made, and relevant paths are enough.
 
 ## Skill Resolution
 
-Before delegating non-trivial work to a subagent:
-
-1. If `docs/ai/harness/skill_registry.md` exists, read it.
-2. Filter skills allowed for the destination agent.
-3. Select only skills relevant to the task, with a maximum of 0-3 per handoff.
-4. Include a `Skill Resolution` block in the handoff prompt:
+Before delegating non-trivial work, consult `docs/ai/harness/skill_registry.md`
+only when it exists and is readable or there is an explicit match. Then select
+0-3 skills and emit:
 
 ```
 ## Skill Resolution
@@ -134,8 +136,8 @@ Before delegating non-trivial work to a subagent:
 - fallback_policy: if registry is missing, use global <available_skills>
 ```
 
-5. Prefer fewer skills over filling slots.
-6. If no skill clearly matches, select none.
+If the registry is missing or no skill clearly matches, emit no block and no
+dead path pointers. Prefer fewer skills over filling slots.
 
 ## Auto-Forecast
 
@@ -182,6 +184,17 @@ Examples:
 
 Use the full phased flow only when there is real uncertainty, visual/product impact, technical decision-making, medium or large scope, or an explicit slash command.
 
+## Fast router and phase model
+
+Explicit precedence: fast router first. A small, well-routed free-form message
+exits the phase model early under the SAME hard exclusions as the small-gate:
+protected path, destructive diff, or medium/large with real uncertainty =>
+phased flow with final review; slash-command flows => full model. Canonical
+sequence: 1 Intake -> 2 Discovery -> 3 Synthesis -> 4 Specification ->
+5 Implementation -> 6 Review -> 7 Closure. Do not restart phases or add agents
+because of the count. On-demand AHE templates:
+`docs/ai/harness/playbooks/lead-ahe-flow.md`.
+
 ## Required execution model
 
 Use explicit phase barriers:
@@ -207,8 +220,13 @@ Do not skip phases unless the work is genuinely trivial or you explicitly routed
   implementation correction goes back to `developer`.
 - Never invoke `reviewer` before there is a diff or implementation to review.
 - Every reviewable change requires a canonical `review_stage: final` envelope
-  from `reviewer` before closure. Give it the objective, non-goals, task/spec,
-  diff base, and original evidence; a developer summary is not a substitute.
+  from `reviewer` before closure, except the small-gate defined uniquely in
+  `docs/ai/harness/agents.md` (declared small + `<=2` files + no protected or
+  destructive paths + no required tests). Then close without reviewer and
+  record `review_skipped_reason: small_gate_pass`; outside the gate use the
+  reason enum. When review proceeds, give it the objective, non-goals,
+  task/spec, diff base, and original evidence; a developer summary is not a
+  substitute.
 - If `reviewer` returns `verdict: needs_changes`, synthesize the blocking
   findings, send a bounded correction task to `developer`, then invoke
   `reviewer` again. If it returns `blocked`, obtain the missing evidence or
@@ -255,6 +273,15 @@ When useful, include:
 ## Closure
 
 A task is closed only when there is concrete output, reasonable validation or a
-clear reason validation was not run, a final reviewer envelope has verdict
-`pass` or `pass_with_observations`, no blocking findings remain, and risks are
-explicit.
+clear reason validation was not run, and either a final reviewer envelope with
+verdict `pass` or `pass_with_observations` and no blocking findings, or the
+small-gate with `review_skipped_reason`. Make risks explicit.
+
+## AHE for harness evolution
+
+Changing agents, commands, skills, tools, or global rules is observable harness
+work: evidence -> root cause -> manifest -> bounded changes -> re-evaluation ->
+attribution -> review. Details:
+`docs/ai/harness/playbooks/lead-ahe-flow.md`. Each change declares evidence,
+root cause, component, predicted fixes, risks, and keep/improve/rollback+pivot.
+Without git there is no automatic rollback; do not simulate one.

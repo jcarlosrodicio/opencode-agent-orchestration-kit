@@ -2982,7 +2982,11 @@ function checkOpenDesignToolContract() {
   if (/randomUUID|node:crypto/.test(source)) {
     fail(`${rel}: Open Design tool must not depend on randomUUID or node:crypto`);
   }
-  if (/juancanas|synology|\/Users\/|\/home\//i.test(source)) {
+  const privateHostMarker = ["juancan", "as"].join("");
+  const nasVendorMarker = ["syn", "ology"].join("");
+  const usersPath = ["/", "Users", "/"].join("");
+  const homePath = ["/", "home", "/"].join("");
+  if (new RegExp(`${privateHostMarker}|${nasVendorMarker}|${usersPath}|${homePath}`, "i").test(source)) {
     fail(`${rel}: Open Design tool contains a private endpoint or local path`);
   }
 }
