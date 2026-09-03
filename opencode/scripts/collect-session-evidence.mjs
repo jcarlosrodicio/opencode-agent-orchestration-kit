@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 function fail(message) {
@@ -130,6 +130,154 @@ function firstTextPart(parts) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Phase-0 telemetry (iteration-025).
+// These signals live ONLY in this collector's output; they are never injected
+// into agent handoff prompts. All fields are additive and optional so existing
+// consumers of execution-trees.jsonl keep working unchanged.
+//
+// Semantics:
+// - request_turn_id: `<root_session_id>:t<n>` numbered by root user-message
+//   time; each spawn maps to the latest root turn active at its spawn moment,
+//   which makes multi-turn sessions classifiable per request instead of per
+//   session head.
+// - t_handoff_start/t_handoff_end: paired spawn boundaries. For spawn i,
+//   t_handoff_start is the completion time of the previous hop (root start for
+//   the first hop) and t_handoff_end is the new spawn's creation time, so
+//   gap_ms is the observable consolidation gap before each delegation.
+//   Overlapping hops produce negative gaps (reported honestly, not clamped).
+// - diff_size: measured at collection time against the tree root directory
+//   (`git diff --numstat`), never at gate decision time; consumers must treat
+//   it as a post-hoc approximation (captured_at: "collection").
+// - review_skipped_reason: enum-valid marker extracted from session summaries.
+// ---------------------------------------------------------------------------
+
+const REVIEW_SKIPPED_REASONS = new Set([
+  "small_gate_pass",
+  "protected_surface",
+  "destructive_diff",
+  "tests_required",
+  "scope_not_small",
+  "human_decision",
+]);
+
+const REVIEW_SKIPPED_REASON_PATTERN = /review_skipped_reason:\s*([a-z_]+)/;
+
+function buildRequestTurns(turnTimes, rootSessionId) {
+  if (!Array.isArray(turnTimes) || turnTimes.length === 0) return [];
+  return [...turnTimes]
+    .filter((time) => typeof time === "number")
+    .sort((left, right) => left - right)
+    .map((tStart, index) => ({ turn_id: `${rootSessionId}:t${index + 1}`, t_start: tStart }));
+}
+
+function resolveRequestTurnId(requestTurns, spawnTime) {
+  if (typeof spawnTime !== "number" || requestTurns.length === 0) return null;
+  let matched = null;
+  for (const turn of requestTurns) {
+    if (turn.t_start <= spawnTime) matched = turn.turn_id;
+  }
+  return matched;
+}
+
+function buildHandoffs(childSessions, rootSession, requestTurns) {
+  const rootStart = typeof rootSession?.time_created === "number" ? rootSession.time_created : null;
+  let predecessorEnd = rootStart;
+  return childSessions.map((child, index) => {
+    const tSpawn = typeof child.time_created === "number" ? child.time_created : null;
+    const tComplete = typeof child.time_updated === "number" ? child.time_updated : null;
+    const gapMs = predecessorEnd !== null && tSpawn !== null ? tSpawn - predecessorEnd : null;
+    const handoff = {
+      sequence: index + 1,
+      agent: child.agent || null,
+      session_id: child.session_id,
+      request_turn_id: resolveRequestTurnId(requestTurns, tSpawn),
+      t_handoff_start: predecessorEnd,
+      t_handoff_end: tSpawn,
+      gap_ms: gapMs,
+      t_spawn: tSpawn,
+      t_complete: tComplete,
+    };
+    if (tComplete !== null) predecessorEnd = tComplete;
+    return handoff;
+  });
+}
+
+function deriveReviewSkippedReason(sortedRows, rootSession) {
+  const orderedRows = [
+    ...(rootSession ? [rootSession] : []),
+    ...sortedRows.filter((row) => row.session_id !== rootSession?.session_id),
+  ];
+  for (const row of orderedRows) {
+    const summary = row.assistant_summary;
+    if (typeof summary !== "string") continue;
+    const match = summary.match(REVIEW_SKIPPED_REASON_PATTERN);
+    if (match && REVIEW_SKIPPED_REASONS.has(match[1])) return match[1];
+  }
+  return null;
+}
+
+function unavailableDiffSize() {
+  return {
+    available: false,
+    files_changed: null,
+    insertions: null,
+    deletions: null,
+    captured_at: "collection",
+  };
+}
+
+function measureDiffSize(directory) {
+  const fallback = unavailableDiffSize();
+  if (typeof directory !== "string" || directory.length === 0) return fallback;
+  let stat;
+  try {
+    stat = fs.statSync(directory);
+  } catch {
+    return fallback;
+  }
+  if (!stat.isDirectory()) return fallback;
+  try {
+    const probe = spawnSync(
+      "git",
+      ["-C", directory, "rev-parse", "--is-inside-work-tree"],
+      { encoding: "utf8", timeout: 10_000 },
+    );
+    if (probe.status !== 0 || probe.stdout.trim() !== "true") return fallback;
+    const numstat = spawnSync(
+      "git",
+      ["-C", directory, "diff", "--numstat"],
+      { encoding: "utf8", timeout: 15_000, maxBuffer: 32 * 1024 * 1024 },
+    );
+    if (numstat.status !== 0) return fallback;
+    let filesChanged = 0;
+    let insertions = 0;
+    let deletions = 0;
+    for (const line of numstat.stdout.split("\n")) {
+      if (!line.trim()) continue;
+      const [added, removed] = line.split("\t");
+      filesChanged += 1;
+      if (/^\d+$/.test(added)) insertions += Number(added);
+      if (/^\d+$/.test(removed)) deletions += Number(removed);
+    }
+    // Untracked files are part of the visible work-tree delta even though
+    // `git diff --numstat` omits them; count them so small-gate metrics see
+    // brand-new files too.
+    const untracked = spawnSync(
+      "git",
+      ["-C", directory, "ls-files", "--others", "--exclude-standard"],
+      { encoding: "utf8", timeout: 15_000 },
+    );
+    if (untracked.status === 0) {
+      filesChanged += untracked.stdout.split("\n").filter((entry) => entry.trim()).length;
+    }
+    return { ...fallback, available: true, files_changed: filesChanged, insertions, deletions };
+  } catch {
+    return fallback;
+  }
+}
+
+
 function loadPreviousCursor(iteration, outputDir) {
   if (!iteration) return null;
   const runsDir = path.dirname(path.dirname(outputDir));
@@ -217,6 +365,8 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
     partsByMessage.set(part.message_id, list);
   }
 
+  const userTurnTimesBySession = new Map();
+
   const normalized = [];
   let skipped = 0;
   const skipReasons = {};
@@ -244,6 +394,13 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
       if (role === "user") userMessages.push(message);
       if (role === "assistant") assistantMessages.push(message);
     }
+
+    userTurnTimesBySession.set(
+      session.id,
+      userMessages
+        .map((message) => message.time_created)
+        .filter((time) => typeof time === "number"),
+    );
 
     const firstUser = userMessages[0];
     const lastAssistant = assistantMessages.at(-1);
@@ -302,6 +459,7 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
       skip_reasons: skipReasons,
     },
     normalized,
+    userTurnTimesBySession,
   };
 }
 
@@ -411,7 +569,7 @@ function treeRepresentativeSummary(sessions) {
     .at(-1).assistant_summary;
 }
 
-function buildExecutionTrees(sqliteRows, rawRows, previousCursor, fullRescan) {
+function buildExecutionTrees(sqliteRows, rawRows, previousCursor, fullRescan, userTurnTimesBySession = null) {
   const sqliteMap = new Map(sqliteRows.map((row) => [row.session_id, row]));
   const rawBySessionId = new Map(rawRows.map((row) => [row.session_id, row]));
   const grouped = new Map();
@@ -474,6 +632,18 @@ function buildExecutionTrees(sqliteRows, rawRows, previousCursor, fullRescan) {
       source_formats: [...new Set(["opencode-sqlite", ...matchedRawIds.map(() => "opencode-raw-json")])],
     };
 
+    const requestTurns = buildRequestTurns(
+      userTurnTimesBySession?.get(rootSession.session_id),
+      rootSession.session_id,
+    );
+    tree.telemetry = {
+      method_version: 1,
+      request_turns: requestTurns,
+      handoffs: buildHandoffs(childSessions, rootSession, requestTurns),
+      review_skipped_reason: deriveReviewSkippedReason(sortedRows, rootSession),
+      diff_size: unavailableDiffSize(),
+    };
+
     if (
       !fullRescan &&
       previousCursor &&
@@ -527,8 +697,12 @@ export async function collectExecutionTreeByRoot(dbPath, rootSessionId) {
   const result = await summarizeSqlite(dbPath, null, true);
   const rootSession = result.normalized.find((row) => row.session_id === rootSessionId);
   if (!rootSession || rootSession.parent_session_id !== null) return null;
-  const built = buildExecutionTrees(result.normalized, [], null, true);
-  return built.trees.find((tree) => tree.root_session_id === rootSessionId) || null;
+  const built = buildExecutionTrees(result.normalized, [], null, true, result.userTurnTimesBySession);
+  const tree = built.trees.find((candidate) => candidate.root_session_id === rootSessionId) || null;
+  if (tree?.telemetry) {
+    tree.telemetry.diff_size = measureDiffSize(tree.root_directory);
+  }
+  return tree;
 }
 
 function makeCursor(previousCursor, treeSummary, trees, supplementalRawSummary, fullRescan) {
@@ -576,25 +750,39 @@ export async function main(argv = process.argv.slice(2)) {
   const summaries = [];
   let sqliteRows = [];
   let rawRows = [];
+  let userTurnTimesBySession = null;
 
   const previousCursor = args.fullRescan ? null : loadPreviousCursor(args.iteration, outputDir);
 
   for (const sourcePath of sourcePaths) {
     if (!fs.existsSync(sourcePath)) continue;
     const kind = detectSource(sourcePath);
-    const result =
-      kind === "opencode-sqlite"
-        ? await summarizeSqlite(sourcePath, previousCursor, args.fullRescan)
-        : summarizeRawDir(sourcePath);
+    let result;
+    if (kind === "opencode-sqlite") {
+      result = await summarizeSqlite(sourcePath, previousCursor, args.fullRescan);
+    } else {
+      result = { source: null, normalized: [] };
+      const rawResult = summarizeRawDir(sourcePath);
+      result.source = rawResult.source;
+      result.normalized = rawResult.normalized;
+      result.userTurnTimesBySession = new Map();
+    }
     summaries.push(result.source);
     if (kind === "opencode-sqlite") {
       sqliteRows = sqliteRows.concat(result.normalized);
+      userTurnTimesBySession = new Map([
+        ...(userTurnTimesBySession || []),
+        ...result.userTurnTimesBySession,
+      ]);
     } else {
       rawRows = rawRows.concat(result.normalized);
     }
   }
 
-  const built = buildExecutionTrees(sqliteRows, rawRows, previousCursor, args.fullRescan);
+  const built = buildExecutionTrees(sqliteRows, rawRows, previousCursor, args.fullRescan, userTurnTimesBySession);
+  for (const tree of built.trees) {
+    tree.telemetry.diff_size = measureDiffSize(tree.root_directory);
+  }
   const acceptedSessionIds = new Set(built.trees.flatMap((tree) => tree.session_ids));
   const filteredSessionRows = sortSessions(sqliteRows.filter((row) => acceptedSessionIds.has(row.session_id)));
   const cursor = makeCursor(previousCursor, built.treeSummary, built.trees, built.supplementalRawSummary, args.fullRescan);

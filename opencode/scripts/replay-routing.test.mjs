@@ -6,6 +6,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { evaluateReplay } from "./replay-routing.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.dirname(scriptDir);
@@ -17,6 +18,14 @@ const corpusPath = path.join(
 const fixturesPath = path.join(
   root,
   "docs/ai/evolution/benchmarks/replay-fixtures.jsonl",
+);
+const redCorpusPath = path.join(
+  root,
+  "docs/ai/evolution/benchmarks/router-scenarios-red.jsonl",
+);
+const redFixturesPath = path.join(
+  root,
+  "docs/ai/evolution/benchmarks/replay-fixtures-red.jsonl",
 );
 const coverageChannels = [
   "session_events",
@@ -1451,4 +1460,53 @@ test("missing stop evidence is inconclusive", () => {
       reasonCode: "stop-not-observed",
     });
   });
+});
+
+test("phase-0 red fixtures fail deterministically with the natural routing symptoms", () => {
+  const scenarios = readJsonl(redCorpusPath);
+  const fixtures = readJsonl(redFixturesPath);
+  assert.deepEqual(
+    fixtures.map((fixture) => fixture.scenario_id).sort(),
+    scenarios.map((scenario) => scenario.id).sort(),
+  );
+
+  const report = evaluateReplay({
+    scenarios,
+    observations: fixtures,
+    mode: "deterministic",
+  });
+  // Intentional red-pending regression net: these fail until the small-gate
+  // fast path changes real routing; the classic corpus stays all-green.
+  assert.equal(report.operational_status, "ok");
+  assert.equal(report.status, "fail");
+
+  const byId = new Map(
+    report.scenario_results.map((result) => [result.scenario_id, result]),
+  );
+  const copyTrivial = byId.get("freeform-tiny-copy-trivial");
+  assert.ok(copyTrivial, "missing copy-trivial red scenario");
+  assert.equal(copyTrivial.status, "fail");
+  const copyFails = new Map(
+    copyTrivial.assertions
+      .filter((assertion) => assertion.status === "fail")
+      .map((assertion) => [assertion.id, assertion]),
+  );
+  assert.equal(copyFails.get("forbidden-agents")?.reason_code, "forbidden-agent-observed");
+  assert.deepEqual(copyFails.get("forbidden-agents")?.evidence_sequences, [5]);
+  assert.equal(copyFails.get("review-policy")?.reason_code, "reviewer-forbidden");
+  assert.deepEqual(copyFails.get("delegation-budget")?.reason_code, "delegation-budget-exceeded");
+
+  const seedPipeline = byId.get("freeform-tiny-toy-single-file-full-pipeline");
+  assert.ok(seedPipeline, "missing toy single-file full-pipeline red scenario");
+  assert.equal(seedPipeline.status, "fail");
+  const seedForbidden = seedPipeline.assertions.find(
+    (assertion) => assertion.id === "forbidden-agents",
+  );
+  assert.equal(seedForbidden?.status, "fail");
+  assert.deepEqual(seedForbidden?.evidence_sequences, [2, 4, 9]);
+  const seedReviewPolicy = seedPipeline.assertions.find(
+    (assertion) => assertion.id === "review-policy",
+  );
+  assert.equal(seedReviewPolicy?.status, "fail");
+  assert.equal(seedReviewPolicy?.reason_code, "reviewer-forbidden");
 });

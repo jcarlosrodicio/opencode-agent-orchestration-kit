@@ -83,6 +83,33 @@ generate or modify frontmatter.
 - `evaluator`, `debugger`, and `evolver` are optional sidecars.
 - `evolver` works only on the OpenCode harness.
 
+### Small-gate closeout without review
+
+This is the unique, computable definition of "small" that may skip final
+review. `lead` and the condensed Task Contract card consume this SAME
+definition; no second definition exists in other contracts. The gate holds
+ONLY when every condition is true:
+
+1. Scope declared `small` in the handoff or Task Contract.
+2. `diff_files_changed <= 2` counted against the real diff base.
+3. No file touches a protected path: auth/sessions, secrets/.env, exported
+   public API, migrations, CI, or the harness itself (`agents/**`,
+   `commands/**`, `docs/ai/harness/**`, `scripts/**`, `AGENTS.md`,
+   `docs/ai/evolution/benchmarks/**`, `skills/**`).
+4. Diff is not destructive: no mass deletes, no reverts of others' work, no
+   permission or security-config changes.
+5. The touched surface does not require new or mandatory tests.
+
+Point-3 exclusions beat any size or prompt-length heuristic. When closing
+through this gate, `lead` records `review_skipped_reason: small_gate_pass`.
+The closed enum is: `small_gate_pass | protected_surface | destructive_diff |
+tests_required | scope_not_small | human_decision`; the other values document
+why the fast path did not apply, or an explicit human decision.
+
+This gate does not reduce `reviewer` authority: medium/large work and every
+sensitive surface keep a full `review_stage: final` with a single final
+`reviewer` verdict. It does not apply retroactively to work already reviewed.
+
 ## Mission runtime projection
 
 `mission-status` is a read-only view over the durable loop snapshot and
@@ -129,6 +156,29 @@ when the change is not trivial. The minimum block is:
 - `accepted_tradeoffs`: accepted tradeoffs or `none`.
 - `validation`: commands, tests, or evidence.
 - `ask_abort_triggers`: conditions for asking, blocking, or returning work.
+
+### Condensed card for small scope
+
+When the change meets the small-gate in the section above ("Small-gate closeout
+without review", same unique definition), `lead` may delegate and `developer`
+may close with a condensed 6-field card instead of the full Task Contract,
+`handoff_packet`, and separate Result Contract / Verification Envelope stack.
+This is an activation exemption, not a new contract: for non-trivial work every
+prior block remains mandatory. Canonical audited example, exactly 6 fields:
+
+```text
+small-card:
+  objective: rename the Save button to Save changes
+  success: visible label changed in the UI
+  validation: grep the literal + local render smoke
+  diff_base: working tree on HEAD (1 file)
+  constraints: do not touch other literals or tests
+  output: short summary with the applied diff
+```
+
+When closing this way, `lead` records `review_skipped_reason` from the gate
+enum. Telemetry (turn ids, timestamps, diff size) ALWAYS stays out of the
+card: it lives only in evidence-collector output.
 
 For long, multi-agent, or resumable work, the responsible agent adds a compact
 `handoff_packet` with current objective, decisions made, files read/touched,
