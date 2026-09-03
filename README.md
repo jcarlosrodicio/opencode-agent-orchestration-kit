@@ -420,7 +420,7 @@ After a tagged release is published, you can install the same CLI directly
 from GitHub without keeping a checkout:
 
 ```bash
-npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.42"
+npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.43"
 oc-switch
 ```
 
@@ -849,7 +849,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.42
+node scripts/version.mjs --check-tag v1.0.43
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.
