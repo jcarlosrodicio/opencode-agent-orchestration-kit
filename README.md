@@ -901,7 +901,6 @@ node scripts/check-harness.mjs
 │   ├── quickstart.md
 │   ├── security.md
 │   ├── superpowers.md
-│   ├── synology.md
 │   ├── troubleshooting.md
 │   └── workflows.md
 ├── opencode/
@@ -1037,7 +1036,6 @@ Detailed guides are available in [`docs/`](docs/):
 - [Threat model](docs/threat-model.md)
 - [Reproducible use cases](docs/use-cases/README.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [Synology notes](docs/synology.md)
 - [Awesome OpenCode submission draft](docs/distribution/awesome-opencode-submission.md)
 
 ## Compatibility and scope
