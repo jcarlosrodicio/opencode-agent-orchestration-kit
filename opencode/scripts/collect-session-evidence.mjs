@@ -308,7 +308,8 @@ function loadPreviousCursor(iteration, outputDir) {
 
 async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
   const cutoff = !fullRescan && previousCursor ? previousCursor.cursor_end_time_updated_max : null;
-  const cutoffFilter = cutoff ? `AND time_created > ${Number(cutoff)}` : "";
+  const safeCutoff = Number(cutoff);
+  const cutoffFilter = cutoff && Number.isFinite(safeCutoff) ? `AND time_created > ${safeCutoff}` : "";
 
   // Session query: always full (lightweight, needed for parent resolution)
   const sessions = await streamSqliteJson(
@@ -348,7 +349,10 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
   const messages = await streamSqliteJson(dbPath, messageSql, 300_000);
 
   // Part query: need full data for text extraction, but apply time cutoff to reduce rows scanned
-  const partsSql = `select id, message_id, session_id, time_created, time_updated, data from part where 1=1 ${cutoffFilter} order by session_id, time_created, id;`;
+  const partsSql =
+    "select id, message_id, session_id, time_created, time_updated, data from part where 1=1 " +
+    cutoffFilter +
+    " order by session_id, time_created, id;";
   const parts = await streamSqliteJson(dbPath, partsSql, 300_000);
 
   const messagesBySession = new Map();
