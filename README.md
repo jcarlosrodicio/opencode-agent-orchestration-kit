@@ -1042,7 +1042,7 @@ Detailed guides are available in [`docs/`](docs/):
 
 - Node.js 22 and 24 are supported; the exact engine is `^22.9.0 || ^24.0.0`.
 - OpenCode `>=1.14.41 <2.0.0` is supported through tested boundary versions.
-- WSL2 is experimental. Native Windows is unsupported because lifecycle wrappers require Bash.
+- WSL2 is experimental. Native Windows remains unsupported for lifecycle wrappers, which require Bash; direct `oak` commands are best-effort and do not provide POSIX-equivalent directory-entry fsync durability.
 - Open Design, Superpowers, Impeccable, Docker, and token-usage plugins remain optional.
 
 See the [complete compatibility matrix](docs/compatibility.md) for status

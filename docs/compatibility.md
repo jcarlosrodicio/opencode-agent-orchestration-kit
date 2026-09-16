@@ -33,7 +33,7 @@ while `supported` describes the maintained promise derived from that evidence.
 | macOS GitHub runner | tested | blocking Node 24 job; runner details recorded |
 | Other mainstream Linux/macOS environments | supported | Bash, Node, and OpenCode must support the host |
 | WSL2 | experimental | recommended upstream path, no kit-owned runner |
-| Native Windows | unsupported | Bash lifecycle wrappers have no native contract |
+| Native Windows | unsupported | Bash lifecycle wrappers have no native contract; direct `oak` commands are best-effort and do not provide POSIX-equivalent directory-entry fsync durability |
 | Token usage plugin | experimental | compile/import is tested; runtime session-tree behavior is not stable API evidence |
 | Open Design Docker adapter | experimental | optional pinned image inputs, no blocking integration smoke |
 | Superpowers | experimental | optional upstream Git plugin, not part of core smoke |

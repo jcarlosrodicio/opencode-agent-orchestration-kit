@@ -903,7 +903,8 @@ function ensureDirectory(fullPath, mode, fsOps = fs) {
   fsOps.chmodSync(fullPath, mode);
 }
 
-function fsyncDirectory(fullPath, fsOps = fs) {
+export function fsyncDirectory(fullPath, fsOps = fs, platform = process.platform) {
+  if (platform === "win32") return;
   const descriptor = fsOps.openSync(fullPath, "r");
   try {
     while (true) {
@@ -1118,15 +1119,26 @@ export function createInstallationManager(options) {
     ensureDirectory(oakPath, 0o700, fsOps);
     const lock = { transaction_id: transactionId, pid, command, created_at: clock().toISOString() };
     const lockPath = path.join(oakPath, "lock.json");
-    const descriptor = fsOps.openSync(lockPath, "wx", 0o600);
+    let descriptor;
+    let lockCreated = false;
     try {
+      descriptor = fsOps.openSync(lockPath, "wx", 0o600);
+      lockCreated = true;
       fsOps.writeFileSync(descriptor, `${canonicalJson(lock)}\n`);
       fsOps.fsyncSync(descriptor);
-    } finally {
       fsOps.closeSync(descriptor);
+      descriptor = undefined;
+      fsyncDirectory(oakPath, fsOps);
+      return lock;
+    } catch (error) {
+      if (descriptor !== undefined) {
+        try { fsOps.closeSync(descriptor); } catch {}
+      }
+      if (lockCreated) {
+        try { fsOps.unlinkSync(lockPath); } catch {}
+      }
+      throw error;
     }
-    fsyncDirectory(oakPath, fsOps);
-    return lock;
   }
 
   function releaseLock(targetRoot) {
