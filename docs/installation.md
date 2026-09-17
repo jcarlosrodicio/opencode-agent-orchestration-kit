@@ -21,6 +21,11 @@ oak install
 remains an explicit operation with the ownership, collision, backup, and
 rollback rules documented below.
 
+On native Windows, direct `oak` commands are best-effort: regular-file fsync is
+retained, but directory-entry durability cannot match the POSIX protocol. The
+Bash lifecycle wrappers remain unsupported; use WSL2 for the supported wrapper
+path.
+
 Installing from a cloned checkout remains supported through `./install.sh` or
 `npm install --global .` followed by `oak install`.
 

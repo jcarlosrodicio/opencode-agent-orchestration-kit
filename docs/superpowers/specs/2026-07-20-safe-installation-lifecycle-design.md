@@ -954,11 +954,15 @@ publication: the implementation may use a same-directory durable temporary plus
 an atomic no-replace primitive such as same-filesystem link publication when a
 portable no-replace rename is unavailable. Lock removal also fsyncs `.oak/`.
 
-Directory `fsync` behavior is encapsulated in one internal helper. It retries
-interruptions and handles macOS/Linux-specific open or sync limitations
-explicitly; it must not silently downgrade a failed required directory sync to
-success. A filesystem that cannot provide the required durability causes the
-operation to fail closed and remain recoverable.
+Directory `fsync` behavior is encapsulated in one internal helper. On POSIX it
+retries interruptions and handles macOS/Linux-specific open or sync limitations
+explicitly; a failed required directory sync must not be silently downgraded to
+success. On `win32`, the helper does not open or sync a directory descriptor
+because that operation is not supported by the platform. This is an explicit
+Windows limitation: regular-file fsync remains required, but directory-entry
+durability is not equivalent to the POSIX protocol. A filesystem that cannot
+provide the required durability for its platform causes the operation to fail
+closed and remain recoverable.
 
 No operation is declared committed until managed files, required manifest
 publication or removal, final journal, new rollback point, and all relevant

@@ -13,6 +13,7 @@ import {
   buildPlan,
   canonicalManifestBytes,
   createInstallationManager,
+  fsyncDirectory,
   inventorySource,
   inspectInstallation,
   main,
@@ -1565,6 +1566,66 @@ test("[S094] ambiguous PID-probe errors fail closed", async (t) => {
   const result = await managerFixture(sourceRoot, { pidProbe() { const error = new Error("ambiguous"); error.code = "EIO"; throw error; } }).run("install", { targetRoot });
   assert.equal(result.exitCode, 2);
   assert.equal(fs.existsSync(path.join(targetRoot, ".oak", "lock.json")), true);
+});
+
+test("[S137] Windows directory fsync skips directory handles", () => {
+  let opened = false;
+  const fsOps = {
+    openSync() {
+      opened = true;
+      throw new Error("directory handles are not supported");
+    },
+  };
+
+  assert.doesNotThrow(() => fsyncDirectory("/tmp/oak", fsOps, "win32"));
+  assert.equal(opened, false);
+});
+
+test("[S138] failed lock acquisition cleans only its own published lock", async (t) => {
+  const first = makeFixture(t);
+  put(first.sourceRoot, "agents/lead.md", "lead\n");
+  const oakPath = path.join(first.targetRoot, ".oak");
+  let regularFileFsyncs = 0;
+  const failingFs = new Proxy(fs, {
+    get(target, property) {
+      if (property === "openSync") {
+        return (fullPath, ...args) => {
+          if (fullPath === oakPath) throw Object.assign(new Error("directory fsync failed"), { code: "EIO" });
+          return target.openSync(fullPath, ...args);
+        };
+      }
+      if (property === "fsyncSync") {
+        return (descriptor) => {
+          regularFileFsyncs += 1;
+          return target.fsyncSync(descriptor);
+        };
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+
+  const failed = await managerFixture(first.sourceRoot, { fsOps: failingFs }).run("install", {
+    targetRoot: first.targetRoot,
+  });
+  assert.equal(failed.exitCode, 2);
+  assert.equal(regularFileFsyncs, 1);
+  assert.equal(fs.existsSync(path.join(first.targetRoot, ".oak", "lock.json")), false);
+  assert.equal(fs.existsSync(path.join(first.targetRoot, ".oak", "transaction.json")), false);
+
+  const second = makeFixture(t);
+  put(second.sourceRoot, "agents/lead.md", "lead\n");
+  fs.mkdirSync(path.join(second.targetRoot, ".oak"), { recursive: true });
+  const lockPath = path.join(second.targetRoot, ".oak", "lock.json");
+  fs.writeFileSync(lockPath, `${JSON.stringify({
+    transaction_id: "existing", pid: 4321, command: "install", created_at: "2026-07-20T00:00:00.000Z",
+  })}\n`);
+  const before = fs.readFileSync(lockPath);
+  const blocked = await managerFixture(second.sourceRoot, { fsOps: failingFs }).run("install", {
+    targetRoot: second.targetRoot,
+  });
+  assert.equal(blocked.exitCode, 1);
+  assert.deepEqual(fs.readFileSync(lockPath), before);
 });
 
 test("[S043] failure before journal creation leaves zero persistent state", async (t) => {
