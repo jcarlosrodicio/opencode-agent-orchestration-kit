@@ -17,6 +17,10 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
+function readFrontmatterText(rel) {
+  return read(rel).replace(/\r\n/g, "\n");
+}
+
 function exists(rel) {
   return fs.existsSync(path.join(root, rel));
 }
@@ -711,7 +715,7 @@ function parsePortableAgentPermissions(rel) {
 }
 
 function parseFrontmatter(rel) {
-  const text = read(rel);
+  const text = readFrontmatterText(rel);
   if (!text.startsWith("---\n")) {
     fail(`${rel}: missing frontmatter`);
     return {};
@@ -739,7 +743,7 @@ function parseFrontmatter(rel) {
 }
 
 function frontmatterBlock(rel) {
-  const text = read(rel);
+  const text = readFrontmatterText(rel);
   if (!text.startsWith("---\n")) return "";
   const end = text.indexOf("\n---", 4);
   if (end === -1) return "";
