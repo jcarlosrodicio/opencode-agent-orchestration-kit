@@ -107,3 +107,10 @@ they must never rewrite `compatibility.json` or documentation automatically.
 This matrix covers the kit, its declared runtime boundaries, and the listed
 optional integrations. Model-provider compatibility, credentials, quotas, and
 provider-specific model behavior are outside its scope.
+
+### Direct Windows check
+
+The direct `oak check` skill-registry generator resolves the user home through
+Node's platform API, so it does not require `HOME` to be defined in a native
+Windows shell. This does not extend the native Windows contract to the Bash
+lifecycle wrappers or restore POSIX-equivalent directory-entry fsync durability.

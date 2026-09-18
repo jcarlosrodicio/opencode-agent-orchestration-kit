@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,7 +11,8 @@ const root = path.resolve(__dirname, "..");
 const registryMdRel = "docs/ai/harness/skill_registry.md";
 const registryJsonRel = "docs/ai/harness/skill_registry.json";
 const builtInSkillsDir = path.join(root, "skills");
-const userSkillsDir = path.join(process.env.HOME, ".agents", "skills");
+const home = os.homedir();
+const userSkillsDir = path.join(home, ".agents", "skills");
 
 const SCHEMA_VERSION = 2;
 
@@ -164,7 +166,6 @@ function displayPath(skillFile, source) {
     return path.relative(root, skillFile).split(path.sep).join("/");
   }
 
-  const home = process.env.HOME;
   if (home && skillFile.startsWith(`${home}${path.sep}`)) {
     return `~/${path.relative(home, skillFile).split(path.sep).join("/")}`;
   }

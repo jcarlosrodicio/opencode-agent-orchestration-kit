@@ -1554,6 +1554,31 @@ test("generator produces deterministic public output", () => {
   }
 });
 
+test("generator resolves home without HOME when user skills are enabled", () => {
+  const cwd = makeFixture();
+  try {
+    const env = { ...process.env };
+    delete env.HOME;
+    env.OPENCODE_INCLUDE_USER_SKILLS = "1";
+
+    const generation = spawnSync(process.execPath, ["scripts/update-skill-registry.mjs"], {
+      cwd,
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(generation.status, 0, generation.stderr);
+
+    const check = spawnSync(process.execPath, ["scripts/update-skill-registry.mjs", "--check"], {
+      cwd,
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(check.status, 0, check.stderr);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("--check mode works when public registry is up to date", () => {
   const cwd = makeFixture();
   try {
