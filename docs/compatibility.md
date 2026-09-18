@@ -33,7 +33,7 @@ while `supported` describes the maintained promise derived from that evidence.
 | macOS GitHub runner | tested | blocking Node 24 job; runner details recorded |
 | Other mainstream Linux/macOS environments | supported | Bash, Node, and OpenCode must support the host |
 | WSL2 | experimental | recommended upstream path, no kit-owned runner |
-| Native Windows | unsupported | Bash lifecycle wrappers have no native contract; direct `oak` commands are best-effort and do not provide POSIX-equivalent directory-entry fsync durability |
+| Native Windows | unsupported | Bash lifecycle wrappers have no native contract; direct `oak` commands are best-effort and do not provide POSIX-equivalent directory-entry fsync durability; the check harness accepts LF and CRLF Markdown frontmatter |
 | Token usage plugin | experimental | compile/import is tested; runtime session-tree behavior is not stable API evidence |
 | Open Design Docker adapter | experimental | optional pinned image inputs, no blocking integration smoke |
 | Superpowers | experimental | optional upstream Git plugin, not part of core smoke |
@@ -83,6 +83,11 @@ core compatibility promise to either integration.
 
 These combinations remain policy statements until their remote jobs record
 results. This document does not claim that the remote matrix has passed.
+
+The direct `oak check` harness normalizes Markdown frontmatter line endings, so
+native Windows CRLF checkouts do not produce false missing-frontmatter errors.
+This does not extend the native Windows contract to the Bash lifecycle
+wrappers or restore POSIX-equivalent directory-entry fsync durability.
 
 Node.js 26 and OpenCode `latest` run in core mode as non-blocking canaries. A
 failed canary is an early warning, not proof that the supported range has

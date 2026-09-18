@@ -35,6 +35,55 @@ function write(rel, content, cwd) {
   fs.writeFileSync(path.join(cwd, rel), content);
 }
 
+test("harness accepts CRLF frontmatter for agents and commands", () => {
+  const cwd = makeFixture();
+  try {
+    for (const rel of ["agents/lead.md", "commands/feature.md"]) {
+      const content = fs.readFileSync(path.join(cwd, rel), "utf8");
+      write(rel, content.replace(/\r?\n/g, "\r\n"), cwd);
+    }
+
+    const result = runHarness(cwd);
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("frontmatter diagnostics remain for invalid blocks", async (t) => {
+  for (const [label, mutate, pattern] of [
+    [
+      "missing opener",
+      (source) => source.replace(/^---\n/, "description: missing opener\n"),
+      /agents\/lead\.md: missing frontmatter/,
+    ],
+    [
+      "unclosed block",
+      (source) => source.replace(/\n---\n[\s\S]*$/, "\n"),
+      /agents\/lead\.md: unclosed frontmatter/,
+    ],
+    [
+      "malformed field",
+      (source) => source.replace(/^description:/m, "not valid\ndescription:"),
+      /agents\/lead\.md: malformed frontmatter line "not valid"/,
+    ],
+  ]) {
+    await t.test(label, () => {
+      const cwd = makeFixture();
+      try {
+        const rel = "agents/lead.md";
+        write(rel, mutate(fs.readFileSync(path.join(cwd, rel), "utf8")), cwd);
+
+        const result = runHarness(cwd);
+        assert.notEqual(result.status, 0, `checker accepted ${label}`);
+        assert.match(result.stderr, pattern);
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
 function canonicalRouterScenario(overrides = {}) {
   return {
     schema_version: 1,
