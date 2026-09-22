@@ -38,6 +38,27 @@ generate or modify frontmatter.
   context.
 - If `lead` needs to understand how the code works before deciding what to do,
   it delegates substantive discovery to `researcher`.
+- `lead` emits its routing decision as **fields, not prose**: `route`,
+  `confidence`, `skipped` and `why` (one line, only when `confidence` is `low`).
+  It does not justify the agents it discards. Measured on the
+  `feature-tag-normalizer` case, the routing turn generated between 3,776 and
+  13,116 output tokens, much of it paragraphs explaining why `designer` and
+  `researcher` did not apply to a twenty line function.
+- **Optional external router (`OAK_ROUTER=jev`).** Off unless the operator
+  exports that variable; the harness works identically without it and that is
+  the default. `scripts/route-jev.mjs` asks the TypeSafe `choice` primitive and
+  answers `ok`, `low_confidence` or `unavailable`, and **always exits 0**:
+  `unavailable` means "route yourself", not a failure. It degrades on a missing
+  variable, a missing key, no network, a timeout, a non-2xx status, a malformed
+  body, an agent outside the declared set, or unusable confidence. Only the
+  request text leaves the machine; never file contents or repository paths.
+  Measured at 657-687 ms against 163-538 s for the model's own routing turn.
+  `plugins/jev-router.ts` performs the call on `chat.message` and injects the
+  answer through `experimental.chat.system.transform`, because a routing step
+  the model can forget to take is not a routing step. An explicit command
+  already mandates its flow, so the plugin skips requests above
+  `OAK_ROUTER_MAX_CHARS`; `chat.message` exposes no command flag, so that size
+  test stands in for a missing upstream signal.
 - If there is a diff, implementation, or reviewable plan, bug, security,
   regression, and compliance review belongs to `reviewer`.
 - Every `lead` handoff to another agent must be self-contained: objective,

@@ -92,6 +92,55 @@ Routing decision:
 - `specifier`: enough context exists, but the work still needs tasks, acceptance criteria, or a validation plan.
 - Ask the user: real ambiguity changes whether research, design, spec, or direct implementation is appropriate.
 
+### How you emit the decision
+
+Fields, not prose. Emit exactly this block and nothing else about routing:
+
+```
+route: developer | researcher | designer | specifier | ask_user
+confidence: high | low
+skipped: <agents not chosen, comma separated>
+why: <one line, only when confidence is low or the route is not obvious>
+```
+
+**Do not justify the agents you do not choose.** Writing a paragraph per
+discarded agent ("Designer: not applicable - no UX/visual surface. Researcher:
+not applicable - ...") is generation with no reader, and it lengthens the one
+turn everything else hangs off. Measured on real runs, this turn reached 13,000
+output tokens to route a twenty line function. `skipped` already says what you
+discarded; why you discarded it only matters when `confidence` is `low`, and
+then it fits on one line.
+
+With `confidence: low`, emit `route: ask_user` and ask; do not choose silently.
+
+### Optional external router
+
+**Always run it once, before deciding**, as the first action of routing:
+
+```sh
+node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/route-jev.mjs" "<request text>"
+```
+
+Do not check any environment variable first: **the script is the gate**. If the
+operator did not export `OAK_ROUTER=jev` it answers `unavailable` without
+touching the network, and you route exactly as if it did not exist. That is the
+default and the majority case; `unavailable` is never reported to the user and
+never retried.
+
+Pass **only the request text**. Never file contents, repository paths, or
+context you have read: the routing question does not need them and they would
+leave the machine.
+
+| `status` | what you do |
+| --- | --- |
+| `ok` | use its `route` and emit `confidence: high` |
+| `low_confidence` | `route: ask_user` and ask |
+| `unavailable` | **route yourself, exactly as if it did not exist** |
+
+When the `jev-router` plugin is installed it does this for you and injects the
+answer into your context, so the block above is already decided. Either way the
+harness routes without the network.
+
 When using persistent memory, recollections, or MCP context, treat them as hints
 (`memory-as-hint`), not a source of truth. Verify against current
 repository/artifact state before they affect routing or delegation decisions.
