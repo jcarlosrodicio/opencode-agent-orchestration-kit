@@ -9,7 +9,12 @@ permission:
   lsp: allow
   edit: deny
   bash:
-    "*": ask
+    # `deny`, not `ask`: with `--auto` every `ask` is auto-approved, so `ask`
+    # let `lead` run arbitrary commands - including writes - and it did.
+    # Only an explicit deny survives that flag. `lead` delegates; it never
+    # implements, so it needs read-only inspection and the few scripts its own
+    # commands tell it to run.
+    "*": deny
     "git status*": allow
     "git diff*": allow
     "git log*": allow
@@ -20,6 +25,8 @@ permission:
     "grep *": allow
     "rg *": allow
     "node scripts/collect-session-evidence.mjs --iteration *": allow
+    "node scripts/loop-state.mjs inspect*": allow
+    "node scripts/preflight-audit.mjs --iteration *": allow
     "tail *": allow
     "which": allow
     "which *": allow
@@ -91,6 +98,17 @@ Routing decision:
 - `designer`: UX/UI, visual design, layout, brand, interaction, or visual criteria.
 - `specifier`: enough context exists, but the work still needs tasks, acceptance criteria, or a validation plan.
 - Ask the user: real ambiguity changes whether research, design, spec, or direct implementation is appropriate.
+
+**You always delegate. You do none of those things yourself.** Implementing
+belongs to `developer`, investigating to `researcher`, reviewing to `reviewer`,
+designing to `designer`, specifying to `specifier`. There is no exception for
+size: a one-line change is delegated too. If you catch yourself editing,
+running or reasoning out the solution instead of routing it, you have left your
+role.
+
+This no longer depends on you remembering it: your `bash` allowlist denies
+everything that is not read-only inspection, so an attempt to implement is
+refused instead of slipping through.
 
 ### How you emit the decision
 

@@ -1167,6 +1167,7 @@ function checkOrchestratedReviewContract() {
     ["agents/researcher.md", "BEGIN_SPEC_INPUT", "researcher must delimit a forwardable spec_input block"],
     ["agents/lead.md", "BEGIN_SPEC_INPUT", "lead must forward researcher's spec_input block"],
     ["agents/lead.md", "Do not re-synthesize the research", "lead must not rewrite research findings before specifier"],
+    ["agents/lead.md", "You always delegate. You do none of those things yourself", "lead must never implement"],
     ["agents/specifier.md", "BEGIN_SPEC_INPUT", "specifier must know the block arrives verbatim"],
   ]) {
     if (exists(specRel) && !read(specRel).includes(specToken)) fail(`${specRel}: missing ${specToken} (${specWhy})`);
@@ -1315,6 +1316,13 @@ function checkLeadRouterContract() {
 
   if (!/^\s*edit:\s*deny\s*$/m.test(frontmatter)) {
     fail("agents/lead.md: lead edit permission must remain deny");
+  }
+
+  // Only the `bash:` block: `task` also defaults to `"*": deny`, and matching
+  // the whole frontmatter would let an `ask` pass.
+  const leadBash = (frontmatter.match(/^  bash:\n((?:    .*\n)+)/m) || [])[1] || "";
+  if (!/^\s*"\*":\s*deny\s*$/m.test(leadBash)) {
+    fail('agents/lead.md: bash must default to deny - with --auto an "ask" is auto-approved, which let lead implement instead of delegating');
   }
 
   for (const command of [
