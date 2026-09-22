@@ -13,6 +13,7 @@ node_modules/
 dist/
 build/
 .codegraph/
+.tgrep/
 .seo-cache/
 .DS_Store
 .backup.*
