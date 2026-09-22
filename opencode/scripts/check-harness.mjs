@@ -1155,6 +1155,21 @@ function checkOrchestratedReviewContract() {
     ]) {
       if (!coordinator.includes(token)) fail(`agents/review_coordinator.md: missing preparer permission/routing token ${token}`);
     }
+    if (!coordinator.includes("in parallel")) {
+      fail("agents/review_coordinator.md: --full-agents must launch specialists in parallel");
+    }
+    if (/sequentially/i.test(coordinator)) {
+      fail("agents/review_coordinator.md: sequential specialist execution was removed; the contract must not reintroduce it");
+    }
+  }
+
+  for (const [specRel, specToken, specWhy] of [
+    ["agents/researcher.md", "BEGIN_SPEC_INPUT", "researcher must delimit a forwardable spec_input block"],
+    ["agents/lead.md", "BEGIN_SPEC_INPUT", "lead must forward researcher's spec_input block"],
+    ["agents/lead.md", "Do not re-synthesize the research", "lead must not rewrite research findings before specifier"],
+    ["agents/specifier.md", "BEGIN_SPEC_INPUT", "specifier must know the block arrives verbatim"],
+  ]) {
+    if (exists(specRel) && !read(specRel).includes(specToken)) fail(`${specRel}: missing ${specToken} (${specWhy})`);
   }
 
   if (exists(docRel)) {
@@ -1196,7 +1211,8 @@ function checkOrchestratedReviewContract() {
       "full",
       "no automatic provider failover",
       "There is no remote control plane",
-      "Real concurrency is deferred",
+      "`--full-agents` is experimental, parallel",
+      "There is no concurrent writer",
       "timed_out",
       "workspace is cleaned by default",
       "requires_human_verification",

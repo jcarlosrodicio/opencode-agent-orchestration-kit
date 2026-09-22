@@ -37,7 +37,7 @@ Run preparation exactly once with all arguments:
 - `--agents`: at most one focused review in the coordinator session.
 - In `--agents`, Do not invoke `task`. Do not use `git diff` or source files
   after preflight, and do not write or list `findings/`. For `lite`, return at most one finding backed by an assigned patch.
-- `--full-agents`: experimental sequential mode with at most four specialists,
+- `--full-agents`: experimental parallel mode with at most four specialists,
   `--reviewer-timeout-ms` budgets, and partial-failure reporting.
 - `--retain`: preserve the workspace.
 - Designed options: `--base`, `--staged`, `--include-untracked`.

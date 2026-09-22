@@ -344,6 +344,15 @@ test("--full-agents mode caps planned specialized reviewers at four", () => {
   assert.equal(plan.max_reviewers_to_execute, 4);
 });
 
+test("--full-agents strategy instructs parallel execution, not sequential", () => {
+  const options = parseArgs(["--full-agents"]);
+  const plan = buildExecutionPlan("full", ["review_quality", "review_security"], options);
+
+  assert.match(plan.strategy, /in parallel/);
+  assert.doesNotMatch(plan.strategy, /sequentially/);
+  assert.equal(plan.reviewer_timeout_ms, options.budgets.reviewer_timeout_ms);
+});
+
 test("reviewer timeout and failure statuses are recorded as partial results", () => {
   const manifest = {
     failed_reviewers: [],
