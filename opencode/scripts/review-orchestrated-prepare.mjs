@@ -339,7 +339,7 @@ function buildExecutionPlan(classification, recommendedReviewers, options) {
     verdict: "not_run",
     dry_run_alias: false,
     ai_review: planned.length > 0 ? "experimental_specialized_agents" : "not_run",
-    strategy: "Experimental costly mode; run selected specialized reviewers sequentially with timeout and partial-failure reporting.",
+    strategy: "Experimental costly mode; run selected specialized reviewers in parallel, launching every task call in one turn, with a per-reviewer timeout and partial-failure reporting.",
     planned_reviewers: planned,
     max_reviewers_to_execute: 4,
     reviewer_timeout_ms: timeoutMs,

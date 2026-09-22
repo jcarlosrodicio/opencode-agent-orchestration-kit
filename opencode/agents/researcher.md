@@ -67,6 +67,20 @@ If your handoff prompt contains a `Skill Resolution` block:
 9. State: `ready for spec` / `not ready for spec`.
 10. Handoff for specifier.
 
+Delimit that handoff exactly like this, because `lead` forwards it **verbatim**
+to `specifier` without rewriting it:
+
+```
+BEGIN_SPEC_INPUT
+...decisions, derived requirements, technical constraints, risks that belong in
+the spec, suggested acceptance criteria, open questions, spec readiness...
+END_SPEC_INPUT
+```
+
+Write it self-contained and compact: it is the only part of your research
+`specifier` will read, and nobody will summarize it for you. Do not rely on
+anything that lives only in your own context.
+
 ## Markers
 
 When useful, include:

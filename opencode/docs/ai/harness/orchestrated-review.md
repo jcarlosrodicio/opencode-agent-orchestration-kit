@@ -122,9 +122,17 @@ There is no remote control plane and no automatic provider failover. Model
 profiles remain local and versionable without permanently mutating
 `opencode.json` or adding external services.
 
-Real concurrency is deferred. `--full-agents` is experimental, sequential, and
-limited to four reviewers with timeout and partial-failure reporting. It is
-never activated automatically.
+`--full-agents` is experimental, parallel, and limited to four reviewers with a
+per-reviewer timeout and partial-failure reporting. It is never activated
+automatically.
+
+The parallelism is safe by construction of the preparer, not by runtime
+coordination: all four reviewers are `mode: subagent` with `edit: deny`, each
+reads only the patches in its `manifest.reviewer_patch_sets[reviewer]` and
+returns findings in its response. There is no concurrent writer, no shared file,
+and nothing to synchronize when collecting. What does change is the meaning of
+the budget: `reviewer_timeout_ms` stays per reviewer, but because they overlap
+the total clock tends to the slowest reviewer instead of the sum of the four.
 
 The temporary workspace is cleaned by default. `--retain` preserves it for
 debugging and records that choice in `workspace_retention`.

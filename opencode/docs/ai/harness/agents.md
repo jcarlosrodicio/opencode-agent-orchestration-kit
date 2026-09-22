@@ -133,8 +133,9 @@ attestation is required for completed state.
 
 `/review-preflight` is the daily path: deterministic artifacts with no AI
 review. `/review-orchestrated --agents` adds at most one focused coordinator
-review for `lite`; `--full-agents` is experimental, sequential, and limited to
-four specialists. Real concurrency is not promised.
+review for `lite`; `--full-agents` is experimental, parallel, and limited to
+four specialists. It is safe because the specialists share no writable state;
+see `docs/ai/harness/orchestrated-review.md`.
 
 The complete contract lives in `docs/ai/harness/orchestrated-review.md`.
 

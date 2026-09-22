@@ -250,16 +250,19 @@ Keep this additive. Do not let Superpowers override explicit user instructions o
 
 ## Synthesis before spec
 
-Before invoking `specifier`, consolidate:
+Do not re-synthesize the research. `researcher` already delivers a
+`BEGIN_SPEC_INPUT`/`END_SPEC_INPUT` block carrying decisions, derived
+requirements, constraints, risks and suggested acceptance criteria, and
+`specifier` consumes it as is. Forward it **verbatim** and add only what nobody
+else knows:
 
 - validated objective;
-- researcher findings, if any;
-- designer handoff, if any;
-- decisions made;
-- assumptions;
-- risks;
-- constraints;
-- scope and out of scope.
+- scope and out of scope;
+- which assumptions you accept;
+- designer handoff, if any.
+
+Rewriting findings another agent already wrote is a whole model turn that adds
+no information.
 
 ## Output markers
 
