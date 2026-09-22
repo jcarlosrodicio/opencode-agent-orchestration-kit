@@ -34,7 +34,7 @@ oc-switch
 Once a release tag exists, a checkout is optional:
 
 ```bash
-npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.43"
+npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.44"
 oc-switch
 ```
 
