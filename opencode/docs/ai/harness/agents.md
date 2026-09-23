@@ -38,6 +38,15 @@ generate or modify frontmatter.
   context.
 - If `lead` needs to understand how the code works before deciding what to do,
   it delegates substantive discovery to `researcher`.
+- **`lead` always delegates and never implements**, whatever the size of the
+  change. The rule was already written down, but it was not enforced: with
+  `--auto` an `ask` permission is auto-approved, so `bash: "*": ask` let `lead`
+  run anything, writes included. Measured: `lead` implemented on its own with
+  grep/glob/read/bash instead of delegating. It is now `"*": deny` with a
+  read-only allowlist, plus the exact scripts its own commands tell it to run
+  (`loop-state.mjs inspect`, `preflight-audit.mjs`). A shell plugin that
+  rewrites commands must have its rewritten forms allowlisted too, or they fall
+  through to the deny.
 - `lead` emits its routing decision as **fields, not prose**: `route`,
   `confidence`, `skipped` and `why` (one line, only when `confidence` is `low`).
   It does not justify the agents it discards. Measured on the
