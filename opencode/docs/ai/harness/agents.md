@@ -38,6 +38,12 @@ generate or modify frontmatter.
   context.
 - If `lead` needs to understand how the code works before deciding what to do,
   it delegates substantive discovery to `researcher`.
+- `lead` emits its routing decision as **fields, not prose**: `route`,
+  `confidence`, `skipped` and `why` (one line, only when `confidence` is `low`).
+  It does not justify the agents it discards. Measured on the
+  `feature-tag-normalizer` case, the routing turn generated between 3,776 and
+  13,116 output tokens, much of it paragraphs explaining why `designer` and
+  `researcher` did not apply to a twenty line function.
 - If there is a diff, implementation, or reviewable plan, bug, security,
   regression, and compliance review belongs to `reviewer`.
 - Every `lead` handoff to another agent must be self-contained: objective,
