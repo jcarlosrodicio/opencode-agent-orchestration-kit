@@ -33,7 +33,8 @@ const ACTION_RELEASE = /^v[1-9][0-9]*$/;
 const NODE_IMAGE_TAG = /^[1-9][0-9]*-bookworm-slim$/;
 const PACKAGE_FILES = [
   "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "NOTICE.md", "README.md",
-  "SECURITY.md", "compatibility.json", "docker/", "docs/", "doctor.sh",
+  "SECURITY.md", "compatibility.json", "docker/",
+  "!docker/open-design/data/", "!docker/open-design/opencode-auth/", "docs/", "doctor.sh",
   "env.example", "install.sh", "opencode/", "rollback.sh", "scripts/",
   "supply-chain.json", "uninstall.sh", "upgrade.sh",
 ];
