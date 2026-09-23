@@ -39,6 +39,8 @@
     "SECURITY.md",
     "compatibility.json",
     "docker/",
+    "!docker/open-design/data/",
+    "!docker/open-design/opencode-auth/",
     "docs/",
     "doctor.sh",
     "env.example",

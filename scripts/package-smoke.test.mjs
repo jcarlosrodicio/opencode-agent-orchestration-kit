@@ -13,6 +13,7 @@ import {
   validateArchiveEntries,
   validatePackedOak,
   validatePackedFileSet,
+  validateTrackedFileSet,
 } from "./package-smoke.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -204,6 +205,48 @@ for (const ignoredMetadata of [
     assert.throws(() => validatePackedFileSet([...REQUIRED, ignoredMetadata]), /forbidden/i);
   });
 }
+
+// npm packs whatever `files` matches on disk, including git-ignored local state:
+// v1.0.44 shipped docker/open-design's runtime databases that way. The name
+// denylist above cannot anticipate the next one; git's tracked set can.
+test("validateTrackedFileSet accepts a package made only of tracked files", () => {
+  validateTrackedFileSet(["package/", "package/package.json", "package/docker/"], new Set(["package.json"]));
+});
+
+test("validateTrackedFileSet rejects a packed file that git does not track", () => {
+  assert.throws(
+    () => validateTrackedFileSet(
+      ["package/package.json", "package/docker/open-design/opencode-auth/opencode.db"],
+      new Set(["package.json"]),
+    ),
+    /not tracked by git: docker\/open-design\/opencode-auth\/opencode\.db/,
+  );
+});
+
+test("smokeTarball checks the tracked set before extraction", async () => {
+  const calls = [];
+  await assert.rejects(
+    smokeTarball({
+      repositoryRoot: ROOT,
+      tarball: "/public/opencode-agent-orchestration-kit-1.0.45.tgz",
+      captureTarball(_source, destination) {
+        fs.writeFileSync(destination, "fixture");
+        return { size: 1 };
+      },
+      hashFile: () => ({ sha256: HASH, sha1: "b".repeat(40), sha512: "c".repeat(128) }),
+      run(command, args) {
+        calls.push([command, ...args]);
+        const untracked = "package/docker/open-design/data/app.sqlite";
+        if (args.includes("-tzf")) return { stdout: `${[...REQUIRED, untracked].join("\n")}\n` };
+        if (args.includes("-tvzf")) return { stdout: `${[...REQUIRED, untracked].map(() => "-rw-r--r-- fixture").join("\n")}\n` };
+        if (command === "git") return { stdout: REQUIRED.map((name) => name.slice("package/".length)).join("\0") };
+        throw new Error("extraction must not run");
+      },
+    }),
+    /not tracked by git: docker\/open-design\/data\/app\.sqlite/,
+  );
+  assert.deepEqual(calls.map((call) => call[0]), ["tar", "tar", "git"]);
+});
 
 test("smokeTarball validates both archive listings before extraction", async () => {
   const calls = [];

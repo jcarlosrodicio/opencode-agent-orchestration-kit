@@ -119,6 +119,18 @@ export function validatePackedFileSet(names) {
   }
 }
 
+// Every packed file must be one git tracks. npm packs whatever `files` matches
+// on disk, git-ignored local state included - v1.0.44 shipped docker/open-design
+// runtime databases that way - and a denylist of names cannot anticipate the
+// next local file. The tracked set can.
+export function validateTrackedFileSet(names, tracked) {
+  for (const name of names) {
+    if (name.endsWith("/")) continue;
+    const relative = name.startsWith("package/") ? name.slice("package/".length) : name;
+    if (!tracked.has(relative)) throw smokeError(`packed file is not tracked by git: ${relative}`);
+  }
+}
+
 export function validatePackedOak({ packed, packedRoot, fsOps = fs }) {
   if (
     !packed?.bin
@@ -344,6 +356,8 @@ export async function smokeTarball(options = {}) {
     const verboseLines = archiveNames(verbose.stdout);
     validateArchiveEntries(names, verboseLines);
     validatePackedFileSet(names);
+    const tracked = run("git", ["-C", repositoryRoot, "ls-files", "-z"], { label: "git ls-files failed" });
+    validateTrackedFileSet(names, new Set(tracked.stdout.split("\0").filter(Boolean)));
 
     const extracted = path.join(temporary.root, "extracted");
     fs.mkdirSync(extracted);
