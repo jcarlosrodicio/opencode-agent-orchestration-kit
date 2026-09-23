@@ -117,7 +117,6 @@ shell command from acting with the privileges of the user account.
 | Open Design service and container | TB-003<br>TB-006 | Documentation recommends local or authenticated network exposure; the service can execute agents and write workspace files |
 | Agent web access | TB-003<br>TB-006 | Frontmatter asks, allows, or denies web tools per role; fetched content remains untrusted |
 | MCP, memory, models, and tool output | TB-003<br>TB-006 | Persistent memory is a hint rather than truth; no general content-isolation guarantee exists |
-| Optional external router (`OAK_ROUTER=jev`) | TB-003<br>TB-006 | Off unless the operator exports the variable, so the default installation makes no such call. When enabled, the user's request text - and only that text, never file contents or repository paths - is sent to a third-party endpoint under a per-request budget. The answer is advice, not authority: it is constrained to the four declared agents, low confidence asks the human, and any failure degrades to the model's own routing. The endpoint is a remote service on a mutable model tag, so it cannot be pinned the way `supply-chain.json` pins every other external input; that is why it is opt-in and never required |
 | Package, tag, and release publication | TB-008 | Version checks, exact tarball smoke, canonical checksum, and separate human authorization reduce artifact mismatch |
 
 ## Persistence surfaces

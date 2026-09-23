@@ -113,34 +113,6 @@ then it fits on one line.
 
 With `confidence: low`, emit `route: ask_user` and ask; do not choose silently.
 
-### Optional external router
-
-**Always run it once, before deciding**, as the first action of routing:
-
-```sh
-node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/route-jev.mjs" "<request text>"
-```
-
-Do not check any environment variable first: **the script is the gate**. If the
-operator did not export `OAK_ROUTER=jev` it answers `unavailable` without
-touching the network, and you route exactly as if it did not exist. That is the
-default and the majority case; `unavailable` is never reported to the user and
-never retried.
-
-Pass **only the request text**. Never file contents, repository paths, or
-context you have read: the routing question does not need them and they would
-leave the machine.
-
-| `status` | what you do |
-| --- | --- |
-| `ok` | use its `route` and emit `confidence: high` |
-| `low_confidence` | `route: ask_user` and ask |
-| `unavailable` | **route yourself, exactly as if it did not exist** |
-
-When the `jev-router` plugin is installed it does this for you and injects the
-answer into your context, so the block above is already decided. Either way the
-harness routes without the network.
-
 When using persistent memory, recollections, or MCP context, treat them as hints
 (`memory-as-hint`), not a source of truth. Verify against current
 repository/artifact state before they affect routing or delegation decisions.
