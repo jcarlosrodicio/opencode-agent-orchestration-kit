@@ -60,6 +60,8 @@ export function assertPluginsActive(body) {
   for (const id of EXPECTED_LOCAL_PLUGINS) {
     if (!byId.has(id)) problems.push(`${id} missing`);
   }
+  // `serve` never loads CLI entries; this at least proves OpenCode 2 found tui.tsx.
+  if (byId.has("oak.tui") && byId.get("oak.tui")?.features?.tui !== true) problems.push("oak.tui has no CLI entry");
   if (problems.length > 0) throw new Error(`OpenCode 2 plugins: ${[...new Set(problems)].join(", ")}`);
   return EXPECTED_LOCAL_PLUGINS.filter((id) => byId.get(id)?.state?.status === "active");
 }
@@ -75,20 +77,22 @@ function freePort() {
   });
 }
 
+function signalGroup(child, name) {
+  try {
+    process.kill(-child.pid, name);
+    return true;
+  } catch {
+    return false; // The process group is gone.
+  }
+}
+
+// The server runs in its own process group; npx can exit before the OpenCode
+// process it started, so wait for the whole group and force it down if needed.
 async function stop(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  const exited = new Promise((resolve) => child.once("exit", resolve));
-  const signal = (name) => {
-    try {
-      process.kill(-child.pid, name);
-    } catch {
-      // The process group is already gone.
-    }
-  };
-  signal("SIGTERM");
-  const timer = setTimeout(() => signal("SIGKILL"), 10_000);
-  await exited;
-  clearTimeout(timer);
+  signalGroup(child, "SIGTERM");
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline && signalGroup(child, 0)) await sleep(200);
+  signalGroup(child, "SIGKILL");
 }
 
 async function main() {
@@ -97,6 +101,14 @@ async function main() {
   const privatePaths = [smokeRoot, fs.realpathSync(smokeRoot), ROOT, os.homedir()].filter(Boolean);
   const safe = (text) => privatePaths.reduce((value, hidden) => value.split(hidden).join("<redacted>"), String(text));
   let server;
+  // A detached server does not receive the terminal's interrupt; clean up for it.
+  for (const name of ["SIGINT", "SIGTERM"]) {
+    process.once(name, () => {
+      if (server) signalGroup(server, "SIGKILL");
+      fs.rmSync(smokeRoot, { recursive: true, force: true });
+      process.exit(name === "SIGINT" ? 130 : 143);
+    });
+  }
   try {
     const config = path.join(smokeRoot, "config", "opencode");
     fs.cpSync(path.join(ROOT, "opencode"), config, {
@@ -169,6 +181,8 @@ async function main() {
     const agent = lead?.data ?? lead;
     if (agent?.id !== "lead" || agent?.mode !== "primary") throw new Error("lead did not resolve as a primary agent");
     console.log(`opencode v2 smoke ok: mode=${mode} requested=${request} resolved=${version} plugins=${ids.length}`);
+  } catch (error) {
+    throw new Error(safe(error instanceof Error ? error.message : error));
   } finally {
     if (server) await stop(server);
     fs.rmSync(smokeRoot, { recursive: true, force: true });

@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EXPECTED_LOCAL_PLUGINS, assertPluginsActive, parseSmokeArgs, parseVersion } from "./opencode-v2-smoke.mjs";
 
-const active = (id, type = "local") => ({ id, source: { type }, features: {}, state: { status: "active" } });
+const active = (id, type = "local") => ({
+  id,
+  source: { type },
+  features: id === "oak.tui" ? { server: true, tui: true } : { server: true },
+  state: { status: "active" },
+});
 
 test("parses mode and version", () => {
   assert.deepEqual(parseSmokeArgs(["core", "2.0.18"]), { mode: "core", request: "2.0.18" });
@@ -44,4 +49,11 @@ test("rejects a local plugin that failed before it reported an id", () => {
     () => assertPluginsActive(list),
     (error) => /mission-runtime\.ts failed/.test(error.message) && !error.message.includes("/private/cfg"),
   );
+});
+
+test("rejects an oak.tui plugin without its CLI entry", () => {
+  const list = EXPECTED_LOCAL_PLUGINS.map((id) => active(id));
+  const tui = list.find((plugin) => plugin.id === "oak.tui");
+  tui.features = { server: true };
+  assert.throws(() => assertPluginsActive(list), /oak\.tui has no CLI entry/);
 });
