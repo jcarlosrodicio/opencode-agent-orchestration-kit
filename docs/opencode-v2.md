@@ -38,6 +38,10 @@ One repository and one installed payload serve both lines.
 
 - Both lines use the `opencode` binary, the same config directory and the same
   database. The OpenCode 2 installer replaces OpenCode 1.
+- Going from OpenCode 1 to OpenCode 2 and back works: on first start OpenCode 2
+  imports the OpenCode 1 sessions and leaves the OpenCode 1 tables in place.
+  OpenCode 1 cannot open a database that OpenCode 2 created from scratch; it
+  fails with `Database is not empty and has no session table`.
 - Run `oak doctor` after switching. It reports `info` for `opencode-version` on
   an OpenCode 2 release inside the supported range.
 - To try OpenCode 2 without touching your setup, isolate it: point
@@ -131,6 +135,21 @@ Results recorded on 2026-09-27 on macOS (arm64) with Node.js 24.14.1.
   `node scripts/opencode-v2-smoke.mjs default 2.0.18`: ok, with
   `oak.mission-runtime`, `oak.open-design`, `oak.shell-export-guard` and
   `oak.tui` active. A plugin with a broken import failed the smoke.
+- `node scripts/opencode-v2-smoke.mjs core latest`: ok (resolved 2.0.18).
+- `bash scripts/opencode-compat-smoke.sh core 1.14.41` and `core 1.18.4`: ok.
+
+Manual sessions ran in an isolated config installed with `oak install`, with
+an OpenAI-compatible provider model, on OpenCode 2.0.18 and OpenCode 1.18.4:
+
+| Check | OpenCode 2.0.18 | OpenCode 1.18.4 |
+|---|---|---|
+| Sidebar shows `Tokens` and `Lead … \| Total …`, and `Subagents +… \| 1` after a delegation | pass | partial: `Tokens` renders but the values stay 0 in a scripted terminal; release 1.0.45 behaves the same |
+| A mission toast appears when a session starts (`running`) and finishes (`idle`) | pass | pass |
+| `lead` delegates `export -p` to `developer`, and the guard blocks it with `[shell-export-guard:shell-export-environment-enumeration]` | pass (`shell`) | pass (`bash`) |
+| `designer` calls `open_design_health` without `OPEN_DESIGN_URL` and gets `OPEN_DESIGN_URL is not set` | pass (through Code Mode) | pass |
+| `lead` cannot create a file: it has no edit tool and its shell redirection is denied | pass | pass |
+| An open task run records `agent_session` events for the root and child sessions | pass | pass |
+| `collect-session-evidence.mjs --run` rebuilds the execution trees from the database | pass (`session_v2`) | covered by unit tests |
 
 OpenCode 2 behavior that shaped the smoke:
 
