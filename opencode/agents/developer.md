@@ -22,6 +22,25 @@ permission:
     "pnpm run lint*": allow
     "npm run typecheck*": allow
     "pnpm run typecheck*": allow
+    "git switch -c *": allow
+    "git add *": allow
+    "git commit -m *": allow
+    "oak run *": allow
+    "oak deliver *": allow
+    "git add -A*": deny
+    "git add --all*": deny
+    "git add -u*": deny
+    "git add --update*": deny
+    "git add .": deny
+    "git add . *": deny
+    "git commit * -a*": deny
+    "git commit *--all*": deny
+    "git commit * -n*": deny
+    "git commit *--no-v*": deny
+    "git push*": deny
+    "gh *": deny
+    "git merge*": deny
+    "git reset --hard*": deny
   webfetch: ask
   websearch: ask
   todowrite: allow
@@ -30,12 +49,14 @@ permission:
     "*": deny
     "api-and-interface-design": allow
     "code-simplification": allow
+    "commit": allow
     "debugging-and-error-recovery": allow
     "documentation-and-adrs": allow
     "runtime-verification": allow
     "security-and-hardening": allow
     "source-driven-development": allow
     "test-driven-development": allow
+    "update-docs": allow
 ---
 
 
@@ -101,6 +122,10 @@ If your handoff prompt contains a `Skill Resolution` block:
   before retrying (see that skill).
 - `runtime-verification` after validation passes and before the final review,
   whenever the change has a runtime surface.
+- `update-docs` before closeout whenever the change made documentation stale.
+- `commit` only when the human asks, or at `/autonomous` delivery. Never stage
+  with `-A`/`.`, never bypass hooks; pushing and pull requests go through
+  `oak deliver` only.
 
 ## Feedback loop
 

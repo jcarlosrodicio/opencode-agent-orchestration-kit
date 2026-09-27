@@ -77,6 +77,9 @@ OAK ships its own process skills. Each belongs to the agent that owns the phase:
 - `adversarial-review` for every final review — `reviewer`.
 - `runtime-verification` before the final review of a change with a runtime
   surface — `developer`.
+- `update-docs` before closeout when the change made documentation stale, and
+  `commit` only when the human asks or at `/autonomous` delivery — `developer`.
+  Pushing and pull requests go through `oak deliver` only.
 
 User instructions and the local repository `AGENTS.md` take precedence.
 

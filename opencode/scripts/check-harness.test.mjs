@@ -2059,3 +2059,34 @@ test("harness rejects a specialist that claims a final verdict", () => {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("developer git permissions deny bulk staging, hook bypass, push and gh after the allows", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "agents/developer.md";
+    const source = fs.readFileSync(path.join(cwd, rel), "utf8");
+    write(rel, source.replace('    "git push*": deny\n', ""), cwd);
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /agents\/developer\.md: developer bash must deny git push\*/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("developer git permissions reject a deny placed before its allow", () => {
+  const cwd = makeFixture();
+  try {
+    const rel = "agents/developer.md";
+    const source = fs.readFileSync(path.join(cwd, rel), "utf8");
+    const moved = source
+      .replace('    "git add -A*": deny\n', "")
+      .replace('    "git add *": allow\n', '    "git add -A*": deny\n    "git add *": allow\n');
+    write(rel, moved, cwd);
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /agents\/developer\.md: developer bash deny git add -A\* must come after git add \*/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});

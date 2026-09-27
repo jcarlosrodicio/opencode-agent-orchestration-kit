@@ -3019,6 +3019,54 @@ function checkOpenDesignToolContract() {
   }
 }
 
+// OpenCode applies the last matching bash rule, so every git deny must follow
+// the allow it narrows.
+const DEVELOPER_GIT_DENIES = [
+  "git add -A*",
+  "git add --all*",
+  "git add -u*",
+  "git add --update*",
+  "git add .",
+  "git add . *",
+  "git commit * -a*",
+  "git commit *--all*",
+  "git commit * -n*",
+  "git commit *--no-v*",
+  "git push*",
+  "gh *",
+  "git merge*",
+  "git reset --hard*",
+];
+const DEVELOPER_GIT_ALLOWS = [
+  ["git add ", "git add *"],
+  ["git commit ", "git commit -m *"],
+];
+
+function checkDeveloperGitPermissions() {
+  const rel = "agents/developer.md";
+  const rules = [];
+  let inBash = false;
+  for (const line of frontmatterBlock(rel).split("\n")) {
+    if (/^  [A-Za-z_]/.test(line)) inBash = /^  bash:\s*$/.test(line);
+    if (!inBash) continue;
+    const match = line.match(/^    "([^"]+)":\s*(allow|ask|deny)$/);
+    if (match) rules.push({ key: match[1], action: match[2] });
+  }
+  const indexOf = (key) => rules.findIndex((rule) => rule.key === key);
+  for (const key of DEVELOPER_GIT_DENIES) {
+    const index = indexOf(key);
+    if (index === -1 || rules[index].action !== "deny") {
+      fail(`${rel}: developer bash must deny ${key}`);
+      continue;
+    }
+    for (const [prefix, allowKey] of DEVELOPER_GIT_ALLOWS) {
+      if (key.startsWith(prefix) && index < indexOf(allowKey)) {
+        fail(`${rel}: developer bash deny ${key} must come after ${allowKey}`);
+      }
+    }
+  }
+}
+
 function checkMissionRuntimeContract() {
   const required = [
     "scripts/mission-status.mjs",
@@ -3096,6 +3144,7 @@ checkShellExportGuardContract();
 checkRuntimePermissionPolicy();
 checkOpenDesignToolContract();
 checkMissionRuntimeContract();
+checkDeveloperGitPermissions();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");

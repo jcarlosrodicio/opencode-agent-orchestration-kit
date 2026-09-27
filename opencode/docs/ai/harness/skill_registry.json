@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T09:11:44Z",
+  "generated_at": "2026-09-27T09:13:44Z",
   "schema_version": 2,
   "skills": [
     {
@@ -133,6 +133,26 @@
       "status": "active",
       "description": "Simplifies code for clarity. Use when refactoring code for clarity without changing behavior. Use when code works but is harder to read, maintain, or extend than it should be. Use when reviewing code that has accumulated unnecessary complexity.",
       "load_path": "skills/code-simplification/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "commit",
+      "source": "built-in",
+      "phase": "ship",
+      "domains": [
+        "release"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use when the user asks to commit or open a pull request, or when /autonomous reaches delivery - produces atomic commits that stage explicit paths only, with messages and a pull-request body written from the actual diff.",
+      "load_path": "skills/commit/SKILL.md",
       "origin": null
     },
     {
@@ -448,6 +468,26 @@
       "status": "active",
       "description": "Drives development with tests. Use when implementing any logic, fixing any bug, or changing any behavior. Use when you need to prove that code works, when a bug report arrives, or when you're about to modify existing functionality.",
       "load_path": "skills/test-driven-development/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "update-docs",
+      "source": "built-in",
+      "phase": "ship",
+      "domains": [
+        "documentation"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use as the last step of any change that altered behavior, contracts, schema, architecture, setup or a roadmap item, before committing - updates the documentation the repository treats as its source of truth so the next session starts from accurate context.",
+      "load_path": "skills/update-docs/SKILL.md",
       "origin": null
     },
     {
