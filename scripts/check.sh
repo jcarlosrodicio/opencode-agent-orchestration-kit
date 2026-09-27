@@ -66,6 +66,9 @@ opencode/scripts/runtime-permission-policy.test.mjs
 opencode/scripts/shell-export-policy.mjs
 opencode/scripts/shell-export-policy.d.mts
 opencode/scripts/shell-export-policy.test.mjs
+opencode/scripts/task-run.mjs
+opencode/scripts/task-run.d.mts
+opencode/scripts/task-run.test.mjs
 opencode/commands/loop.md
 opencode/commands/loop-status.md
 opencode/commands/plan.md

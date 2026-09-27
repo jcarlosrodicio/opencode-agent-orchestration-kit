@@ -14,6 +14,7 @@ engines as the shell wrappers; it does not add a second implementation.
 | `oak check` | Validate an installed harness with the checker shipped by this package |
 | `oak replay` | Run the packaged deterministic routing corpus and fixtures |
 | `oak state` | Run the packaged durable loop-state runtime against an explicit project root |
+| `oak run` | Open, record, inspect, and close the task run context of an explicit project root |
 | `oak uninstall` | Remove only unchanged files owned by the lifecycle manifest |
 | `oak rollback` | Reverse the most recent committed lifecycle operation |
 | `oak version` | Print the canonical package identity |
@@ -91,6 +92,38 @@ oak state attest-review --root /path/to/project --slug task-slug \
 This stores `<slug>.review.json`, bound to the approved contract. Completion
 fails closed unless the attestation identifies the `reviewer` subagent and an
 `APPROVE` verdict.
+
+## Task run context
+
+A task run spans the sessions, subagents, and reviews that deliver one change.
+`oak run` keeps its identity in the working tree, next to the loop state:
+
+```bash
+oak run start --root /path/to/project --slug task-slug [--kind production|benchmark]
+oak run status --root /path/to/project
+oak run event --root /path/to/project --type review blocking=0 verdict=safe_to_commit
+oak run close --root /path/to/project --output docs/ai/runs/2026-09-27-task-slug/run-summary.json
+```
+
+- `start` writes `<root>/.opencode/runs/active.json` (schema `oak.run/1`) with
+  a `run_id` of the form `oak_<YYYYMMDDTHHMMSSZ>_<8 hex>`, the change slug, the
+  current branch, and the repository name. It is idempotent on the same branch
+  and refuses only while a run from another branch is open. The directory
+  carries its own `.gitignore`, so the context never shows up in `git status`.
+- `event` appends one `oak.event/1` line to `active.events.jsonl`. The type
+  is one of `agent_session`, `review`, `runtime_verification`, `verify`,
+  `delivery`, or `ci`; keys are lowercase; integer values stay numbers and
+  control characters are stripped. Without an open run it succeeds and records
+  nothing.
+- `status` reports the run and its event count, and flags it as stale when it
+  belongs to another branch or is older than seven days.
+- `close` writes an `oak.run.summary/1` file inside the root, which is meant to
+  be committed with the change, and removes the active context.
+
+The run context is optional and gates nothing: a stale run is only reported. It
+uses no network and no subprocess. Events carry counts and enums only, never
+prose, prompts, output, secrets, or absolute paths; the words belong in the
+task reports.
 
 ## Safety boundary
 

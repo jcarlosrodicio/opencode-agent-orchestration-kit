@@ -14,6 +14,7 @@ export const OAK_COMMANDS = [
   "check",
   "replay",
   "state",
+  "run",
   "uninstall",
   "rollback",
   "version",
@@ -28,6 +29,7 @@ export const OAK_ENTRYPOINTS = Object.freeze({
   check: path.join(REPOSITORY_ROOT, "opencode", "scripts", "check-harness.mjs"),
   replay: path.join(REPOSITORY_ROOT, "opencode", "scripts", "replay-routing.mjs"),
   state: path.join(REPOSITORY_ROOT, "opencode", "scripts", "loop-state.mjs"),
+  run: path.join(REPOSITORY_ROOT, "opencode", "scripts", "task-run.mjs"),
 });
 
 export const OAK_REPLAY_DEFAULTS = Object.freeze({
@@ -58,6 +60,7 @@ const HELP = {
   check: "Usage: oak check [--target PATH]",
   replay: "Usage: oak replay [--corpus PATH] [--fixtures PATH] [--output PATH]",
   state: "Usage: oak state <init|resume|record|release|inspect|repair|migrate> --root PATH [options]",
+  run: "Usage: oak run <start|status|event|close> --root PATH [options]",
   uninstall: "Usage: oak uninstall [--dry-run] [--yes] [--target PATH]",
   rollback: "Usage: oak rollback [--dry-run] [--target PATH]",
   version: "Usage: oak version",
@@ -198,6 +201,37 @@ function dispatchState(args, runtime) {
   );
 }
 
+function dispatchRun(args, runtime) {
+  const [action, ...options] = args;
+  const actions = new Set(["start", "status", "event", "close"]);
+  const valueFlags = new Set(["--root", "--slug", "--kind", "--type", "--output"]);
+  if (!actions.has(action)) return invalid(runtime.stderr, "invalid run action");
+
+  let root;
+  for (let index = 0; index < options.length; index += 1) {
+    const token = options[index];
+    if (!token.startsWith("--")) {
+      if (action !== "event" || token.indexOf("=") <= 0) return invalid(runtime.stderr, "invalid run arguments");
+      continue;
+    }
+    if (!valueFlags.has(token)) return invalid(runtime.stderr, "invalid run arguments");
+    const value = options[index + 1];
+    if (!value || value.startsWith("--")) return invalid(runtime.stderr, "invalid run arguments");
+    if (token === "--root") {
+      if (root !== undefined) return invalid(runtime.stderr, "invalid run arguments");
+      root = value;
+    }
+    index += 1;
+  }
+  if (root === undefined) return invalid(runtime.stderr, "run requires --root PATH");
+  return runNode(
+    OAK_ENTRYPOINTS.run,
+    args,
+    { cwd: path.resolve(root), env: runtime.env, label: "run" },
+    runtime,
+  );
+}
+
 export function dispatchOak(argv, deps = {}) {
   const runtime = {
     run: deps.run ?? spawnSync,
@@ -230,6 +264,7 @@ export function dispatchOak(argv, deps = {}) {
   if (command === "check") return dispatchCheck(rest, runtime);
   if (command === "replay") return dispatchReplay(rest, runtime);
   if (command === "state") return dispatchState(rest, runtime);
+  if (command === "run") return dispatchRun(rest, runtime);
   if (LIFECYCLE_COMMANDS.has(command)) {
     return runNode(
       OAK_ENTRYPOINTS.manager,

@@ -82,6 +82,7 @@ test("[O001] command set is closed and ordered", () => {
     "check",
     "replay",
     "state",
+    "run",
     "uninstall",
     "rollback",
     "version",
@@ -301,6 +302,32 @@ test("[O010] state delegates only an explicit loop-state command and root", () =
     ["state", "init", "--slug", "example"],
     ["state", "init", "--root", "/tmp/oak-target", "--root", "/tmp/other"],
     ["state", "init", "--root"],
+  ]) {
+    assert.equal(dispatchOak(argv, runnerDeps()), 2);
+  }
+});
+
+test("[O010b] run delegates each task-run action with an explicit root", () => {
+  for (const args of [
+    ["run", "start", "--root", "/tmp/oak-target", "--slug", "add-login", "--kind", "production"],
+    ["run", "status", "--root", "/tmp/oak-target"],
+    ["run", "event", "--root", "/tmp/oak-target", "--type", "review", "blocking=0", "verdict=safe_to_commit"],
+    ["run", "close", "--root", "/tmp/oak-target", "--output", "docs/ai/runs/2026-09-26-add-login/run-summary.json"],
+  ]) {
+    const calls = [];
+    assert.equal(dispatchOak(args, runnerDeps(calls)), 0);
+    assert.deepEqual(calls[0].args, [OAK_ENTRYPOINTS.run, ...args.slice(1)]);
+    assert.equal(calls[0].options.cwd, "/tmp/oak-target");
+    assert.equal(calls[0].options.shell, false);
+  }
+
+  for (const argv of [
+    ["run"],
+    ["run", "unknown", "--root", "/tmp/oak-target"],
+    ["run", "status", "--slug", "example"],
+    ["run", "status", "--root", "/tmp/oak-target", "blocking=0"],
+    ["run", "event", "--root", "/tmp/oak-target", "--type", "review", "=0"],
+    ["run", "start", "--root", "/tmp/oak-target", "--root", "/tmp/other"],
   ]) {
     assert.equal(dispatchOak(argv, runnerDeps()), 2);
   }
