@@ -11,7 +11,6 @@ const REPOSITORY_ROOT = path.dirname(path.dirname(SCRIPT_PATH));
 const EXACT_KEYS = {
   root: ["schema_version", "external_refs", "npm_overrides"],
   externalRefs: [
-    "superpowers",
     "actions_checkout",
     "actions_setup_node",
     "open_design",
@@ -19,7 +18,6 @@ const EXACT_KEYS = {
     "pnpm",
     "opencode_ai",
   ],
-  integration: ["release", "commit"],
   action: ["release", "commit"],
   commit: ["commit"],
   image: ["tag", "digest"],
@@ -73,7 +71,6 @@ function assertStableVersion(value, field) {
 export function validateSupplyChainData(data) {
   assertExactKeys(data, EXACT_KEYS.root, "supply chain");
   assertExactKeys(data.external_refs, EXACT_KEYS.externalRefs, "external_refs");
-  assertExactKeys(data.external_refs.superpowers, EXACT_KEYS.integration, "external_refs.superpowers");
   assertExactKeys(data.external_refs.actions_checkout, EXACT_KEYS.action, "external_refs.actions_checkout");
   assertExactKeys(data.external_refs.actions_setup_node, EXACT_KEYS.action, "external_refs.actions_setup_node");
   assertExactKeys(data.external_refs.open_design, EXACT_KEYS.commit, "external_refs.open_design");
@@ -83,17 +80,6 @@ export function validateSupplyChainData(data) {
   assertExactKeys(data.npm_overrides, EXACT_KEYS.overrides, "npm_overrides");
 
   if (data.schema_version !== 1) throw invalid("schema_version must be 1");
-
-  const superpowers = data.external_refs.superpowers;
-  if (typeof superpowers.release !== "string" || !superpowers.release.startsWith("v")) {
-    throw invalid("external_refs.superpowers.release must use canonical vMAJOR.MINOR.PATCH syntax");
-  }
-  try {
-    parseStableVersion(superpowers.release.slice(1));
-  } catch {
-    throw invalid("external_refs.superpowers.release must use canonical vMAJOR.MINOR.PATCH syntax");
-  }
-  assertCommit(superpowers.commit, "external_refs.superpowers.commit");
 
   for (const field of ["actions_checkout", "actions_setup_node"]) {
     const action = data.external_refs[field];
@@ -386,24 +372,11 @@ function activeCommandFiles(root, fsOps) {
   return files;
 }
 
-function validateStarterConfig(root, data, fsOps) {
+function validateStarterConfig(root, fsOps) {
   const relative = "opencode/opencode.json";
   const config = readJson(root, relative, fsOps);
-  const expected = `superpowers@git+https://github.com/obra/superpowers.git#${data.external_refs.superpowers.commit}`;
-  if (!Array.isArray(config.plugin)) {
-    throw invalid(`${relative} plugin must be an array containing the exact Superpowers full reviewed commit`);
-  }
-  if (config.plugin.filter((plugin) => plugin === expected).length !== 1) {
-    throw invalid(`${relative} superpowers plugin must use the exact full reviewed commit ${data.external_refs.superpowers.commit}`);
-  }
-  for (const plugin of config.plugin) {
-    if (typeof plugin !== "string") throw invalid(`${relative} plugin entries must be strings`);
-    if (plugin.includes("git+https") && plugin !== expected) {
-      throw invalid(`${relative} git+https plugin must use the exact full reviewed commit`);
-    }
-    if (plugin.includes("@latest")) {
-      throw invalid(`${relative} must not use @latest in a stable input`);
-    }
+  if (Object.hasOwn(config, "plugin")) {
+    throw invalid(`${relative} must not declare external plugins`);
   }
 }
 
@@ -511,7 +484,6 @@ function canonicalDocumentationPinBlock(data) {
   return `<!-- supply-chain-pins:start -->
 | Surface | Reviewed label | Immutable identifier |
 |---|---|---|
-| Superpowers | ${data.external_refs.superpowers.release} | \`${data.external_refs.superpowers.commit}\` |
 | actions/checkout | ${data.external_refs.actions_checkout.release} | \`${data.external_refs.actions_checkout.commit}\` |
 | actions/setup-node | ${data.external_refs.actions_setup_node.release} | \`${data.external_refs.actions_setup_node.commit}\` |
 | Open Design | reviewed commit | \`${data.external_refs.open_design.commit}\` |
@@ -539,7 +511,6 @@ function validateDocumentation(root, data, fsOps) {
   const actualBlock = policy.slice(startIndex, endIndex + end.length);
   if (actualBlock !== canonicalDocumentationPinBlock(data)) {
     const rowPositions = [
-      "| Superpowers |",
       "| actions/checkout |",
       "| actions/setup-node |",
       "| Open Design |",
@@ -571,15 +542,6 @@ function validateDocumentation(root, data, fsOps) {
     ],
   ]) {
     if (!policy.includes(required)) throw invalid(message);
-  }
-
-  const expected = `superpowers@git+https://github.com/obra/superpowers.git#${data.external_refs.superpowers.commit}`;
-  const referencePattern = /superpowers@git\+https:\/\/github\.com\/obra\/superpowers\.git(?:#[A-Za-z0-9._-]+)?/g;
-  for (const activeDoc of ["README.md", "docs/superpowers.md"]) {
-    const references = readText(root, activeDoc, fsOps).match(referencePattern) ?? [];
-    if (references.length === 0 || references.some((reference) => reference !== expected)) {
-      throw invalid(`${activeDoc} active Superpowers reference must use the full reviewed commit`);
-    }
   }
 
   const documentationRequirements = new Map([
@@ -626,7 +588,7 @@ function validateDocumentation(root, data, fsOps) {
 function validateSurfaces(root, data, fsOps) {
   validatePackages(root, data, fsOps);
   validateAutomatedInstalls(root, fsOps);
-  validateStarterConfig(root, data, fsOps);
+  validateStarterConfig(root, fsOps);
   validateWorkflowActions(root, data, fsOps);
   validateStableWorkflowCommands(root, fsOps);
   validateDockerfile(root, data, fsOps);

@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   LoopStateError,
   acquireLoop,
+  attestReview,
   initLoopState,
   inspectLoopState,
   migrateLoopState,
@@ -216,6 +217,7 @@ test("records actions idempotently and rejects action-id reuse with different co
     const duplicate = recordLoopAction(action);
     assert.deepEqual(duplicate, first);
 
+    attestReview({ root, slug: "example", reviewerSessionId: "child-1", reviewerAgent: "reviewer", reviewerVerdict: "APPROVE" });
     const later = recordLoopAction({
       ...action,
       actionId: "iteration-2",
@@ -664,4 +666,35 @@ test("does not follow a broken history symlink during initialization", () => {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(outside, { recursive: true, force: true });
   }
+});
+
+test("completion fails closed without a reviewer attestation bound to the contract", () => {
+  withRepo(({ root, contractPath }) => {
+    initExample(root, contractPath);
+    acquireLoop({ root, slug: "example", contractPath, sessionId: "session-1", actionId: "resume-1" });
+    const complete = { root, slug: "example", sessionId: "session-1", actionId: "done-1", iteration: 1, completedStep: "reviewer_approved", blockingCause: null, status: "completed" };
+    assert.throws(() => recordLoopAction(complete), (error) => error instanceof LoopStateError && error.code === "review_attestation_required");
+
+    assert.throws(() => attestReview({ root, slug: "example", reviewerSessionId: "child-9", reviewerAgent: "developer", reviewerVerdict: "APPROVE" }), /reviewer_agent/);
+    assert.throws(() => attestReview({ root, slug: "example", reviewerSessionId: "child-9", reviewerAgent: "reviewer", reviewerVerdict: "REJECT" }), /reviewer_verdict/);
+
+    const attestation = attestReview({ root, slug: "example", reviewerSessionId: "child-9", reviewerAgent: "reviewer", reviewerVerdict: "APPROVE" });
+    assert.equal(attestation.contract_hash, inspectLoopState({ root, slug: "example" }).approval.contract_hash);
+    assert.equal(recordLoopAction(complete).status, "completed");
+  });
+});
+
+test("an attestation for another contract does not complete the loop", () => {
+  withRepo(({ root, contractPath }) => {
+    initExample(root, contractPath);
+    acquireLoop({ root, slug: "example", contractPath, sessionId: "session-1", actionId: "resume-1" });
+    attestReview({ root, slug: "example", reviewerSessionId: "child-9", reviewerAgent: "reviewer", reviewerVerdict: "APPROVE" });
+    const file = path.join(root, ".opencode/loops/example.review.json");
+    const tampered = { ...JSON.parse(fs.readFileSync(file, "utf8")), contract_hash: `sha256:${"0".repeat(64)}` };
+    fs.writeFileSync(file, JSON.stringify(tampered));
+    assert.throws(
+      () => recordLoopAction({ root, slug: "example", sessionId: "session-1", actionId: "done-1", iteration: 1, completedStep: "reviewer_approved", blockingCause: null, status: "completed" }),
+      (error) => error.code === "review_attestation_required",
+    );
+  });
 });

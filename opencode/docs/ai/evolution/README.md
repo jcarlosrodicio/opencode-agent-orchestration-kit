@@ -152,16 +152,17 @@ a scheduler or autonomous loop engine.
 
 ## Adversarial suite
 
-Slice 2.5 adds a portable corpus of 11 threats in
+Slice 2.5 adds a portable corpus of 14 threats in
 `benchmarks/adversarial-scenarios.jsonl` and connects each scenario to a real
 harness control through `scripts/adversarial-harness.test.mjs`. It covers
 injection in diffs and repository documentation, external symlinks, traversal,
 control-character filenames, wrapper allowlist bypass, network exfiltration,
-approval manipulation, credential canaries, unpinned external references, and
-corrupt or repeated events.
+approval manipulation, credential canaries, unpinned external references,
+corrupt or repeated events, and autonomous delivery to the default branch,
+without a reviewer attestation, or with a private path in the PR body.
 
 The suite runs no network, models, or installations. Fixtures are symbolic;
-the checker enforces the closed schema, all 11 threats, and the permission and
+the checker enforces the closed schema, all 14 threats, and the permission and
 trust contracts that support them.
 
 ## Required Manifest

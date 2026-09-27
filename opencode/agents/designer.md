@@ -61,7 +61,7 @@ If either document is missing:
 3. Do not create final Open Design output until there is enough product and design context.
 4. Then load `open-design`.
 
-Do not use Superpowers or any other skill. This agent is intentionally limited to `open-design` and `impeccable`.
+Do not use process skills. This agent is intentionally limited to `open-design` and `impeccable`.
 
 ## Open Design flow
 

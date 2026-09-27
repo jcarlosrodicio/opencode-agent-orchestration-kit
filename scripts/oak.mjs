@@ -14,6 +14,8 @@ export const OAK_COMMANDS = [
   "check",
   "replay",
   "state",
+  "run",
+  "deliver",
   "uninstall",
   "rollback",
   "version",
@@ -28,6 +30,8 @@ export const OAK_ENTRYPOINTS = Object.freeze({
   check: path.join(REPOSITORY_ROOT, "opencode", "scripts", "check-harness.mjs"),
   replay: path.join(REPOSITORY_ROOT, "opencode", "scripts", "replay-routing.mjs"),
   state: path.join(REPOSITORY_ROOT, "opencode", "scripts", "loop-state.mjs"),
+  run: path.join(REPOSITORY_ROOT, "opencode", "scripts", "task-run.mjs"),
+  deliver: path.join(REPOSITORY_ROOT, "opencode", "scripts", "deliver.mjs"),
 });
 
 export const OAK_REPLAY_DEFAULTS = Object.freeze({
@@ -57,7 +61,9 @@ const HELP = {
   doctor: "Usage: oak doctor [--accept-preserved PATH] [--target PATH]",
   check: "Usage: oak check [--target PATH]",
   replay: "Usage: oak replay [--corpus PATH] [--fixtures PATH] [--output PATH]",
-  state: "Usage: oak state <init|resume|record|release|inspect|repair|migrate> --root PATH [options]",
+  state: "Usage: oak state <init|resume|record|release|inspect|attest-review|repair|migrate> --root PATH [options]",
+  run: "Usage: oak run <start|status|event|close> --root PATH [options]",
+  deliver: "Usage: oak deliver <pr|checks> --root PATH [options]",
   uninstall: "Usage: oak uninstall [--dry-run] [--yes] [--target PATH]",
   rollback: "Usage: oak rollback [--dry-run] [--target PATH]",
   version: "Usage: oak version",
@@ -158,7 +164,7 @@ function dispatchReplay(args, runtime) {
 
 function dispatchState(args, runtime) {
   const [action, ...options] = args;
-  const actions = new Set(["init", "resume", "record", "release", "inspect", "repair", "migrate"]);
+  const actions = new Set(["init", "resume", "record", "release", "inspect", "attest-review", "repair", "migrate"]);
   const valueFlags = new Set([
     "--root",
     "--slug",
@@ -172,6 +178,9 @@ function dispatchState(args, runtime) {
     "--blocking-cause",
     "--status",
     "--approval-status",
+    "--reviewer-session-id",
+    "--reviewer-agent",
+    "--reviewer-verdict",
   ]);
   const booleanFlags = new Set(["--release-lock", "--truncate-tail"]);
   if (!actions.has(action)) return invalid(runtime.stderr, "invalid state action");
@@ -194,6 +203,65 @@ function dispatchState(args, runtime) {
     OAK_ENTRYPOINTS.state,
     args,
     { cwd: path.resolve(root), env: runtime.env, label: "state" },
+    runtime,
+  );
+}
+
+function dispatchRun(args, runtime) {
+  const [action, ...options] = args;
+  const actions = new Set(["start", "status", "event", "close"]);
+  const valueFlags = new Set(["--root", "--slug", "--kind", "--type", "--output"]);
+  if (!actions.has(action)) return invalid(runtime.stderr, "invalid run action");
+
+  let root;
+  for (let index = 0; index < options.length; index += 1) {
+    const token = options[index];
+    if (!token.startsWith("--")) {
+      if (action !== "event" || token.indexOf("=") <= 0) return invalid(runtime.stderr, "invalid run arguments");
+      continue;
+    }
+    if (!valueFlags.has(token)) return invalid(runtime.stderr, "invalid run arguments");
+    const value = options[index + 1];
+    if (!value || value.startsWith("--")) return invalid(runtime.stderr, "invalid run arguments");
+    if (token === "--root") {
+      if (root !== undefined) return invalid(runtime.stderr, "invalid run arguments");
+      root = value;
+    }
+    index += 1;
+  }
+  if (root === undefined) return invalid(runtime.stderr, "run requires --root PATH");
+  return runNode(
+    OAK_ENTRYPOINTS.run,
+    args,
+    { cwd: path.resolve(root), env: runtime.env, label: "run" },
+    runtime,
+  );
+}
+
+// There is no merge action, by design: delivery ends at an open pull request.
+function dispatchDeliver(args, runtime) {
+  const [action, ...options] = args;
+  const actions = new Set(["pr", "checks"]);
+  const valueFlags = new Set(["--root", "--slug", "--title", "--body-file", "--pr"]);
+  if (!actions.has(action)) return invalid(runtime.stderr, "invalid deliver action");
+
+  let root;
+  for (let index = 0; index < options.length; index += 1) {
+    const flag = options[index];
+    if (!valueFlags.has(flag)) return invalid(runtime.stderr, "invalid deliver arguments");
+    const value = options[index + 1];
+    if (!value || value.startsWith("--")) return invalid(runtime.stderr, "invalid deliver arguments");
+    if (flag === "--root") {
+      if (root !== undefined) return invalid(runtime.stderr, "invalid deliver arguments");
+      root = value;
+    }
+    index += 1;
+  }
+  if (root === undefined) return invalid(runtime.stderr, "deliver requires --root PATH");
+  return runNode(
+    OAK_ENTRYPOINTS.deliver,
+    args,
+    { cwd: path.resolve(root), env: runtime.env, label: "deliver" },
     runtime,
   );
 }
@@ -230,6 +298,8 @@ export function dispatchOak(argv, deps = {}) {
   if (command === "check") return dispatchCheck(rest, runtime);
   if (command === "replay") return dispatchReplay(rest, runtime);
   if (command === "state") return dispatchState(rest, runtime);
+  if (command === "run") return dispatchRun(rest, runtime);
+  if (command === "deliver") return dispatchDeliver(rest, runtime);
   if (LIFECYCLE_COMMANDS.has(command)) {
     return runNode(
       OAK_ENTRYPOINTS.manager,

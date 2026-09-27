@@ -185,6 +185,26 @@ npm run build
 npm run dev  # Verify in browser
 ```
 
+## Classify the Failure Before Retrying
+
+Before any retry, name which of four kinds the failure is, and quote the line
+of output that decides it:
+
+1. **The code is wrong.** Fix the code. This is the only kind that justifies
+   changing the implementation.
+2. **The check is wrong.** It asserts something the specification never asked
+   for. Correct the assertion and cite the specification. Never delete, skip or
+   loosen it to get a pass.
+3. **The harness is misaimed.** The wrong test was selected, state is stale, or
+   a tool is missing. Correct that and run again. If the fault is in
+   configuration the project owns, report it instead of editing it.
+4. **A piece is missing.** A fixture, a seam or some access does not exist yet.
+   That is new work: return to planning.
+
+Never re-run a failure unchanged. A flake needs its log line recorded, and the
+same flake twice is a finding. A failure that recurs across tasks should become
+infrastructure: a test, a check or a documented decision.
+
 ## Error-Specific Patterns
 
 ### Test Failure Triage

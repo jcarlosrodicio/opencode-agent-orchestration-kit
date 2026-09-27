@@ -188,7 +188,7 @@ corrupt, report the durable error and do not repair or resume automatically.
 
 Contract: explicit invocation -> `developer -> reviewer -> developer (state sync)`.
 
-`/autonomous <objective>` authorizes one local task without another human gate
+`/autonomous <objective>` authorizes one task without another human gate
 per iteration. It requires durable state, deterministic validation, new evidence
 for retries, and reviewer-only closure. Before starting, `lead` sets a
 task-specific planned iteration budget from 1 to 6; six remains the hard safety
@@ -196,9 +196,12 @@ ceiling rather than a target. Final reviewer approval stops the cycle
 immediately. An explicit schema migration requires renewed human approval
 before `oak state resume`; earlier approval cannot be reused. It permits at
 most the planned iteration budget and stops on success, no progress, repeated failure, impossible validation, budget,
-protected changes, scope expansion, or sensitive paths. It forbids scheduling,
-parallelism, worktrees, network, write MCP, commit, push, merge, deploy, and
-publication; `/loop` retains its human gate and three-iteration bound.
+protected changes, scope expansion, or one of its seven stop reasons. It works
+on a feature branch inside a task run (`oak run`), writes its reports under
+`docs/ai/runs/<date>-<slug>/`, and ends at an open pull request through
+`oak deliver`, with CI classified; it never merges, deploys, releases or
+publishes. It forbids scheduling, parallelism, worktrees, and write MCP;
+`/loop` retains its human gate and three-iteration bound.
 
 Use installed `oak state --root .` so consumer repositories do not need to
 contain the runtime. `lead` invokes `reviewer` only as a `task` subagent. A

@@ -42,3 +42,12 @@ esa deduplicación al reiniciar no altera el snapshot ni el historial.
 La compaction conserva el session id. Un error de notificación no bloquea el
 loop ni se convierte en una transición durable. Las transiciones reales siguen
 requiriendo `loop-state.mjs` y sus locks, hashes, `action_id` y presupuesto.
+
+## Enlace con el task run
+
+El plugin escribe exactamente un tipo de dato durable: eventos
+`agent_session` del task run (`oak run`), y solo cuando hay un run abierto.
+Registra cada sesión una vez, con `session_id`, `parent_session_id`, `agent`
+y `runtime`, a través de `appendRunEvent`. Sin run abierto no escribe nada, y
+un fallo al registrar nunca afecta a la sesión. El plugin sigue sin escribir en
+`.opencode/loops`.

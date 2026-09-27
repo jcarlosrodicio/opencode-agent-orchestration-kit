@@ -66,6 +66,12 @@ opencode/scripts/runtime-permission-policy.test.mjs
 opencode/scripts/shell-export-policy.mjs
 opencode/scripts/shell-export-policy.d.mts
 opencode/scripts/shell-export-policy.test.mjs
+opencode/scripts/task-run.mjs
+opencode/scripts/task-run.d.mts
+opencode/scripts/task-run.test.mjs
+opencode/scripts/deliver.mjs
+opencode/scripts/deliver.d.mts
+opencode/scripts/deliver.test.mjs
 opencode/commands/loop.md
 opencode/commands/loop-status.md
 opencode/commands/plan.md
@@ -170,7 +176,6 @@ grep -q '"default_agent": "lead"' opencode/opencode.json
 grep -q './plugins/token-tree-usage.tsx' opencode/tui.json
 
 grep -q 'Open Design' README.md
-grep -q 'Superpowers' README.md
 grep -q 'oak check' README.md
 grep -q 'oak replay' README.md
 grep -q 'OPENCODE_CONFIG_DIR' docs/cli.md
@@ -180,7 +185,7 @@ grep -q 'Impeccable' README.md
 
 grep -q '"open-design": allow' opencode/agents/designer.md
 grep -q '"impeccable": allow' opencode/agents/designer.md
-grep -q '"superpowers"' opencode/agents/designer.md && { echo 'designer should not allow superpowers' >&2; exit 1; } || true
+! grep -qi 'superpowers' opencode/agents/*.md opencode/AGENTS.md opencode/opencode.json || { echo 'Superpowers must not be referenced by OAK agents or config' >&2; exit 1; }
 grep -q 'mode: all' opencode/agents/developer.md
 grep -q 'Direct mode without slash commands' opencode/agents/developer.md
 grep -q 'Default behavior without slash commands' opencode/agents/lead.md
@@ -250,6 +255,5 @@ grep -q 'Apache License' LICENSE
 grep -q 'OpenCode' NOTICE.md
 grep -q 'Open Design' NOTICE.md
 grep -q 'Impeccable' NOTICE.md
-grep -q 'Superpowers' NOTICE.md
 
 echo 'check ok'

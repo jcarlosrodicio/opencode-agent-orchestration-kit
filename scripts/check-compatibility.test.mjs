@@ -106,7 +106,6 @@ Canonical Node engine: \`${VALID_COMPATIBILITY.node.engines}\`.
 | Native Windows | unsupported | Bash lifecycle wrappers have no native contract |
 | Token usage plugin | experimental | compile/import is tested; runtime session-tree behavior is not stable API evidence |
 | Open Design Docker adapter | experimental | optional pinned image inputs, no blocking integration smoke |
-| Superpowers | experimental | optional upstream Git plugin, not part of core smoke |
 | Impeccable | experimental | optional externally installed skill |
 <!-- compatibility-matrix:end -->
 `;
@@ -524,7 +523,6 @@ for (const [surface, currentStatus, replacement, expectedStatus] of [
   ["WSL2", "experimental", "supported", "experimental"],
   ["Token usage plugin", "experimental", "supported", "experimental"],
   ["Open Design Docker adapter", "experimental", "supported", "experimental"],
-  ["Superpowers", "experimental", "supported", "experimental"],
   ["Impeccable", "experimental", "supported", "experimental"],
 ]) {
   test(`documentation rejects the wrong status for ${surface}`, (t) => {
@@ -553,7 +551,6 @@ for (const surface of [
   "Native Windows",
   "Token usage plugin",
   "Open Design Docker adapter",
-  "Superpowers",
   "Impeccable",
 ]) {
   test(`documentation requires the ${surface} boundary`, (t) => {
@@ -1211,12 +1208,7 @@ function makeCompatibilitySmokeFixture(t, options = {}) {
   writeText(root, "opencode/node_modules/excluded", "must not be copied\n");
   writeText(root, "opencode/.oak/excluded", "must not be copied\n");
   writeText(root, "opencode/plugins/token-tree-usage.tsx", "export default {};\n");
-  writeJson(root, "opencode/opencode.json", {
-    default_agent: "lead",
-    plugin: [
-      "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99",
-    ],
-  });
+  writeJson(root, "opencode/opencode.json", { default_agent: "lead" });
 
   const quotedRoot = shellQuote(root);
   const realNpm = spawnSync("which", ["npm"], { encoding: "utf8" }).stdout.trim();
@@ -1256,7 +1248,7 @@ case "${options.mode ?? "core"}" in
     ;;
   default)
     test -f "$2/plugins/token-tree-usage.tsx"
-    node -e 'const c=require(process.argv[1]); const p=c.plugin; if (!Array.isArray(p) || p.length !== 1 || p[0] !== "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99") process.exit(1)' "$2/opencode.json"
+    node -e 'const c=require(process.argv[1]); if (Object.hasOwn(c, "plugin")) process.exit(1)' "$2/opencode.json"
     ;;
 esac
 `);

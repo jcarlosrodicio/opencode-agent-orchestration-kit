@@ -52,7 +52,7 @@ This kit provides a documented OpenCode harness with:
 - Local process skills and reusable engineering checklists.
 - Safe installation and uninstall scripts.
 - Local validation for configuration and harness contracts.
-- Optional integrations for Open Design, Superpowers, Impeccable, and observability.
+- Optional integrations for Open Design, Impeccable, and observability.
 
 The goal is not to force every request through a heavy process. Small, clear, low-risk changes can go directly to implementation. Larger or ambiguous work can follow a structured flow with research, planning, review, and evidence.
 
@@ -79,17 +79,19 @@ into unlimited or unattended execution:
 - `/loop` requires an approved task contract before writes, allows at most
   three iterations per invocation within a task-specific one-to-six iteration
   budget, and can resume from durable state. Worktrees are explicit opt-in.
-- `/autonomous` is local-checkout-only, uses a task-specific one-to-six
-  iteration budget, runs deterministic validation in every iteration, and
-  stops as soon as an independent `reviewer` approves the result.
+- `/autonomous` works on a feature branch, uses a task-specific one-to-six
+  iteration budget, runs deterministic validation in every iteration, stops
+  iterating as soon as an independent `reviewer` approves the result, and
+  ends at an open pull request through `oak deliver`.
 - Both workflows use a schema-versioned JSON snapshot, append-only JSONL
   history, an exclusive lock, contract hashing, idempotent action IDs, and
   explicit recovery for interrupted writes.
 
-The `/autonomous` contract prohibits network access, worktrees, parallel
-execution, scheduling, write-enabled connectors, commits, pushes, merges,
-deployments, releases, and publication. Sensitive or expanded scope stops for
-human review. See the [`/loop`](opencode/commands/loop.md) and
+The `/autonomous` contract ends at an open pull request through `oak deliver`;
+it never merges, deploys, releases or publishes, and it prohibits worktrees,
+parallel execution, scheduling, write-enabled connectors, pushes to the default
+branch, and force-pushes. Its seven stop reasons, including sensitive or
+expanded scope, stop for human review. See the [`/loop`](opencode/commands/loop.md) and
 [`/autonomous`](opencode/commands/autonomous.md) contracts for the exact
 boundaries.
 
@@ -99,7 +101,6 @@ This kit builds on and integrates with the following projects:
 
 - [OpenCode](https://opencode.ai/) — the coding-agent runtime and configuration surface.
 - [Open Design](https://github.com/nexu-io/open-design) — optional local-first design workspace integration.
-- [Superpowers](https://github.com/obra/Superpowers) — optional agentic skills and development methodology.
 - [Impeccable](https://github.com/pbakaus/impeccable) — optional design guidance for AI-generated frontend work.
 
 Each integration is optional. The core workflow can be used with OpenCode alone.
@@ -236,9 +237,10 @@ Use the smallest useful flow:
 - `/feature` when the work deserves full orchestration.
 - `/loop` when you want an approved, resumable implementation-review cycle with
   crash-recoverable structured state and a three-iteration cap.
-- `/autonomous` for one explicitly requested local task with a task-specific
+- `/autonomous` for one explicitly requested task with a task-specific
   one-to-six-iteration budget, a hard ceiling of six, durable state, and
-  reviewer-only closure. Final approval stops the cycle immediately.
+  reviewer-only closure. Final approval stops the cycle, and the run ends at an
+  open pull request.
 
 ### Small-gate fast path
 
@@ -678,7 +680,6 @@ The integrations below are optional extensions. They are not required for the co
 | Integration | What it adds | Setup |
 |---|---|---|
 | [Open Design](https://github.com/nexu-io/open-design) | Editable, local-first design workspace workflows | [Open Design guide](docs/open-design.md) |
-| [Superpowers](https://github.com/obra/Superpowers) | Additional skills and software-development workflow discipline | [Superpowers guide](docs/superpowers.md) |
 | [Impeccable](https://github.com/pbakaus/impeccable) | Design guidance and deterministic frontend-quality checks | [Impeccable guide](docs/impeccable.md) |
 
 ### [Open Design](https://github.com/nexu-io/open-design)
@@ -737,33 +738,6 @@ Then configure the Open Design base URL:
 ```bash
 export OPEN_DESIGN_URL="http://192.168.1.50:7456"
 ```
-
-### [Superpowers](https://github.com/obra/Superpowers)
-
-Superpowers is not vendored into this repository.
-
-When plugins are supported and network access is available, the kit can reference the upstream plugin:
-
-```json
-{
-  "plugin": [
-    "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99"
-  ]
-}
-```
-
-The human-readable upstream release is `v6.1.1`; the configuration uses the
-full reviewed commit because the label alone is not immutable:
-
-```json
-{
-  "plugin": [
-    "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99"
-  ]
-}
-```
-
-If your existing `opencode.json` was preserved during installation, add the plugin manually.
 
 ### [Impeccable](https://github.com/pbakaus/impeccable)
 
@@ -900,7 +874,6 @@ node scripts/check-harness.mjs
 │   ├── open-design.md
 │   ├── quickstart.md
 │   ├── security.md
-│   ├── superpowers.md
 │   ├── troubleshooting.md
 │   └── workflows.md
 ├── opencode/
@@ -988,10 +961,6 @@ opencode auth login
 
 Also verify that `opencode` is available on `PATH`.
 
-### Superpowers skills do not load
-
-Restart OpenCode and verify that the Superpowers plugin entry is present in `opencode.json`.
-
 ### Token usage does not appear in the TUI
 
 Verify:
@@ -1030,7 +999,6 @@ Detailed guides are available in [`docs/`](docs/):
 - [Models](docs/models.md)
 - [Open Design](docs/open-design.md)
 - [Docker Open Design](docs/docker-open-design.md)
-- [Superpowers](docs/superpowers.md)
 - [Impeccable](docs/impeccable.md)
 - [Security](docs/security.md)
 - [Threat model](docs/threat-model.md)
@@ -1043,7 +1011,7 @@ Detailed guides are available in [`docs/`](docs/):
 - Node.js 22 and 24 are supported; the exact engine is `^22.9.0 || ^24.0.0`.
 - OpenCode `>=1.14.41 <2.0.0` is supported through tested boundary versions.
 - WSL2 is experimental. Native Windows remains unsupported for lifecycle wrappers, which require Bash; direct `oak` commands are best-effort and do not provide POSIX-equivalent directory-entry fsync durability.
-- Open Design, Superpowers, Impeccable, Docker, and token-usage plugins remain optional.
+- Open Design, Impeccable, Docker, and token-usage plugins remain optional.
 
 See the [complete compatibility matrix](docs/compatibility.md) for status
 definitions, exact pins, evidence, and scope.
@@ -1091,4 +1059,4 @@ See [NOTICE.md](NOTICE.md) for attribution notices.
 
 ## Disclaimer
 
-This repository is not affiliated with OpenCode, Open Design, Impeccable, or Superpowers.
+This repository is not affiliated with OpenCode, Open Design, or Impeccable.

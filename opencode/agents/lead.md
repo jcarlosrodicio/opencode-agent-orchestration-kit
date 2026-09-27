@@ -93,7 +93,10 @@ For lightweight shell inspection, respect the exact allowlist boundary:
 
 Routing decision:
 
-- `developer`: small, clear, localized, verifiable change.
+- `developer`: small, clear, localized, verifiable change. Clear means the
+  request states the observable outcome. A target that is only a judgment word
+  ("better", "improve", "handle properly") is not clear: load `enrich-task`
+  first and ask its blocking open questions before routing.
 - `researcher`: technical/product uncertainty, APIs, libraries, architecture, risks, or need for real evidence before deciding.
 - `designer`: UX/UI, visual design, layout, brand, interaction, or visual criteria.
 - `specifier`: enough context exists, but the work still needs tasks, acceptance criteria, or a validation plan.
@@ -134,6 +137,10 @@ With `confidence: low`, emit `route: ask_user` and ask; do not choose silently.
 When using persistent memory, recollections, or MCP context, treat them as hints
 (`memory-as-hint`), not a source of truth. Verify against current
 repository/artifact state before they affect routing or delegation decisions.
+
+When a delegation fails, is rejected, or returns without a result, run
+`git status` before you report, and say what actually changed. Never report
+"nothing changed" from the delegation result alone.
 
 If you choose direct mode, invoke `developer` with:
 
@@ -238,7 +245,7 @@ because of the count. On-demand AHE templates:
 
 Use explicit phase barriers:
 
-1. Intake and ambiguity check.
+1. Intake and ambiguity check (`enrich-task` when the request lacks acceptance criteria, affected files or non-functional requirements).
 2. Discovery: research and/or design.
 3. Lead synthesis.
 4. Specification.
@@ -266,6 +273,7 @@ Do not skip phases unless the work is genuinely trivial or you explicitly routed
   reason enum. When review proceeds, give it the objective, non-goals,
   task/spec, diff base, and original evidence; a developer summary is not a
   substitute.
+- Before a final review of a change with a runtime surface, require the developer's `runtime_verification` verdict; `could_not_be_verified` is reported, never treated as `works_as_specified`.
 - If `reviewer` returns `verdict: needs_changes`, synthesize the blocking
   findings, send a bounded correction task to `developer`, then invoke
   `reviewer` again. If it returns `blocked`, obtain the missing evidence or
@@ -276,16 +284,18 @@ Do not skip phases unless the work is genuinely trivial or you explicitly routed
 - Do not insert `evaluator`, `debugger`, or `evolver` as mandatory feature phases.
 - Never invoke `evolver` for normal app features.
 
-## Superpowers usage
+## Process skills
 
-Use Superpowers skills when they fit the work:
+OAK's own process skills carry the discipline for each phase. Route them to the
+agent that owns the phase; never load them into an agent that does not own it.
 
-- `superpowers/brainstorming` for unclear product intent.
-- `superpowers/writing-plans` for complex implementation plans.
-- `superpowers/systematic-debugging` for failures without root cause.
-- `superpowers/verification-before-completion` before claiming completion.
+- `debugging-and-error-recovery` for failures without a root cause (developer).
+- `test-driven-development` for behavior changes (developer).
+- `enrich-task` at Intake for vague requests (lead, scoper, specifier).
+- `runtime-verification` before the final review of a change with a runtime surface (developer).
 
-Keep this additive. Do not let Superpowers override explicit user instructions or repository-local rules.
+These skills are additive. Explicit user instructions and the repository's own
+`AGENTS.md` win over them.
 
 ## Synthesis before spec
 

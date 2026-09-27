@@ -40,7 +40,7 @@ const common = {
 export const AGENT_POLICIES = Object.freeze({
   debugger: Object.freeze({ ...common, repository_write: "unspecified", task_default: "unspecified", write: "ask", network: "allow", delegate_to: [] }),
   designer: Object.freeze({ ...common, repository_write: "ask", task_default: "unspecified", write: "ask", network: "allow", delegate_to: [] }),
-  developer: Object.freeze({ ...common, repository_write: "allow", task_default: "unspecified", write: "allow", network: "ask", commit: "ask", delegate_to: [] }),
+  developer: Object.freeze({ ...common, repository_write: "allow", task_default: "unspecified", write: "allow", network: "ask", commit: "ask", push: "ask", delegate_to: [] }),
   evaluator: Object.freeze({ ...common, repository_write: "unspecified", task_default: "unspecified", write: "ask", network: "ask", delegate_to: [] }),
   evolver: Object.freeze({ ...common, repository_write: "unspecified", task_default: "unspecified", write: "ask", network: "ask", delegate_to: [] }),
   lead: Object.freeze({ ...common, repository_write: "deny", task_default: "deny", write: "deny", network: "allow", delegate_to: ["debugger", "designer", "developer", "evaluator", "evolver", "researcher", "reviewer", "specifier"] }),

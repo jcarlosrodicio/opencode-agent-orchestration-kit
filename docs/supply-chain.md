@@ -8,7 +8,6 @@ the immutable identifier consumed by the repository.
 <!-- supply-chain-pins:start -->
 | Surface | Reviewed label | Immutable identifier |
 |---|---|---|
-| Superpowers | v6.1.1 | `d884ae04edebef577e82ff7c4e143debd0bbec99` |
 | actions/checkout | v6 | `d23441a48e516b6c34aea4fa41551a30e30af803` |
 | actions/setup-node | v6 | `249970729cb0ef3589644e2896645e5dc5ba9c38` |
 | Open Design | reviewed commit | `1592beb96134f9d49b8a90dc6a359b94a69af57e` |
@@ -46,10 +45,10 @@ an install command; do not blindly run the kit's frozen-install command there.
 
 The release-blocking core smoke removes external plugins and the local token
 plugin and runs without the Open Design service or Impeccable. The separate
-default-config smoke proves that the packed starter configuration loads with
-the reviewed Superpowers commit. Superpowers, Open Design, Impeccable, and the
-token plugin remain experimental; default smoke evidence does not promote
-them into the supported core contract.
+default-config smoke proves that the packed starter configuration loads
+without external plugins. Open Design, Impeccable, and the token plugin remain
+experimental; default smoke evidence does not promote them into the supported
+core contract.
 
 The Open Design image fixes the Node image digest, Open Design commit, pnpm
 version, JavaScript lockfile, and OpenCode CLI version. It does not guarantee a
@@ -66,8 +65,6 @@ normal check fetches or rewrites a pin.
 
 For each surface, also record:
 
-- Superpowers: tag and peeled commit evidence; update starter config and every
-  active copy-paste example; run core and default smokes.
 - `actions/checkout`: the full commit behind the reviewed release; update all
   blocking and canary uses while retaining the release comment.
 - `actions/setup-node`: the full commit behind the reviewed release; update all

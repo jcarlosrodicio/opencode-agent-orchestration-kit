@@ -45,7 +45,6 @@ body:
         - agents
         - commands
         - open-design skill/tool
-        - Superpowers integration
         - Impeccable documentation
         - Docker Open Design
         - install/uninstall scripts

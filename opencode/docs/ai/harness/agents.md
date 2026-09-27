@@ -133,16 +133,18 @@ and never becomes a second authority. The runtime observer is ephemeral; it
 may report activity, but durable transitions still require the loop state
 runtime and its locks.
 
-## Bounded local autonomy
+## Bounded autonomy to a pull request
 
-`/autonomous` uses one explicit user invocation for a local objective, not a
+`/autonomous` uses one explicit user invocation for one objective, not a
 general permission. It reuses durable loop state, requires deterministic
 validation per iteration, and retains `reviewer` as the only completion
 authority. It stops at six iterations or earlier for no progress, repeated
-failure, impossible validation, sensitive paths, or scope expansion. It never
-enables scheduling, parallelism, network, write MCP, worktrees, commit, push,
-merge, deploy, or publication. `reviewer` remains a subagent and its APPROVE
-attestation is required for completed state.
+failure, impossible validation, one of its seven stop reasons, or scope
+expansion. It works on a feature branch inside a task run and ends at an open
+pull request through `oak deliver`; it never merges, deploys, releases or
+publishes, and never enables scheduling, parallelism, write MCP, or worktrees.
+`reviewer` remains a subagent and its APPROVE attestation is required for
+completed state and for delivery.
 
 ## Orchestrated Review
 

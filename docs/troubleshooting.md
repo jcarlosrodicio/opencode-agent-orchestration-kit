@@ -28,10 +28,6 @@ Prefer HTTPS. Browser secure-context rules can block APIs on plain HTTP remote h
 
 Use system package manager jq, or avoid jq in scripts. This kit's checks do not require jq.
 
-## using-superpowers loads by accident
-
-Check plugin config and agent skill permissions. Designer intentionally denies Superpowers.
-
 ## designer cannot see open-design
 
 Verify `opencode/skills/open-design/SKILL.md` exists and `OPEN_DESIGN_URL` is set.

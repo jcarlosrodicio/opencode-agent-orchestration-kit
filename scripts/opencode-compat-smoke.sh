@@ -145,16 +145,13 @@ const root = process.argv[2];
 const mode = process.argv[3];
 const config = JSON.parse(fs.readFileSync(path.join(root, "opencode.json"), "utf8"));
 const plugins = path.join(root, "plugins");
-const superpowers = "superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99";
 
 if (mode === "core") {
   if (!Array.isArray(config.plugin) || config.plugin.length !== 0 || fs.existsSync(plugins)) {
     process.exit(1);
   }
 } else if (
-  !Array.isArray(config.plugin)
-  || config.plugin.length !== 1
-  || config.plugin[0] !== superpowers
+  Object.hasOwn(config, "plugin")
   || !fs.statSync(path.join(plugins, "token-tree-usage.tsx")).isFile()
 ) {
   process.exit(1);

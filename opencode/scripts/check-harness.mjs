@@ -799,7 +799,7 @@ function checkAutonomousContract() {
   const text = contractText(read(rel));
   for (const token of [
     "authorization: explicit_command_invocation",
-    "execution_scope: local_checkout_only",
+    "execution_scope: feature_branch_to_pull_request",
     "max_iterations_per_invocation: 6",
     "planned_iteration_budget: task_specific_1_to_6",
     "hard_safety_ceiling: 6",
@@ -812,13 +812,21 @@ function checkAutonomousContract() {
     "worktree_mode: prohibited",
     "scheduling: prohibited",
     "parallelism: prohibited",
-    "external_writes: prohibited",
-    "auto_commit_push_merge_deploy: prohibited",
+    "delivery_path: oak_deliver_only",
+    "merge_deploy_release_publish: prohibited",
+    "default_branch_push: prohibited",
+    "force_push: prohibited",
+    "ci_fix_attempts_per_job: 2",
+    "stop_reasons: closed_list_of_seven",
+    "autonomy_log: docs/ai/runs/<date>-<slug>/autonomy.md",
+    "run_context: oak_run_required",
     "reviewer_execution: task_subagent_only",
     "reviewer_evidence: required_subagent_attestation",
     "oak state init --root .",
     "task reviewer",
     "oak state attest-review --root .",
+    "oak deliver pr --root .",
+    "Never merge",
     "developer -> reviewer -> developer (state sync)",
     "Do not create worktrees, schedule runs, execute parallel branches, use network",
     "two iterations without observable progress",
@@ -2115,6 +2123,9 @@ function checkAdversarialHarnessSurface() {
   const testRel = "scripts/adversarial-harness.test.mjs";
   const requiredThreats = [
     "approval-state-manipulation",
+    "delivery-default-branch-push",
+    "delivery-private-path-leak",
+    "delivery-without-review",
     "diff-prompt-injection",
     "event-corruption-replay",
     "external-symlink",
@@ -2229,7 +2240,7 @@ function checkAdversarialHarnessSurface() {
     ],
     [
       "docs/ai/evolution/README.md",
-      ["Slice 2.5", "11 threats"],
+      ["Slice 2.5", "14 threats"],
     ],
   ]) {
     const text = contractText(read(rel));
@@ -3019,6 +3030,81 @@ function checkOpenDesignToolContract() {
   }
 }
 
+// OpenCode applies the last matching bash rule, so every git deny must follow
+// the allow it narrows.
+const DEVELOPER_GIT_DENIES = [
+  "git add -A*",
+  "git add --all*",
+  "git add -u*",
+  "git add --update*",
+  "git add .",
+  "git add . *",
+  "git add -?A*",
+  "git add -?u*",
+  "git add -?f*",
+  "git add --a*",
+  "git add --u*",
+  "git add --f*",
+  "git add * -A*",
+  "git add * .",
+  "git add ./",
+  "git add ./ *",
+  "git add :/*",
+  "git add -f*",
+  "git add * -f*",
+  "git add *--force*",
+  "git commit * -a*",
+  "git commit *--all*",
+  "git commit * -n*",
+  "git commit *--no-v*",
+  "git commit -a*",
+  "git commit -n*",
+  "git commit *--am*",
+  "git commit * -?a*",
+  "git commit * -?n*",
+  "git commit * .",
+  "git commit * -- *",
+  "git push*",
+  "gh *",
+  "git merge*",
+  "git reset --hard*",
+  "git -C *",
+  "git -c *",
+  "rm *.opencode*",
+  "git branch -d*",
+  "git branch -D*",
+  "git branch --delete*",
+];
+const DEVELOPER_GIT_ALLOWS = [
+  ["git add ", "git add *"],
+  ["git commit ", "git commit -m *"],
+];
+
+function checkDeveloperGitPermissions() {
+  const rel = "agents/developer.md";
+  const rules = [];
+  let inBash = false;
+  for (const line of frontmatterBlock(rel).split("\n")) {
+    if (/^  [A-Za-z_]/.test(line)) inBash = /^  bash:\s*$/.test(line);
+    if (!inBash) continue;
+    const match = line.match(/^    "([^"]+)":\s*(allow|ask|deny)$/);
+    if (match) rules.push({ key: match[1], action: match[2] });
+  }
+  const indexOf = (key) => rules.findIndex((rule) => rule.key === key);
+  for (const key of DEVELOPER_GIT_DENIES) {
+    const index = indexOf(key);
+    if (index === -1 || rules[index].action !== "deny") {
+      fail(`${rel}: developer bash must deny ${key}`);
+      continue;
+    }
+    for (const [prefix, allowKey] of DEVELOPER_GIT_ALLOWS) {
+      if (key.startsWith(prefix) && index < indexOf(allowKey)) {
+        fail(`${rel}: developer bash deny ${key} must come after ${allowKey}`);
+      }
+    }
+  }
+}
+
 function checkMissionRuntimeContract() {
   const required = [
     "scripts/mission-status.mjs",
@@ -3050,6 +3136,9 @@ function checkMissionRuntimeContract() {
   }
   if (/writeFile|appendFile|rename|\.opencode\/loops/.test(`${observer}\n${plugin}`)) {
     fail("mission runtime observer: must not write durable loop state");
+  }
+  if (!plugin.includes("appendRunEvent")) {
+    fail("plugins/mission-runtime.ts: run events must go through appendRunEvent only");
   }
 }
 
@@ -3096,6 +3185,7 @@ checkShellExportGuardContract();
 checkRuntimePermissionPolicy();
 checkOpenDesignToolContract();
 checkMissionRuntimeContract();
+checkDeveloperGitPermissions();
 
 if (errors.length > 0) {
   console.error("Harness check failed:");
