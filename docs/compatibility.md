@@ -36,14 +36,13 @@ while `supported` describes the maintained promise derived from that evidence.
 | Native Windows | unsupported | Bash lifecycle wrappers have no native contract; direct `oak` commands are best-effort and do not provide POSIX-equivalent directory-entry fsync durability; the check harness accepts LF and CRLF Markdown frontmatter |
 | Token usage plugin | experimental | compile/import is tested; runtime session-tree behavior is not stable API evidence |
 | Open Design Docker adapter | experimental | optional pinned image inputs, no blocking integration smoke |
-| Superpowers | experimental | optional upstream Git plugin, not part of core smoke |
 | Impeccable | experimental | optional externally installed skill |
 <!-- compatibility-matrix:end -->
 
-The default-config smoke checks the exact reviewed Superpowers commit because
-the starter enables it. This does not change any integration status: Open
-Design, Superpowers, Impeccable, and the token plugin remain experimental. The
-smaller supported core contract excludes all four. Current immutable external
+The default-config smoke checks that the starter declares no external plugins.
+This does not change any integration status: Open Design, Impeccable, and the
+token plugin remain experimental. The smaller supported core contract excludes
+all three. Current immutable external
 identifiers and their release labels live in
 [the supply-chain policy](supply-chain.md).
 
@@ -71,15 +70,15 @@ job on Node.js 24, core OpenCode smokes at both `1.14.41` and `1.18.4`, and a
 default-config smoke at `1.18.4`. Core evidence loads the working-tree harness
 from an isolated copy with its external plugin list empty and its local token
 plugin absent. It therefore covers the maintained OpenCode boundary without
-Superpowers, Open Design service access, Impeccable, or the token plugin.
+Open Design service access, Impeccable, or the token plugin.
 
 The default-config smoke instead packs the npm artifact, extracts that local
 tarball, installs its frozen dependencies, and loads the unmodified starter
-configuration. It proves that the exact pinned Superpowers commit and bundled
-token plugin can load at the stable boundary. This release-blocking default
-check preserves the shipped starter behavior; it does not promote
-Superpowers or the token plugin from `experimental` and does not extend the
-core compatibility promise to either integration.
+configuration. It proves that the starter, with no external plugins, and the
+bundled token plugin can load at the stable boundary. This release-blocking
+default check preserves the shipped starter behavior; it does not promote the
+token plugin from `experimental` and does not extend the core compatibility
+promise to it.
 
 These combinations remain policy statements until their remote jobs record
 results. This document does not claim that the remote matrix has passed.

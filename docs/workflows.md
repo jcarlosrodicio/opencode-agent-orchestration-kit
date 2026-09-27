@@ -39,10 +39,9 @@ Only for improving the harness itself.
 ## Core and default release evidence
 
 The release-blocking core smoke loads an isolated configuration without
-Superpowers, the token plugin, an Open Design service, or Impeccable at both
-supported OpenCode boundaries. A separate default-config smoke loads the
-packed starter at the stable boundary with the full reviewed Superpowers
-commit. The latter proves the default can load; it does not make optional
+the token plugin, an Open Design service, or Impeccable at both supported
+OpenCode boundaries. A separate default-config smoke loads the packed starter,
+which declares no external plugins, at the stable boundary. The latter proves the default can load; it does not make optional
 integrations part of the supported core contract or promote them from
 experimental.
 

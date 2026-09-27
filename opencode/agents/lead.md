@@ -276,16 +276,16 @@ Do not skip phases unless the work is genuinely trivial or you explicitly routed
 - Do not insert `evaluator`, `debugger`, or `evolver` as mandatory feature phases.
 - Never invoke `evolver` for normal app features.
 
-## Superpowers usage
+## Process skills
 
-Use Superpowers skills when they fit the work:
+OAK's own process skills carry the discipline for each phase. Route them to the
+agent that owns the phase; never load them into an agent that does not own it.
 
-- `superpowers/brainstorming` for unclear product intent.
-- `superpowers/writing-plans` for complex implementation plans.
-- `superpowers/systematic-debugging` for failures without root cause.
-- `superpowers/verification-before-completion` before claiming completion.
+- `debugging-and-error-recovery` for failures without a root cause (developer).
+- `test-driven-development` for behavior changes (developer).
 
-Keep this additive. Do not let Superpowers override explicit user instructions or repository-local rules.
+These skills are additive. Explicit user instructions and the repository's own
+`AGENTS.md` win over them.
 
 ## Synthesis before spec
 

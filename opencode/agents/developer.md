@@ -93,13 +93,11 @@ If your handoff prompt contains a `Skill Resolution` block:
 - If you need an unlisted skill, include explicit justification in your `skill_resolution` output.
 - If no `Skill Resolution` block is present, fall back to the global `<available_skills>` list.
 
-## Superpowers discipline
+## Process skills
 
-Use Superpowers when applicable:
-
-- `superpowers/test-driven-development` for behavior changes when tests are feasible.
-- `superpowers/systematic-debugging` when a failure is not understood.
-- `superpowers/verification-before-completion` before claiming completion.
+- `test-driven-development` for behavior changes when tests are feasible.
+- `debugging-and-error-recovery` when a failure is not understood; classify it
+  before retrying (see that skill).
 
 ## Feedback loop
 

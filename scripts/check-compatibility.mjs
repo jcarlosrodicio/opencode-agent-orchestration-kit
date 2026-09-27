@@ -24,7 +24,6 @@ const STATIC_MATRIX_STATUSES = [
   ["Native Windows", "unsupported"],
   ["Token usage plugin", "experimental"],
   ["Open Design Docker adapter", "experimental"],
-  ["Superpowers", "experimental"],
   ["Impeccable", "experimental"],
 ];
 
@@ -296,7 +295,6 @@ function validateDocumentation(root, data, fsOps) {
     "Native Windows",
     "Token usage plugin",
     "Open Design Docker adapter",
-    "Superpowers",
     "Impeccable",
   ]) {
     if (!matrix.includes(token) && !docs.includes(token)) {

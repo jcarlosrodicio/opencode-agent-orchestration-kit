@@ -68,19 +68,13 @@ See `docs/ai/harness/commands.md` for command contracts.
 - Use local skills as checklists when they fit; do not use them as an excuse to
   add mandatory phases to simple changes.
 
-## Superpowers discipline
+## Process skills
 
-This kit enables the upstream Superpowers OpenCode plugin. Use it as operational
-discipline when applicable:
+OAK ships its own process skills. Each belongs to the agent that owns the phase:
 
-- brainstorming for ambiguous feature intent;
-- writing-plans before complex implementation;
-- test-driven-development for behavior changes when feasible;
-- systematic-debugging when a bug or failure is not understood;
-- verification-before-completion before claiming completion;
-- requesting-code-review and receiving-code-review for review loops.
+- `test-driven-development` and `debugging-and-error-recovery` — `developer`.
 
-User instructions and the local repo `AGENTS.md` take precedence.
+User instructions and the local repository `AGENTS.md` take precedence.
 
 ## Observability
 

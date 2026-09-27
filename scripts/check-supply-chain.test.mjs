@@ -23,10 +23,6 @@ const PACKAGE_FILES = [
 const VALID = {
   schema_version: 1,
   external_refs: {
-    superpowers: {
-      release: "v6.1.1",
-      commit: "d884ae04edebef577e82ff7c4e143debd0bbec99",
-    },
     actions_checkout: {
       release: "v6",
       commit: "d23441a48e516b6c34aea4fa41551a30e30af803",
@@ -75,7 +71,6 @@ function withFixture(data, callback) {
   }
 }
 
-const SUPERPOWERS_REF = `superpowers@git+https://github.com/obra/superpowers.git#${VALID.external_refs.superpowers.commit}`;
 const CHECKOUT_USE = `actions/checkout@${VALID.external_refs.actions_checkout.commit} # ${VALID.external_refs.actions_checkout.release}`;
 const SETUP_NODE_USE = `actions/setup-node@${VALID.external_refs.actions_setup_node.commit} # ${VALID.external_refs.actions_setup_node.release}`;
 
@@ -85,7 +80,6 @@ function canonicalPolicy() {
 <!-- supply-chain-pins:start -->
 | Surface | Reviewed label | Immutable identifier |
 |---|---|---|
-| Superpowers | ${VALID.external_refs.superpowers.release} | \`${VALID.external_refs.superpowers.commit}\` |
 | actions/checkout | ${VALID.external_refs.actions_checkout.release} | \`${VALID.external_refs.actions_checkout.commit}\` |
 | actions/setup-node | ${VALID.external_refs.actions_setup_node.release} | \`${VALID.external_refs.actions_setup_node.commit}\` |
 | Open Design | reviewed commit | \`${VALID.external_refs.open_design.commit}\` |
@@ -110,9 +104,8 @@ function writeValidDocumentation(root) {
   fs.writeFileSync(path.join(root, "docs/supply-chain.md"), canonicalPolicy());
   fs.writeFileSync(
     path.join(root, "README.md"),
-    `${SUPERPOWERS_REF}\nnpm ci --ignore-scripts\nsqlite3\nsudo apt-get install -y sqlite3\n`,
+    `npm ci --ignore-scripts\nsqlite3\nsudo apt-get install -y sqlite3\n`,
   );
-  fs.writeFileSync(path.join(root, "docs/superpowers.md"), `${SUPERPOWERS_REF}\n`);
   fs.writeFileSync(
     path.join(root, "docs/docker-open-design.md"),
     `node:${VALID.external_refs.node_image.tag}@${VALID.external_refs.node_image.digest}\nOPEN_DESIGN_REF=${VALID.external_refs.open_design.commit}\nOPENCODE_AI_VERSION=${VALID.external_refs.opencode_ai.version}\npnpm@${VALID.external_refs.pnpm.version} with pnpm install --frozen-lockfile\n`,
@@ -126,9 +119,7 @@ function writeValidDocumentation(root) {
 
 function writeValidSurfaceFiles(root) {
   fs.mkdirSync(path.join(root, "opencode"), { recursive: true });
-  fs.writeFileSync(path.join(root, "opencode/opencode.json"), `${JSON.stringify({
-    plugin: [SUPERPOWERS_REF],
-  })}\n`);
+  fs.writeFileSync(path.join(root, "opencode/opencode.json"), `${JSON.stringify({})}\n`);
   fs.mkdirSync(path.join(root, ".github/workflows"), { recursive: true });
   fs.writeFileSync(
     path.join(root, ".github/workflows/check.yml"),
@@ -260,7 +251,7 @@ test("rejects missing and unknown keys at every schema level", () => {
   expectInvalid((data) => { data.unknown = true; }, "supply chain keys");
   expectInvalid((data) => delete data.external_refs.pnpm, "external_refs keys");
   expectInvalid((data) => { data.external_refs.unknown = {}; }, "external_refs keys");
-  expectInvalid((data) => delete data.external_refs.superpowers.commit, "external_refs.superpowers keys");
+  expectInvalid((data) => delete data.external_refs.actions_checkout.commit, "external_refs.actions_checkout keys");
   expectInvalid((data) => { data.external_refs.node_image.unknown = true; }, "external_refs.node_image keys");
   expectInvalid((data) => delete data.npm_overrides.uuid, "npm_overrides keys");
   expectInvalid((data) => { data.npm_overrides.extra = "1.0.0"; }, "npm_overrides keys");
@@ -272,8 +263,8 @@ test("requires schema version 1", () => {
 
 test("requires lowercase full-length immutable commits", () => {
   expectInvalid(
-    (data) => { data.external_refs.superpowers.commit = "D884AE04EDEBEF577E82FF7C4E143DEBD0BBEC99"; },
-    "external_refs.superpowers.commit",
+    (data) => { data.external_refs.actions_checkout.commit = "D23441A48E516B6C34AEA4FA41551A30E30AF803"; },
+    "external_refs.actions_checkout.commit",
   );
   expectInvalid(
     (data) => { data.external_refs.open_design.commit = "1592beb"; },
@@ -293,10 +284,6 @@ test("requires a lowercase sha256 digest", () => {
 });
 
 test("requires canonical release labels", () => {
-  expectInvalid(
-    (data) => { data.external_refs.superpowers.release = "6.1.1"; },
-    "external_refs.superpowers.release",
-  );
   expectInvalid(
     (data) => { data.external_refs.actions_checkout.release = "v0"; },
     "external_refs.actions_checkout.release",
@@ -360,13 +347,13 @@ test("surface validation requires exactly the canonical oak and oc-switch bins",
   }
 });
 
-test("surface validation requires the exact Superpowers commit", () => {
+test("starter config must not reference external plugins", () => {
   withSurfaceFixture((root) => {
     const relative = "opencode/opencode.json";
     const config = JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
-    config.plugin = ["superpowers@git+https://github.com/obra/superpowers.git"];
+    config.plugin = ["superpowers@git+https://github.com/obra/superpowers.git#d884ae04edebef577e82ff7c4e143debd0bbec99"];
     fs.writeFileSync(path.join(root, relative), `${JSON.stringify(config)}\n`);
-    assert.throws(() => checkSupplyChain(root), /superpowers.*full reviewed commit/i);
+    assert.throws(() => checkSupplyChain(root), /opencode\/opencode\.json must not declare external plugins/);
   });
 });
 
@@ -559,7 +546,7 @@ test("documentation validation requires one ordered canonical supply-chain pin b
     (policy) => policy.replace("<!-- supply-chain-pins:start -->\n", ""),
     (policy) => `${policy}\n${policy}`,
     (policy) => policy.replace(
-      /\| Superpowers \|[^\n]+\n\| actions\/checkout \|[^\n]+/,
+      /\| actions\/checkout \|[^\n]+\n\| actions\/setup-node \|[^\n]+/,
       (pair) => pair.split("\n").reverse().join("\n"),
     ),
   ]) {
@@ -572,8 +559,6 @@ test("documentation validation requires one ordered canonical supply-chain pin b
 });
 
 for (const [label, current, replacement] of [
-  ["Superpowers release", `| Superpowers | ${VALID.external_refs.superpowers.release} |`, "| Superpowers | DRIFTED |"],
-  ["Superpowers commit", `| \`${VALID.external_refs.superpowers.commit}\` |`, "| `DRIFTED` |"],
   ["checkout release", `| actions/checkout | ${VALID.external_refs.actions_checkout.release} |`, "| actions/checkout | DRIFTED |"],
   ["checkout commit", `| \`${VALID.external_refs.actions_checkout.commit}\` |`, "| `DRIFTED` |"],
   ["setup-node release", `| actions/setup-node | ${VALID.external_refs.actions_setup_node.release} |`, "| actions/setup-node | DRIFTED |"],
@@ -606,18 +591,6 @@ for (const [label, current, message] of [
       const relative = "docs/supply-chain.md";
       fs.writeFileSync(path.join(root, relative), canonicalPolicy().replace(current, "missing policy"));
       assert.throws(() => checkSupplyChain(root), message);
-    });
-  });
-}
-
-for (const relative of ["README.md", "docs/superpowers.md"]) {
-  test(`documentation validation requires active Superpowers examples in ${relative} to use the full commit`, () => {
-    withSurfaceFixture((root) => {
-      fs.writeFileSync(
-        path.join(root, relative),
-        "superpowers@git+https://github.com/obra/superpowers.git#v6.1.1\n",
-      );
-      assert.throws(() => checkSupplyChain(root), /active Superpowers reference.*full reviewed commit/i);
     });
   });
 }

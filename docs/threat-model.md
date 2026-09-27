@@ -113,7 +113,6 @@ shell command from acting with the privileges of the user account.
 | Git repositories and external references | TB-006 | Immutable commit pins and supply-chain checks reject unsupported mutable references |
 | GitHub Actions | TB-006 | Third-party actions are pinned and checked; the CI host and pinned upstream remain trusted dependencies |
 | OpenCode plugin runtime | TB-003<br>TB-006 | Plugin dependencies are scoped and pinned; optional plugin behavior remains partly experimental |
-| Superpowers upstream plugin | TB-006 | The installation contract uses a reviewed immutable Git reference and explicit approval for changes |
 | Open Design service and container | TB-003<br>TB-006 | Documentation recommends local or authenticated network exposure; the service can execute agents and write workspace files |
 | Agent web access | TB-003<br>TB-006 | Frontmatter asks, allows, or denies web tools per role; fetched content remains untrusted |
 | MCP, memory, models, and tool output | TB-003<br>TB-006 | Persistent memory is a hint rather than truth; no general content-isolation guarantee exists |

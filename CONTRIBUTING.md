@@ -38,7 +38,6 @@ This repository is a starter kit, so changes should stay small, portable, and sa
 ## Project conventions
 
 - `open-design` is the only skill wrapper bundled locally.
-- Superpowers is referenced through the upstream OpenCode plugin, not vendored.
 - Impeccable is optional and user-installed.
 - Free-form messages should use direct developer mode for small changes.
 - Slash commands are explicit workflow contracts.
