@@ -69,6 +69,9 @@ opencode/scripts/shell-export-policy.test.mjs
 opencode/scripts/task-run.mjs
 opencode/scripts/task-run.d.mts
 opencode/scripts/task-run.test.mjs
+opencode/scripts/deliver.mjs
+opencode/scripts/deliver.d.mts
+opencode/scripts/deliver.test.mjs
 opencode/commands/loop.md
 opencode/commands/loop-status.md
 opencode/commands/plan.md

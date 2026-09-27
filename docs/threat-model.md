@@ -112,6 +112,7 @@ shell command from acting with the privileges of the user account.
 | npm registry and package metadata | TB-006 | Exact dependency versions, lockfile integrity, dependency audit, signature audit, and package smoke reduce drift; registry compromise remains possible |
 | Git repositories and external references | TB-006 | Immutable commit pins and supply-chain checks reject unsupported mutable references |
 | GitHub Actions | TB-006 | Third-party actions are pinned and checked; the CI host and pinned upstream remain trusted dependencies |
+| Git remote push and pull-request API | TB-003<br>TB-006 | Only `oak deliver` pushes (never forced, never the default branch) and opens pull requests after a reviewer attestation bound to the approved contract; merge is not implemented |
 | OpenCode plugin runtime | TB-003<br>TB-006 | Plugin dependencies are scoped and pinned; optional plugin behavior remains partly experimental |
 | Open Design service and container | TB-003<br>TB-006 | Documentation recommends local or authenticated network exposure; the service can execute agents and write workspace files |
 | Agent web access | TB-003<br>TB-006 | Frontmatter asks, allows, or denies web tools per role; fetched content remains untrusted |
@@ -178,11 +179,12 @@ eliminate the documented abuse. No row is accepted on behalf of the maintainer.
 | TM-018 | Resource exhaustion from patches, loops, tools, or subprocesses | AC-002<br>AC-004 | A-002<br>A-005<br>A-007<br>A-009 | TB-002<br>TB-003<br>TB-009 | Oversized input, repeated iteration, or a hanging process consumes time, memory, disk, or model budget | medium | Review preparation uses budgets and timeouts; loop invocation has an iteration cap | test:scripts/review-orchestrated-prepare.test.mjs budget and timeout cases<br>check:opencode/scripts/check-harness.mjs loop iteration contract<br>limitation:no system-wide resource quota | partially-mitigated | Allowed processes and external services can still exhaust host resources | maintainer | Budget, timeout, loop, subprocess, or input-size change |
 | TM-019 | Poisoned memory, MCP data, or reused evidence | AC-004 | A-001<br>A-004<br>A-007<br>A-009 | TB-003<br>TB-006<br>TB-007 | Stale or malicious remembered content is treated as current truth and changes a decision | high | Persistent memory is documented as a hint and important decisions require verification against current repository state | check:opencode/AGENTS.md memory-as-hint rule<br>limitation:no provenance enforcement for every external memory or MCP response | partially-mitigated | Plausible poisoned context can still bias reasoning before verification | maintainer | Memory, MCP, evidence-reuse, retrieval, or provenance change |
 | TM-020 | Private material crosses public sync or release boundary | AC-006 | A-003<br>A-007<br>A-010 | TB-007<br>TB-008 | Private configuration, service wiring, paths, raw evidence, or credentials enter a public diff or package | high | Deliberate file selection, public translation, leak scans, package file allow/deny checks, diff review, and separate commit/release gates constrain the boundary | check:scripts/check.sh public leak scan<br>test:scripts/package-smoke.test.mjs forbidden package state<br>limitation:semantic privacy review remains human | partially-mitigated | Novel identifiers or sensitive prose can evade mechanical patterns | maintainer | Sync skill, leak scan, package files, documentation, commit, or release change |
+| TM-021 | Autonomous delivery pushes or proposes the wrong content or target | AC-002<br>AC-004 | A-001<br>A-002<br>A-005 | TB-003<br>TB-006 | An unattended run pushes to the default branch, force-pushes, opens a PR without an approving review, or leaks a local path in the PR body | high | `oak deliver` requires a completed loop, a matching reviewer attestation, a non-default branch, a clean tree and a safe body; developer bash denies direct push and `gh` | test:opencode/scripts/deliver.test.mjs refusal cases<br>test:opencode/scripts/adversarial-harness.test.mjs deliver-default-branch-refused<br>check:opencode/scripts/check-harness.mjs developer git permissions | partially-mitigated | A process with the user's credentials can still push outside OAK | maintainer | Delivery, permission, attestation, or forge integration change |
 
 ## Adversarial traceability
 
-The public adversarial corpus remains unchanged. Each scenario maps exactly once
-to its primary risk and to the existing executable defense suite.
+Each scenario in the public adversarial corpus maps exactly once to its primary
+risk and to the existing executable defense suite.
 
 | Scenario ID | Risk ID | Evidence |
 |---|---|---|
@@ -197,6 +199,9 @@ to its primary risk and to the existing executable defense suite.
 | credential-canary-stays-local | TM-010 | test:opencode/scripts/adversarial-harness.test.mjs |
 | unpinned-ref-needs-approval | TM-013 | test:opencode/scripts/adversarial-harness.test.mjs |
 | repeated-event-rejected | TM-009 | test:opencode/scripts/adversarial-harness.test.mjs |
+| deliver-default-branch-refused | TM-021 | test:opencode/scripts/adversarial-harness.test.mjs |
+| deliver-without-attestation-refused | TM-021 | test:opencode/scripts/adversarial-harness.test.mjs |
+| deliver-private-path-body-refused | TM-021 | test:opencode/scripts/adversarial-harness.test.mjs |
 
 ## Residual risks and assumptions
 

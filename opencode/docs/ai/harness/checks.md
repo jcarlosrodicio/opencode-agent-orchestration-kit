@@ -124,10 +124,11 @@ The harness check validates:
   tri-state, opt-in, and privacy contracts;
 - portable adversarial corpus at
   `docs/ai/evolution/benchmarks/adversarial-scenarios.jsonl`, with exactly
-  eleven threats and one real defense per scenario;
+  fourteen threats and one real defense per scenario;
 - `node --test scripts/adversarial-harness.test.mjs` verifies review
   boundaries, paths and symlinks, shell/network permissions, durable approval,
-  canaries, supply-chain rules, and corrupt or repeated events;
+  canaries, supply-chain rules, corrupt or repeated events, and the
+  `oak deliver` refusals;
 - `scripts/shell-export-policy.mjs`, its test suite, and
   `plugins/shell-export-guard.ts` provide defense in depth at the shell
   boundary against environment enumeration and high-risk exports. The policy

@@ -14,9 +14,12 @@ import {
 import {
   LoopStateError,
   acquireLoop,
+  attestReview,
   initLoopState,
   inspectLoopState,
+  recordLoopAction,
 } from "./loop-state.mjs";
+import { DeliverError, deliver } from "./deliver.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.dirname(scriptDir);
@@ -82,6 +85,29 @@ function initializeLoop(rootDir) {
     plannedIterations: 1,
   });
   return contractPath;
+}
+
+function completedDeliveryLoop(rootDir) {
+  const contractPath = initializeLoop(rootDir);
+  acquireLoop({ root: rootDir, slug: "example", contractPath, sessionId: "session-1", actionId: "resume-1" });
+  attestReview({ root: rootDir, slug: "example", reviewerSessionId: "child-1", reviewerAgent: "reviewer", reviewerVerdict: "APPROVE" });
+  recordLoopAction({ root: rootDir, slug: "example", sessionId: "session-1", actionId: "done-1", iteration: 1, completedStep: "reviewer_approved", blockingCause: null, status: "completed" });
+  fs.writeFileSync(path.join(rootDir, "pr-body.md"), "## What\nA change.\n");
+}
+
+function assertDeliveryRefused(rootDir, code, replies = {}) {
+  const calls = [];
+  const scripted = { "git rev-parse": "feat/x", "git symbolic-ref": "origin/main", "git status": "", "git rev-list": "1", ...replies };
+  const runner = (command, args) => {
+    calls.push([command, ...args]);
+    const reply = scripted[`${command} ${args[0]}`];
+    return reply === undefined ? { status: 1, stdout: "" } : { status: 0, stdout: `${reply}\n` };
+  };
+  assert.throws(
+    () => deliver({ root: rootDir, slug: "example", title: "Add x", bodyFile: "pr-body.md", runner }),
+    (error) => error instanceof DeliverError && error.code === code,
+  );
+  assert.equal(calls.some((call) => call[0] === "gh" || (call[0] === "git" && call[1] === "push")), false);
 }
 
 function readAgent(rel) {
@@ -270,6 +296,29 @@ const handlers = {
     assert.match(contract, /explicit human approval before installation/);
   },
 
+  "deliver-default-branch-refused"() {
+    withTempDir("opencode-adversarial-deliver-", (rootDir) => {
+      completedDeliveryLoop(rootDir);
+      assertDeliveryRefused(rootDir, "default_branch", { "git rev-parse": "main" });
+    });
+  },
+
+  "deliver-without-attestation-refused"() {
+    withTempDir("opencode-adversarial-deliver-", (rootDir) => {
+      completedDeliveryLoop(rootDir);
+      fs.rmSync(path.join(rootDir, ".opencode/loops/example.review.json"));
+      assertDeliveryRefused(rootDir, "attestation_missing");
+    });
+  },
+
+  "deliver-private-path-body-refused"() {
+    withTempDir("opencode-adversarial-deliver-", (rootDir) => {
+      completedDeliveryLoop(rootDir);
+      fs.writeFileSync(path.join(rootDir, "pr-body.md"), "Screenshot at /home/someone/shot.png\n");
+      assertDeliveryRefused(rootDir, "unsafe_body");
+    });
+  },
+
   "repeated-event-rejected"() {
     withTempDir("opencode-adversarial-event-", (rootDir) => {
       initializeLoop(rootDir);
@@ -285,7 +334,7 @@ const handlers = {
 };
 
 test("adversarial corpus maps each threat to one real harness defense", () => {
-  assert.equal(scenarios.length, 11);
+  assert.equal(scenarios.length, 14);
   assert.deepEqual(
     scenarios.map((scenario) => scenario.id).sort(),
     Object.keys(handlers).sort(),

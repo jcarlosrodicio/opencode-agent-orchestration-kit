@@ -2115,6 +2115,9 @@ function checkAdversarialHarnessSurface() {
   const testRel = "scripts/adversarial-harness.test.mjs";
   const requiredThreats = [
     "approval-state-manipulation",
+    "delivery-default-branch-push",
+    "delivery-private-path-leak",
+    "delivery-without-review",
     "diff-prompt-injection",
     "event-corruption-replay",
     "external-symlink",
@@ -2229,7 +2232,7 @@ function checkAdversarialHarnessSurface() {
     ],
     [
       "docs/ai/evolution/README.md",
-      ["Slice 2.5", "11 threats"],
+      ["Slice 2.5", "14 threats"],
     ],
   ]) {
     const text = contractText(read(rel));

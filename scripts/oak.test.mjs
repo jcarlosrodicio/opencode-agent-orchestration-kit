@@ -83,6 +83,7 @@ test("[O001] command set is closed and ordered", () => {
     "replay",
     "state",
     "run",
+    "deliver",
     "uninstall",
     "rollback",
     "version",
@@ -345,6 +346,29 @@ test("[O010b] run delegates each task-run action with an explicit root", () => {
     ["run", "status", "--root", "/tmp/oak-target", "blocking=0"],
     ["run", "event", "--root", "/tmp/oak-target", "--type", "review", "=0"],
     ["run", "start", "--root", "/tmp/oak-target", "--root", "/tmp/other"],
+  ]) {
+    assert.equal(dispatchOak(argv, runnerDeps()), 2);
+  }
+});
+
+test("[O010c] deliver delegates pr and checks with an explicit root and has no merge", () => {
+  for (const args of [
+    ["deliver", "pr", "--root", "/tmp/oak-target", "--slug", "task", "--title", "Add x", "--body-file", "pr-body.md"],
+    ["deliver", "checks", "--root", "/tmp/oak-target", "--pr", "7"],
+  ]) {
+    const calls = [];
+    assert.equal(dispatchOak(args, runnerDeps(calls)), 0);
+    assert.deepEqual(calls[0].args, [OAK_ENTRYPOINTS.deliver, ...args.slice(1)]);
+    assert.equal(calls[0].options.cwd, "/tmp/oak-target");
+    assert.equal(calls[0].options.shell, false);
+  }
+
+  for (const argv of [
+    ["deliver"],
+    ["deliver", "merge", "--root", "/tmp/oak-target", "--pr", "7"],
+    ["deliver", "pr", "--slug", "task"],
+    ["deliver", "pr", "--root", "/tmp/oak-target", "--force", "yes"],
+    ["deliver", "checks", "--root", "/tmp/oak-target", "--root", "/tmp/other"],
   ]) {
     assert.equal(dispatchOak(argv, runnerDeps()), 2);
   }

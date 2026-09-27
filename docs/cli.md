@@ -15,6 +15,7 @@ engines as the shell wrappers; it does not add a second implementation.
 | `oak replay` | Run the packaged deterministic routing corpus and fixtures |
 | `oak state` | Run the packaged durable loop-state runtime against an explicit project root |
 | `oak run` | Open, record, inspect, and close the task run context of an explicit project root |
+| `oak deliver` | Push a reviewed feature branch and open its pull request, or read its CI checks |
 | `oak uninstall` | Remove only unchanged files owned by the lifecycle manifest |
 | `oak rollback` | Reverse the most recent committed lifecycle operation |
 | `oak version` | Print the canonical package identity |
@@ -124,6 +125,36 @@ The run context is optional and gates nothing: a stale run is only reported. It
 uses no network and no subprocess. Events carry counts and enums only, never
 prose, prompts, output, secrets, or absolute paths; the words belong in the
 task reports.
+
+## Delivery
+
+`oak deliver` is the only path from a finished loop to a remote. Agents are
+denied `git push` and `gh`; this command runs them itself with `shell: false`.
+
+```bash
+oak deliver pr --root /path/to/project --slug task-slug --title "feat: add x" --body-file pr-body.md
+oak deliver checks --root /path/to/project --pr 7
+```
+
+`pr` refuses before touching the remote unless, in this order:
+
+1. the loop `<slug>` is `completed`;
+2. its `<slug>.review.json` attestation is a reviewer `APPROVE` bound to the
+   approved contract;
+3. the current branch is not the default branch, `main`, `master`, or a
+   detached `HEAD`;
+4. the working tree is clean, apart from OAK's own `.opencode/loops` and
+   `.opencode/runs` state;
+5. the branch has at least one commit ahead of `origin/<default>`;
+6. the body file is a regular file inside the root with no absolute home path,
+   and the title has 1-200 characters.
+
+It then runs `git push --set-upstream origin <branch>`, never forced, and
+`gh pr create` against the default branch, and records a `delivery` event
+when a task run is open. `checks` returns `gh pr checks` as JSON and treats
+the pending exit status 8 as success.
+
+There is no merge, auto-merge, release, or deploy action, by design.
 
 ## Safety boundary
 

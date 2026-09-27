@@ -67,9 +67,10 @@ test("delegation is restricted to the declared task allowlist", () => {
   );
 });
 
-test("publication and deployment operations are denied for every role", () => {
+test("push asks only for developer delivery and deployment is denied for every role", () => {
   for (const agentId of AGENT_IDS) {
-    assert.equal(decideToolAccess({ agentId, operation: "push" }), "deny", agentId);
+    const expectedPush = agentId === "developer" ? "ask" : "deny";
+    assert.equal(decideToolAccess({ agentId, operation: "push" }), expectedPush, agentId);
     assert.equal(decideToolAccess({ agentId, operation: "deploy" }), "deny", agentId);
   }
 });
