@@ -20,6 +20,7 @@ If this file is missing, `lead` continues using the global `<available_skills>` 
 
 | Skill | Source | Phase | Domains | Stacks | Allowed Agents | Status | Trigger Summary | Load Path |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| adversarial-review | built-in | review | review, security, testing | any | reviewer | active | Use for every final review of a diff - an independent pass that assumes the change is wrong, accounts for every changed… | skills/adversarial-review/SKILL.md |
 | api-and-interface-design | built-in | define | api-design, backend, frontend | any | developer, researcher, designer, specifier, reviewer, scoper, lead | active | Guides stable API and interface design. Use when designing APIs, module boundaries, or any public interface. Use when c… | skills/api-and-interface-design/SKILL.md |
 | autonomous-loops | built-in | operate | orchestration, evolution, release | any, harness | lead, evolver | active | Patterns and architectures for autonomous loops — from simple sequential pipelines to RFC-driven multi-agent DAG system… | skills/autonomous-loops/SKILL.md |
 | code-review-and-quality | built-in | review | review, security, testing, performance | any | reviewer, lead, developer | active | Conducts multi-axis code review. Use before merging any change. Use when reviewing code written by yourself, another ag… | skills/code-review-and-quality/SKILL.md |

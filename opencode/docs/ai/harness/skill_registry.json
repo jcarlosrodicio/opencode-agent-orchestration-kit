@@ -1,7 +1,29 @@
 {
-  "generated_at": "2026-09-27T09:07:57Z",
+  "generated_at": "2026-09-27T09:10:53Z",
   "schema_version": 2,
   "skills": [
+    {
+      "name": "adversarial-review",
+      "source": "built-in",
+      "phase": "review",
+      "domains": [
+        "review",
+        "security",
+        "testing"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "reviewer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use for every final review of a diff - an independent pass that assumes the change is wrong, accounts for every changed file, attacks it along fixed dimensions, fact-checks its own findings and ends in an explicit verdict. Use also when the user asks for a red-team or devil's-advocate review.",
+      "load_path": "skills/adversarial-review/SKILL.md",
+      "origin": null
+    },
     {
       "name": "api-and-interface-design",
       "source": "built-in",

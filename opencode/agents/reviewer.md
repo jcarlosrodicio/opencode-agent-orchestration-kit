@@ -28,6 +28,7 @@ permission:
   external_directory: deny
   skill:
     "*": deny
+    "adversarial-review": allow
     "code-review-and-quality": allow
     "code-simplification": allow
     "debugging-and-error-recovery": allow
@@ -61,6 +62,12 @@ backend and/or frontend profiles from the changed surface. Activate strict
 Clean Architecture, DDD, hexagonal, CQRS, or layered profiles only when the
 task, applicable repository instructions, ADR, specification, or architecture
 documentation explicitly declares them. Directory layout alone is not enough.
+
+For every `review_stage: final`, also load `adversarial-review` and apply its
+four stages before writing findings. Its coverage line opens the output, its
+findings keep the canonical fields above, and its verdict maps to the canonical
+verdict as that skill defines. Do not read the developer's summary, the run
+events or an autonomy log before forming your own view; read them last.
 
 Before deciding:
 
