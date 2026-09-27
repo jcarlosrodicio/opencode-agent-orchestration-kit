@@ -2893,13 +2893,16 @@ function checkRetryPoliciesContract() {
 function checkShellExportGuardContract() {
   const policyRel = "scripts/shell-export-policy.mjs";
   const policyTestRel = "scripts/shell-export-policy.test.mjs";
+  const coreRel = "scripts/shell-export-guard-core.mjs";
+  const v1Rel = "runtime/v1/shell-export-guard.ts";
+  const v2Rel = "runtime/v2/shell-export-guard.ts";
   const pluginRel = "plugins/shell-export-guard.ts";
+  const surfaces = [policyRel, policyTestRel, coreRel, v1Rel, v2Rel, pluginRel];
 
-  for (const rel of [policyRel, policyTestRel, pluginRel]) {
+  for (const rel of surfaces) {
     if (!exists(rel)) fail(`${rel}: missing shell export guard surface`);
   }
-
-  if (!exists(policyRel) || !exists(policyTestRel) || !exists(pluginRel)) return;
+  if (!surfaces.every(exists)) return;
 
   const policy = read(policyRel);
   for (const token of [
@@ -2914,20 +2917,19 @@ function checkShellExportGuardContract() {
     }
   }
 
-  const plugin = read(pluginRel);
-  for (const token of [
-    "tool.execute.before",
-    "classifyShellExport",
-    "shell-export-guard",
-    "bash",
-    "shell",
+  for (const [rel, tokens] of [
+    [coreRel, ["classifyShellExport", "shell-export-guard", "bash", "shell"]],
+    [v1Rel, ["tool.execute.before", "assertShellCallAllowed", "oak:v1-only"]],
+    [v2Rel, ['"execute.before"', "assertShellCallAllowed"]],
+    [pluginRel, ["oak.shell-export-guard", "server:", "setup:"]],
   ]) {
-    if (!plugin.includes(token)) {
-      fail(`${pluginRel}: missing shell export guard token ${token}`);
+    const source = read(rel);
+    for (const token of tokens) {
+      if (!source.includes(token)) fail(`${rel}: missing shell export guard token ${token}`);
     }
-  }
-  if (/\$\{?command\}?/.test(plugin)) {
-    fail(`${pluginRel}: shell export guard must not include the raw command in diagnostics`);
+    if (/\$\{?command\}?/.test(source)) {
+      fail(`${rel}: shell export guard must not include the raw command in diagnostics`);
+    }
   }
 
   const policyTests = read(policyTestRel);

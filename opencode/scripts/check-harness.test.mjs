@@ -156,6 +156,19 @@ test("shell export guard surfaces are required", () => {
   }
 });
 
+test("shell export guard OpenCode 2 adapter is required", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "runtime/v2/shell-export-guard.ts"));
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing OpenCode 2 guard adapter");
+    assert.match(result.stderr, /runtime\/v2\/shell-export-guard\.ts: missing shell export guard surface/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 for (const [label, mutate, diagnostic] of [
   [
     "missing the Open Design project URL guard",

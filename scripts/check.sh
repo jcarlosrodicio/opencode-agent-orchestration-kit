@@ -50,6 +50,14 @@ opencode/package.json
 opencode/package-lock.json
 opencode/plugins/token-tree-usage.tsx
 opencode/plugins/shell-export-guard.ts
+opencode/runtime/v1/shell-export-guard.ts
+opencode/runtime/v2/shell-export-guard.ts
+opencode/scripts/shell-export-guard-core.mjs
+opencode/scripts/shell-export-guard-core.d.mts
+opencode/scripts/shell-export-guard-core.test.mjs
+typecheck/v2/package.json
+typecheck/v2/package-lock.json
+typecheck/v2/tsconfig.json
 opencode/plugins/mission-runtime.ts
 opencode/plugins/mission-runtime.test.mjs
 opencode/tools/open_design.ts
