@@ -43,11 +43,18 @@ export function toSessionRecord(event) {
 // affect the session itself. A session is marked as recorded only once an
 // event was written, so a session that started before the run opened is
 // still linked later.
-export function createSessionRecorder(append) {
+// The OpenCode 2 event stream covers every location a server has open, so a
+// session seen in another directory is ignored, including its later events
+// that carry no location.
+export function createSessionRecorder(append, directory) {
   const recorded = new Set();
+  const foreign = new Set();
   return (event) => {
     const record = toSessionRecord(event);
     if (!record || recorded.has(record.session_id)) return;
+    const location = nonEmpty(event.location?.directory) ?? nonEmpty(event.data?.location?.directory);
+    if (location && location !== directory) foreign.add(record.session_id);
+    if (foreign.has(record.session_id)) return;
     try {
       if (append(record)) recorded.add(record.session_id);
     } catch {

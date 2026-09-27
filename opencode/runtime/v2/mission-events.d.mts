@@ -7,4 +7,7 @@ export type SessionRecord = {
 
 export function toObserverEvent(event: unknown): { type: string; properties: Record<string, unknown> } | null;
 export function toSessionRecord(event: unknown): SessionRecord | null;
-export function createSessionRecorder(append: (record: SessionRecord) => unknown): (event: unknown) => void;
+export function createSessionRecorder(
+  append: (record: SessionRecord) => unknown,
+  directory: string,
+): (event: unknown) => void;

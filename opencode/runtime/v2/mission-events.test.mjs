@@ -105,3 +105,16 @@ test("recorder never lets a recording failure escape", () => {
   });
   assert.doesNotThrow(() => record({ type: "session.created", data: { sessionID: "s" } }));
 });
+
+test("recorder ignores sessions that belong to another location", () => {
+  const written = [];
+  const record = createSessionRecorder((fields) => {
+    written.push(fields.session_id);
+    return { type: "agent_session" };
+  }, "/work/a");
+  record({ type: "session.created", location: { directory: "/work/b" }, data: { sessionID: "other" } });
+  record({ type: "session.execution.started", data: { sessionID: "other" } });
+  record({ type: "session.created", location: { directory: "/work/a" }, data: { sessionID: "mine" } });
+  record({ type: "session.execution.started", data: { sessionID: "unlocated" } });
+  assert.deepEqual(written, ["mine", "unlocated"]);
+});
