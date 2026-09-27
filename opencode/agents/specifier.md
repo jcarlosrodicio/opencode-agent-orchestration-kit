@@ -18,6 +18,7 @@ permission:
     "*": deny
     "api-and-interface-design": allow
     "documentation-and-adrs": allow
+    "enrich-task": allow
     "security-and-hardening": allow
     "test-driven-development": allow
   external_directory: deny

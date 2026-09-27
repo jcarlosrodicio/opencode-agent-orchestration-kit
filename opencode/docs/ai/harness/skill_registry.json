@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-04T06:46:29Z",
+  "generated_at": "2026-09-27T09:07:57Z",
   "schema_version": 2,
   "skills": [
     {
@@ -222,6 +222,29 @@
       "description": "Subjects every non-trivial decision to a fresh-context adversarial review before it stands. Use when correctness matters more than speed, when working in unfamiliar code, when stakes are high (production, security-sensitive logic, irreversible operations), or any time a confident output would be cheaper to verify now than to debug later.",
       "load_path": "skills/doubt-driven-development/SKILL.md",
       "origin": "addyosmani/agent-skills"
+    },
+    {
+      "name": "enrich-task",
+      "source": "built-in",
+      "phase": "define",
+      "domains": [
+        "specification",
+        "research"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "lead",
+        "scoper",
+        "specifier"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use before specifying any feature, fix or refactor that arrives as a short request, roadmap line, screenshot or one-paragraph idea - turns it into an implementable specification with scope, reuse, requirements, acceptance criteria, hostile test cases and the open questions the request leaves ambiguous.",
+      "load_path": "skills/enrich-task/SKILL.md",
+      "origin": null
     },
     {
       "name": "iterative-retrieval",

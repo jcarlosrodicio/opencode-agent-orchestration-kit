@@ -73,6 +73,7 @@ See `docs/ai/harness/commands.md` for command contracts.
 OAK ships its own process skills. Each belongs to the agent that owns the phase:
 
 - `test-driven-development` and `debugging-and-error-recovery` — `developer`.
+- `enrich-task` at Intake for vague requests — `lead`, `scoper`, `specifier`.
 
 User instructions and the local repository `AGENTS.md` take precedence.
 

@@ -238,7 +238,7 @@ because of the count. On-demand AHE templates:
 
 Use explicit phase barriers:
 
-1. Intake and ambiguity check.
+1. Intake and ambiguity check (`enrich-task` when the request lacks acceptance criteria, affected files or non-functional requirements).
 2. Discovery: research and/or design.
 3. Lead synthesis.
 4. Specification.
@@ -283,6 +283,7 @@ agent that owns the phase; never load them into an agent that does not own it.
 
 - `debugging-and-error-recovery` for failures without a root cause (developer).
 - `test-driven-development` for behavior changes (developer).
+- `enrich-task` at Intake for vague requests (lead, scoper, specifier).
 
 These skills are additive. Explicit user instructions and the repository's own
 `AGENTS.md` win over them.
