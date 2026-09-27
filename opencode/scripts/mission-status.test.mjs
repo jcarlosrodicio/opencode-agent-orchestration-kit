@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   LoopStateError,
   acquireLoop,
+  attestReview,
   initLoopState,
   recordLoopAction,
   releaseLoop,
@@ -114,6 +115,7 @@ test("projects running, blocked, paused, and completed transitions", () => {
     assert.equal(mission.status, "paused");
     assert.match(mission.next_action, /resume explicitly/);
 
+    attestReview({ root, slug: "example", reviewerSessionId: "child-1", reviewerAgent: "reviewer", reviewerVerdict: "APPROVE" });
     recordLoopAction({
       root,
       slug: "example",

@@ -380,6 +380,7 @@ function pathsFor(root, slug) {
     lockOwner: path.join(loopsDir, `${slug}.lock`, "owner.json"),
     transitionLock: path.join(loopsDir, `${slug}.lock`, "transition.lock"),
     markdown: path.join(loopsDir, `${slug}.md`),
+    review: path.join(loopsDir, `${slug}.review.json`),
   };
 }
 
@@ -787,6 +788,46 @@ export function inspectLoopState({ root, slug }) {
   return structuredClone(state);
 }
 
+export function attestReview({ root, slug, reviewerSessionId, reviewerAgent, reviewerVerdict, now = () => new Date() }) {
+  requireString(reviewerSessionId, "reviewer_session_id");
+  if (reviewerAgent !== "reviewer") fail("invalid_argument", "reviewer_agent must be reviewer");
+  if (reviewerVerdict !== "APPROVE") fail("invalid_argument", "reviewer_verdict must be APPROVE");
+  const paths = pathsFor(root, slug);
+  const state = inspectLoopState({ root, slug });
+  const attestation = {
+    schema_version: 1,
+    slug,
+    contract_hash: state.approval.contract_hash,
+    reviewer_session_id: reviewerSessionId,
+    reviewer_agent: reviewerAgent,
+    reviewer_verdict: reviewerVerdict,
+    attested_at: now().toISOString(),
+  };
+  const temporary = `${paths.review}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify(attestation, null, 2)}\n`, { flag: "wx" });
+  fs.renameSync(temporary, paths.review);
+  return attestation;
+}
+
+function requireReviewAttestation(paths, state) {
+  let attestation;
+  try {
+    const stat = fs.lstatSync(paths.review);
+    if (!stat.isFile()) throw new Error("not a regular file");
+    attestation = JSON.parse(fs.readFileSync(paths.review, "utf8"));
+  } catch {
+    fail("review_attestation_required", "completion requires oak state attest-review");
+  }
+  if (
+    attestation?.schema_version !== 1
+    || attestation.reviewer_agent !== "reviewer"
+    || attestation.reviewer_verdict !== "APPROVE"
+    || attestation.contract_hash !== state.approval.contract_hash
+  ) {
+    fail("review_attestation_required", "reviewer attestation is missing, invalid, or bound to another contract");
+  }
+}
+
 export function readLoopHistory({ root, slug }) {
   const paths = pathsFor(root, slug);
   return structuredClone(readHistory(paths).events);
@@ -920,6 +961,7 @@ export function recordLoopAction({
     if (iteration > state.planned_iterations) {
       fail("iteration_budget_exceeded", "iteration exceeds the planned iteration budget");
     }
+    if (status === "completed") requireReviewAttestation(paths, state);
     try {
       return commitTransition({
         paths,
@@ -1202,10 +1244,17 @@ export function main(argv = process.argv.slice(2)) {
     });
   } else if (command === "migrate") {
     result = migrateLoopState(common);
+  } else if (command === "attest-review") {
+    result = attestReview({
+      ...common,
+      reviewerSessionId: options.reviewer_session_id,
+      reviewerAgent: options.reviewer_agent,
+      reviewerVerdict: options.reviewer_verdict,
+    });
   } else {
     fail(
       "invalid_argument",
-      "command must be init, resume, record, release, inspect, repair, or migrate",
+      "command must be init, resume, record, release, inspect, attest-review, repair, or migrate",
     );
   }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

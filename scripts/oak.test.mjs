@@ -295,10 +295,27 @@ test("[O010] state delegates only an explicit loop-state command and root", () =
   assert.equal(calls[0].options.cwd, "/tmp/oak-target");
   assert.equal(calls[0].options.shell, false);
 
+  const attest = [
+    "state",
+    "attest-review",
+    "--root",
+    "/tmp/oak-target",
+    "--slug",
+    "example",
+    "--reviewer-session-id",
+    "child-1",
+    "--reviewer-agent",
+    "reviewer",
+    "--reviewer-verdict",
+    "APPROVE",
+  ];
+  const attestCalls = [];
+  assert.equal(dispatchOak(attest, runnerDeps(attestCalls)), 0);
+  assert.deepEqual(attestCalls[0].args, [OAK_ENTRYPOINTS.state, ...attest.slice(1)]);
+
   for (const argv of [
     ["state"],
     ["state", "unknown", "--root", "/tmp/oak-target"],
-    ["state", "attest-review", "--root", "/tmp/oak-target"],
     ["state", "init", "--slug", "example"],
     ["state", "init", "--root", "/tmp/oak-target", "--root", "/tmp/other"],
     ["state", "init", "--root"],
