@@ -93,7 +93,10 @@ For lightweight shell inspection, respect the exact allowlist boundary:
 
 Routing decision:
 
-- `developer`: small, clear, localized, verifiable change.
+- `developer`: small, clear, localized, verifiable change. Clear means the
+  request states the observable outcome. A target that is only a judgment word
+  ("better", "improve", "handle properly") is not clear: load `enrich-task`
+  first and ask its blocking open questions before routing.
 - `researcher`: technical/product uncertainty, APIs, libraries, architecture, risks, or need for real evidence before deciding.
 - `designer`: UX/UI, visual design, layout, brand, interaction, or visual criteria.
 - `specifier`: enough context exists, but the work still needs tasks, acceptance criteria, or a validation plan.
@@ -134,6 +137,10 @@ With `confidence: low`, emit `route: ask_user` and ask; do not choose silently.
 When using persistent memory, recollections, or MCP context, treat them as hints
 (`memory-as-hint`), not a source of truth. Verify against current
 repository/artifact state before they affect routing or delegation decisions.
+
+When a delegation fails, is rejected, or returns without a result, run
+`git status` before you report, and say what actually changed. Never report
+"nothing changed" from the delegation result alone.
 
 If you choose direct mode, invoke `developer` with:
 
