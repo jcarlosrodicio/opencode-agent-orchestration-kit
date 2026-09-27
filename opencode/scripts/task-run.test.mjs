@@ -100,3 +100,64 @@ test("event types come from the closed list", () => withRoot((root) => {
   startRun({ root, slug: "x", branch: "b", now: NOW, random: RANDOM });
   assert.throws(() => appendRunEvent({ root, type: "deploy", fields: {} }), /event type must be one of/);
 }));
+
+test("event values are symbolic: no prose, no absolute paths", () => withRoot((root) => {
+  startRun({ root, slug: "x", branch: "b", now: NOW, random: RANDOM });
+  for (const value of ["/home/someone/secret", "free text prose", "a".repeat(201)]) {
+    assert.throws(() => appendRunEvent({ root, type: "review", fields: { note: value } }), /value/);
+  }
+  const event = appendRunEvent({ root, type: "delivery", fields: { branch: "feat/x-1", parent_session_id: "", verdict: "safe_to_commit" }, now: NOW });
+  assert.equal(event.branch, "feat/x-1");
+}));
+
+test("start refuses a different change on the same branch", () => withRoot((root) => {
+  startRun({ root, slug: "a", branch: "b", now: NOW, random: RANDOM });
+  assert.throws(() => startRun({ root, slug: "other", branch: "b", now: NOW, random: RANDOM }),
+    (error) => error.code === "run_open_for_other_change");
+}));
+
+test("run files and the summary never follow symlinks out of place", () => withRoot((root) => {
+  startRun({ root, slug: "x", branch: "b", now: NOW, random: RANDOM });
+  const outside = path.join(root, "outside.jsonl");
+  fs.writeFileSync(outside, "");
+  const events = path.join(root, ".opencode/runs/active.events.jsonl");
+  fs.rmSync(events);
+  fs.symlinkSync(outside, events);
+  assert.throws(() => appendRunEvent({ root, type: "review", fields: {} }), (error) => error.code === "unsafe_path");
+  assert.equal(fs.readFileSync(outside, "utf8"), "");
+  fs.rmSync(events);
+  fs.writeFileSync(events, "");
+
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "oak-task-run-outside-"));
+  fs.symlinkSync(elsewhere, path.join(root, "linked"));
+  try {
+    assert.throws(() => closeRun({ root, output: "linked/new/summary.json", now: NOW }), (error) => error.code === "unsafe_path");
+    assert.deepEqual(fs.readdirSync(elsewhere), []);
+  } finally {
+    fs.rmSync(elsewhere, { recursive: true, force: true });
+  }
+  assert.throws(() => closeRun({ root, output: ".git/hooks/pre-commit", now: NOW }), (error) => error.code === "unsafe_path");
+  assert.equal(runStatus({ root, branch: "b", now: NOW }).active, true);
+}));
+
+test("a corrupt run file is a named error, not a crash", () => withRoot((root) => {
+  fs.mkdirSync(path.join(root, ".opencode/runs"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".opencode/runs/active.json"), "{not json");
+  for (const call of [
+    () => startRun({ root, slug: "x", branch: "b", now: NOW, random: RANDOM }),
+    () => runStatus({ root }),
+    () => closeRun({ root }),
+  ]) {
+    assert.throws(call, (error) => error instanceof TaskRunError && error.code === "run_corrupt");
+  }
+}));
+
+test("a dangling events symlink is refused, not created through", () => withRoot((root) => {
+  startRun({ root, slug: "x", branch: "b", now: NOW, random: RANDOM });
+  const events = path.join(root, ".opencode/runs/active.events.jsonl");
+  const target = path.join(root, "created-outside.jsonl");
+  fs.rmSync(events);
+  fs.symlinkSync(target, events);
+  assert.throws(() => appendRunEvent({ root, type: "review", fields: {} }), (error) => error.code === "unsafe_path");
+  assert.equal(fs.existsSync(target), false);
+}));

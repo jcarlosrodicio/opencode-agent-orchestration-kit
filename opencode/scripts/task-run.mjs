@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 export const RUN_EVENT_TYPES = Object.freeze(["agent_session", "review", "runtime_verification", "verify", "delivery", "ci"]);
 const SLUG = /^[A-Za-z0-9._-]{1,120}$/;
 const KEY = /^[a-z][a-z0-9_]{0,40}$/;
+// Events carry counts and symbolic values only: ids, enums, branch names.
+const INTEGER = /^-?\d+$/;
+const VALUE = /^(?:|[A-Za-z0-9][A-Za-z0-9._:/+-]{0,199})$/;
 const KINDS = new Set(["production", "benchmark"]);
 const STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -34,9 +37,49 @@ function paths(root) {
   return { root: resolved, dir, run: path.join(dir, "active.json"), events: path.join(dir, "active.events.jsonl") };
 }
 
+// lstat, not exists: a dangling symlink must be refused, not written through.
+function requireRegularFile(file) {
+  const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+  if (stat && !stat.isFile()) fail("unsafe_path", `${path.basename(file)} must be a regular file`);
+  return stat !== undefined;
+}
+
 function readRun(p) {
-  if (!fs.existsSync(p.run)) return null;
-  return JSON.parse(fs.readFileSync(p.run, "utf8"));
+  requireRegularFile(p.events);
+  if (!requireRegularFile(p.run)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(p.run, "utf8"));
+  } catch {
+    fail("run_corrupt", ".opencode/runs/active.json is not valid JSON; a human must inspect and remove it");
+  }
+}
+
+function readEvents(p) {
+  if (!fs.existsSync(p.events)) return [];
+  const lines = fs.readFileSync(p.events, "utf8").split("\n").filter(Boolean);
+  try {
+    return lines.map((line) => JSON.parse(line));
+  } catch {
+    fail("run_corrupt", ".opencode/runs/active.events.jsonl is not valid JSON lines");
+  }
+}
+
+// The summary is written inside the root, never through a symlink that leaves
+// it, and never into git's own directory.
+function safeOutput(root, output) {
+  const target = path.resolve(root, output);
+  const relative = path.relative(root, target);
+  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative) || relative.split(path.sep).includes(".git")) {
+    fail("unsafe_path", "output must stay inside the root and outside .git");
+  }
+  let existing = path.dirname(target);
+  while (!fs.existsSync(existing)) existing = path.dirname(existing);
+  const realExisting = path.relative(root, fs.realpathSync(existing));
+  if (realExisting.startsWith("..") || path.isAbsolute(realExisting) || realExisting.split(path.sep).includes(".git")) {
+    fail("unsafe_path", "output must stay inside the root and outside .git");
+  }
+  requireRegularFile(target);
+  return { target, relative };
 }
 
 function stamp(date) {
@@ -55,7 +98,8 @@ export function startRun({ root, slug, branch, kind = "production", now = () => 
   const p = paths(root);
   const existing = readRun(p);
   if (existing) {
-    if (existing.branch === branch) return existing;
+    if (existing.branch === branch && existing.change === slug) return existing;
+    if (existing.branch === branch) fail("run_open_for_other_change", `a run for change ${existing.change} is open on this branch; close it first`);
     fail("run_open_on_other_branch", `a run for branch ${existing.branch} is open; close it first`);
   }
   const date = now();
@@ -83,7 +127,7 @@ export function runStatus({ root, branch, now = () => new Date() }) {
   if (!run) return { active: false };
   const age = now().getTime() - Date.parse(run.started_at);
   const stale = (branch !== undefined && branch !== run.branch) || (Number.isFinite(age) && age > STALE_MS);
-  const events = fs.existsSync(p.events) ? fs.readFileSync(p.events, "utf8").split("\n").filter(Boolean).length : 0;
+  const events = readEvents(p).length;
   return { active: true, run, stale, events };
 }
 
@@ -98,7 +142,12 @@ export function appendRunEvent({ root, type, fields = {}, now = () => new Date()
   const event = { schema: "oak.event/1", run_id: run.run_id, at: now().toISOString(), type };
   for (const [key, raw] of Object.entries(fields)) {
     const value = clean(raw);
-    event[key] = /^-?\d+$/.test(value) ? Number(value) : value;
+    if (INTEGER.test(value)) {
+      event[key] = Number(value);
+      continue;
+    }
+    if (!VALUE.test(value)) fail("invalid_argument", `event value for ${key} must be a count or a symbolic value`);
+    event[key] = value;
   }
   fs.appendFileSync(p.events, `${JSON.stringify(event)}\n`);
   return event;
@@ -108,15 +157,11 @@ export function closeRun({ root, output, now = () => new Date() }) {
   const p = paths(root);
   const run = readRun(p);
   if (!run) return { active: false };
-  const events = fs.existsSync(p.events)
-    ? fs.readFileSync(p.events, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line))
-    : [];
+  const events = readEvents(p);
   const summary = { schema: "oak.run.summary/1", run, closed_at: now().toISOString(), events };
   let written = null;
   if (output !== undefined) {
-    const target = path.resolve(p.root, output);
-    const relative = path.relative(p.root, target);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) fail("unsafe_path", "output must stay inside the root");
+    const { target, relative } = safeOutput(p.root, output);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, `${JSON.stringify(summary, null, 2)}\n`);
     written = relative;
