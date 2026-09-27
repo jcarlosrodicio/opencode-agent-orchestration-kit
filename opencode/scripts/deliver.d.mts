@@ -2,6 +2,7 @@ export type DeliverErrorCode =
   | "not_completed"
   | "attestation_missing"
   | "default_branch"
+  | "unsafe_branch"
   | "dirty_tree"
   | "no_commits"
   | "unsafe_body"

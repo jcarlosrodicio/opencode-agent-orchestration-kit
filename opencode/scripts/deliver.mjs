@@ -1,13 +1,21 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inspectLoopState } from "./loop-state.mjs";
 import { appendRunEvent } from "./task-run.mjs";
 
-const PRIVATE_PATH = /(?:^|[\s("'`])\/(?:Users|home)\/[^\s)"'`]+/;
+const PRIVATE_PATHS = [
+  /(?:^|[\s("'`/:])\/(?:Users|home|root)\/[^\s)"'`]+/,
+  /(?:^|[\s("'`])~\//,
+  /[A-Za-z]:\\Users\\/,
+];
+// A conservative subset of git branch names. It rejects a leading "+" (a
+// force refspec) or "-" (an option), and every sequence git gives meaning to.
+const SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 // OAK's own durable state may stay uncommitted; everything else must be clean.
 const STATE_EXCLUDES = [":(exclude).opencode/loops", ":(exclude).opencode/runs"];
 
@@ -29,7 +37,10 @@ function defaultRunner(command, args, root) {
 
 function run(runner, root, command, args) {
   const result = runner(command, args, root);
-  if (result.status !== 0) fail("command_failed", `${command} ${args[0]} failed`);
+  if (result.status !== 0) {
+    const reason = String(result.stderr ?? "").trim().split("\n")[0];
+    fail("command_failed", `${command} ${args[0]} failed${reason ? `: ${reason}` : ""}`);
+  }
   return String(result.stdout ?? "").trim();
 }
 
@@ -40,10 +51,39 @@ function defaultBranch(runner, root) {
 
 function readAttestation(file) {
   try {
+    if (!fs.lstatSync(file).isFile()) return null;
     return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {
     return null;
   }
+}
+
+function isSafeBranch(branch) {
+  return SAFE_BRANCH.test(branch)
+    && !branch.includes("..")
+    && !branch.includes("//")
+    && !branch.endsWith("/")
+    && !branch.endsWith(".")
+    && !branch.endsWith(".lock");
+}
+
+// Resolve the body through every symlink, keep it inside the root, and return
+// its validated text so gh never re-reads a file that could change.
+function readSafeBody(root, bodyFile) {
+  if (typeof bodyFile !== "string" || bodyFile.length === 0) fail("unsafe_body", "body file is required");
+  let real;
+  try {
+    real = fs.realpathSync(path.resolve(root, bodyFile));
+  } catch {
+    fail("unsafe_body", "body file must be a regular file inside the root");
+  }
+  const relative = path.relative(root, real);
+  if (relative.startsWith("..") || path.isAbsolute(relative) || !fs.statSync(real).isFile()) {
+    fail("unsafe_body", "body file must be a regular file inside the root");
+  }
+  const text = fs.readFileSync(real, "utf8");
+  if (PRIVATE_PATHS.some((pattern) => pattern.test(text))) fail("unsafe_body", "body file contains an absolute home path");
+  return text;
 }
 
 export function deliver({ root, slug, title, bodyFile, runner = defaultRunner }) {
@@ -52,13 +92,15 @@ export function deliver({ root, slug, title, bodyFile, runner = defaultRunner })
   if (state.status !== "completed") fail("not_completed", "the loop must be completed before delivery");
   const attestation = readAttestation(path.join(resolved, ".opencode", "loops", `${slug}.review.json`));
   if (
-    attestation?.reviewer_agent !== "reviewer"
+    attestation?.schema_version !== 1
+    || attestation.reviewer_agent !== "reviewer"
     || attestation.reviewer_verdict !== "APPROVE"
     || attestation.contract_hash !== state.approval.contract_hash
   ) {
     fail("attestation_missing", "delivery requires the reviewer attestation for this contract");
   }
   const branch = run(runner, resolved, "git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branch !== "HEAD" && !isSafeBranch(branch)) fail("unsafe_branch", "branch name must be a plain feature branch name");
   const base = defaultBranch(runner, resolved);
   if (branch === base || branch === "main" || branch === "master" || branch === "HEAD") {
     fail("default_branch", "delivery never pushes the default branch");
@@ -69,21 +111,25 @@ export function deliver({ root, slug, title, bodyFile, runner = defaultRunner })
   if (Number(run(runner, resolved, "git", ["rev-list", "--count", `origin/${base}..HEAD`])) < 1) {
     fail("no_commits", "the branch has no commits ahead of its base");
   }
-  if (typeof bodyFile !== "string" || bodyFile.length === 0) fail("unsafe_body", "body file is required");
-  const body = path.resolve(resolved, bodyFile);
-  const relative = path.relative(resolved, body);
-  if (relative.startsWith("..") || path.isAbsolute(relative) || !fs.existsSync(body) || !fs.lstatSync(body).isFile()) {
-    fail("unsafe_body", "body file must be a regular file inside the root");
-  }
-  if (PRIVATE_PATH.test(fs.readFileSync(body, "utf8"))) fail("unsafe_body", "body file contains an absolute home path");
+  const bodyText = readSafeBody(resolved, bodyFile);
   if (typeof title !== "string" || title.length === 0 || title.length > 200) fail("unsafe_body", "title must be 1-200 characters");
 
-  run(runner, resolved, "git", ["push", "--set-upstream", "origin", branch]);
-  // A later delivery (for example a CI fix) updates the pull request it opened.
-  const existing = runner("gh", ["pr", "view", branch, "--json", "url", "--jq", ".url"], resolved);
-  const existingUrl = existing.status === 0 ? String(existing.stdout ?? "").trim() : "";
-  const prUrl = existingUrl
-    || run(runner, resolved, "gh", ["pr", "create", "--base", base, "--head", branch, "--title", title, "--body-file", body]);
+  // An explicit destination refspec: the branch name is never parsed as one.
+  run(runner, resolved, "git", ["push", "--set-upstream", "origin", `HEAD:refs/heads/${branch}`]);
+  // A later delivery (for example a CI fix) updates the open pull request.
+  const existing = runner("gh", ["pr", "list", "--head", branch, "--state", "open", "--json", "url", "--jq", ".[].url"], resolved);
+  const existingUrl = existing.status === 0 ? String(existing.stdout ?? "").trim().split("\n")[0] : "";
+  let prUrl = existingUrl;
+  if (!prUrl) {
+    const privateDir = fs.mkdtempSync(path.join(os.tmpdir(), "oak-deliver-"));
+    try {
+      const body = path.join(privateDir, "body.md");
+      fs.writeFileSync(body, bodyText, { mode: 0o600 });
+      prUrl = run(runner, resolved, "gh", ["pr", "create", "--base", base, "--head", branch, "--title", title, "--body-file", body]);
+    } finally {
+      fs.rmSync(privateDir, { recursive: true, force: true });
+    }
+  }
   try {
     appendRunEvent({ root: resolved, type: "delivery", fields: { branch, base, outcome: existingUrl ? "pr_updated" : "pr_opened" } });
   } catch {
