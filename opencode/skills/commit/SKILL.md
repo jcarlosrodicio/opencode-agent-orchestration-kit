@@ -49,8 +49,9 @@ on the default branch. If the repository has no convention, ask. Under
 - Write the message from the staged diff only, not from memory of the session.
 - Never claim that tests pass unless they ran in this session.
 - Never bypass hooks (`--no-verify`, `-n`). If a hook fails, fix the cause.
-- Keep option-like words such as ` -n`, ` -a` or `--all` out of a `-m`
-  message: the developer's shell rules deny them as hook bypass or bulk staging.
+- Keep option-like words such as ` -n`, ` -a`, `--all` or ` -- ` out of a
+  `-m` message, and do not end it with ` .`: the developer's shell rules deny
+  them as hook bypass or bulk staging.
 
 ## Pull-request body
 

@@ -9,9 +9,9 @@ import { inspectLoopState } from "./loop-state.mjs";
 import { appendRunEvent } from "./task-run.mjs";
 
 const PRIVATE_PATHS = [
-  /(?:^|[\s("'`/:])\/(?:Users|home|root)\/[^\s)"'`]+/,
+  /(?:^|[\s("'`/:<[|=])\/(?:Users|home|root)\/[^\s)"'`]+/,
   /(?:^|[\s("'`])~\//,
-  /[A-Za-z]:\\Users\\/,
+  /[A-Za-z]:\\users\\/i,
 ];
 // A conservative subset of git branch names. It rejects a leading "+" (a
 // force refspec) or "-" (an option), and every sequence git gives meaning to.
@@ -117,7 +117,7 @@ export function deliver({ root, slug, title, bodyFile, runner = defaultRunner })
   // An explicit destination refspec: the branch name is never parsed as one.
   run(runner, resolved, "git", ["push", "--set-upstream", "origin", `HEAD:refs/heads/${branch}`]);
   // A later delivery (for example a CI fix) updates the open pull request.
-  const existing = runner("gh", ["pr", "list", "--head", branch, "--state", "open", "--json", "url", "--jq", ".[].url"], resolved);
+  const existing = runner("gh", ["pr", "list", "--head", branch, "--state", "open", "--json", "url,isCrossRepository", "--jq", ".[] | select(.isCrossRepository | not) | .url"], resolved);
   const existingUrl = existing.status === 0 ? String(existing.stdout ?? "").trim().split("\n")[0] : "";
   let prUrl = existingUrl;
   if (!prUrl) {

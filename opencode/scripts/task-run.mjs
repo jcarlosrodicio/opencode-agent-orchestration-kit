@@ -66,16 +66,19 @@ function readEvents(p) {
 
 // The summary is written inside the root, never through a symlink that leaves
 // it, and never into git's own directory.
+// Case-insensitive: on macOS and Windows ".GIT" is the same directory as ".git".
+const inGitDir = (relative) => relative.split(path.sep).some((segment) => segment.toLowerCase() === ".git");
+
 function safeOutput(root, output) {
   const target = path.resolve(root, output);
   const relative = path.relative(root, target);
-  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative) || relative.split(path.sep).includes(".git")) {
+  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative) || inGitDir(relative)) {
     fail("unsafe_path", "output must stay inside the root and outside .git");
   }
   let existing = path.dirname(target);
   while (!fs.existsSync(existing)) existing = path.dirname(existing);
   const realExisting = path.relative(root, fs.realpathSync(existing));
-  if (realExisting.startsWith("..") || path.isAbsolute(realExisting) || realExisting.split(path.sep).includes(".git")) {
+  if (realExisting.startsWith("..") || path.isAbsolute(realExisting) || inGitDir(realExisting)) {
     fail("unsafe_path", "output must stay inside the root and outside .git");
   }
   requireRegularFile(target);
@@ -115,7 +118,7 @@ export function startRun({ root, slug, branch, kind = "production", now = () => 
   fs.mkdirSync(p.dir, { recursive: true });
   // The run context is local state: keep it out of git in any repository.
   const ignore = path.join(p.dir, ".gitignore");
-  if (!fs.existsSync(ignore)) fs.writeFileSync(ignore, "*\n");
+  if (!requireRegularFile(ignore)) fs.writeFileSync(ignore, "*\n", { flag: "wx" });
   fs.writeFileSync(p.run, `${JSON.stringify(run, null, 2)}\n`, { flag: "wx" });
   fs.writeFileSync(p.events, "");
   return run;

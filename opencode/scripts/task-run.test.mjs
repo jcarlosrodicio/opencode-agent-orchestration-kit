@@ -161,3 +161,18 @@ test("a dangling events symlink is refused, not created through", () => withRoot
   assert.throws(() => appendRunEvent({ root, type: "review", fields: {} }), (error) => error.code === "unsafe_path");
   assert.equal(fs.existsSync(target), false);
 }));
+
+test("the summary cannot land in git's directory under any letter case", () => withRoot((root) => {
+  startRun({ root, slug: "x", branch: "b", now: NOW, random: RANDOM });
+  for (const output of [".GIT/config", "sub/.Git/hooks/pre-commit"]) {
+    assert.throws(() => closeRun({ root, output, now: NOW }), (error) => error.code === "unsafe_path");
+  }
+}));
+
+test("start never writes the ignore file through a dangling symlink", () => withRoot((root) => {
+  fs.mkdirSync(path.join(root, ".opencode/runs"), { recursive: true });
+  const escaped = path.join(root, "escaped.txt");
+  fs.symlinkSync(escaped, path.join(root, ".opencode/runs/.gitignore"));
+  assert.throws(() => startRun({ root, slug: "x", branch: "b", now: NOW, random: RANDOM }), (error) => error.code === "unsafe_path");
+  assert.equal(fs.existsSync(escaped), false);
+}));

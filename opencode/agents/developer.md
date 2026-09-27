@@ -33,7 +33,12 @@ permission:
     "git add --update*": deny
     "git add .": deny
     "git add . *": deny
-    "git add -*A*": deny
+    "git add -?A*": deny
+    "git add -?u*": deny
+    "git add -?f*": deny
+    "git add --a*": deny
+    "git add --u*": deny
+    "git add --f*": deny
     "git add * -A*": deny
     "git add * .": deny
     "git add ./": deny
@@ -48,7 +53,10 @@ permission:
     "git commit *--no-v*": deny
     "git commit -a*": deny
     "git commit -n*": deny
-    "git commit *--amend*": deny
+    "git commit *--am*": deny
+    "git commit * -?a*": deny
+    "git commit * -?n*": deny
+    "git commit * .": deny
     "git commit * -- *": deny
     "git push*": deny
     "gh *": deny

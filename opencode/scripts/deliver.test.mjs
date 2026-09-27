@@ -127,7 +127,7 @@ test("a second delivery pushes to the existing pull request instead of opening a
   const result = deliver({ root, slug: "task", title: "Add x", bodyFile: "pr-body.md", runner: fake.runner });
   assert.equal(result.pr_url, "https://github.com/example/repo/pull/7");
   assert.equal(fake.calls.some(([command, args]) => command === "gh" && args[1] === "create"), false);
-  assert.deepEqual(fake.calls.find(([command, args]) => command === "gh" && args[1] === "list")[1], ["pr", "list", "--head", "feat/x", "--state", "open", "--json", "url", "--jq", ".[].url"]);
+  assert.deepEqual(fake.calls.find(([command, args]) => command === "gh" && args[1] === "list")[1], ["pr", "list", "--head", "feat/x", "--state", "open", "--json", "url,isCrossRepository", "--jq", ".[] | select(.isCrossRepository | not) | .url"]);
   assert.ok(fake.calls.some(([command, args]) => command === "git" && args[0] === "push"));
 });
 
@@ -200,3 +200,12 @@ test("a failed command reports its first stderr line", (t) => {
     : { status: 0, stdout: "" });
   assert.throws(() => deliver({ root, slug: "task", title: "Add x", bodyFile: "pr-body.md", runner }), /git rev-parse failed: fatal: not a git repository$/);
 });
+
+for (const leak of ["[shot](/home/someone/x.png)", "</home/someone/x>", "path=/home/someone", "|/home/someone|", "C:\\users\\someone"]) {
+  test(`refuses a body that leaks ${JSON.stringify(leak)} in markup`, (t) => {
+    const root = completedLoop();
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    fs.writeFileSync(path.join(root, "pr-body.md"), `Evidence ${leak}\n`);
+    assert.throws(() => deliver({ root, slug: "task", title: "Add x", bodyFile: "pr-body.md", runner: fakeRunner().runner }), (error) => error.code === "unsafe_body");
+  });
+}
