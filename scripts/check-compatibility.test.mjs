@@ -462,7 +462,10 @@ for (const [label, mutate, message] of [
 for (const [label, mutate, message] of [
   ["without the latest canary", (text) => text.replace("            opencode: latest\n", ""), /OpenCode 2 workflow must contain: opencode: latest/],
   ["without the type workspace install", (text) => text.replace("run: npm --prefix typecheck/v2 ci --ignore-scripts", "run: true"), /OpenCode 2 workflow must contain: run: npm --prefix typecheck\/v2 ci --ignore-scripts/],
-  ["with secrets", (text) => `${text}\n# \${{ secrets.TOKEN }}\n`, /must not use secrets or write permissions/],
+  ["with secrets", (text) => `${text}\n# \${{ secrets.TOKEN }}\n`, /must not use secrets/],
+  ["with write permissions", (text) => text.replace("  contents: read\n", "  contents: write\n"), /must use read-only permissions/],
+  ["with an extra write scope", (text) => text.replace("  contents: read\n", "  contents: read\n  id-token: write\n"), /must use read-only permissions/],
+  ["with job-level permissions", (text) => text.replace("    runs-on: ubuntu-latest\n", "    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n"), /job-level permissions are forbidden/],
   ["without markers", (text) => text.replace("  # opencode-v2:end\n", ""), /exactly one opencode-v2 marker pair/],
 ]) {
   test(`OpenCode 2 workflow is rejected ${label}`, (t) => {

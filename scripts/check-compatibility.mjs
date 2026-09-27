@@ -696,8 +696,12 @@ function validateOpenCodeV2Workflow(root, data, fsOps) {
   ]) {
     if (!section.includes(token)) throw invalid(`OpenCode 2 workflow must contain: ${token}`);
   }
-  if (/\$\{\{\s*secrets\./.test(workflow) || /^\s*permissions:\s*write-all/m.test(workflow)) {
-    throw invalid("OpenCode 2 workflow must not use secrets or write permissions");
+  if (/\$\{\{\s*secrets\./.test(workflow)) throw invalid("OpenCode 2 workflow must not use secrets");
+  if (!/^permissions:\n  contents: read$/m.test(workflow) || /^\s*[^#\n]+:\s*(?:write|write-all)\s*$/m.test(workflow)) {
+    throw invalid("OpenCode 2 workflow must use read-only permissions");
+  }
+  if (/^    permissions\s*:/m.test(workflow)) {
+    throw invalid("OpenCode 2 workflow job-level permissions are forbidden");
   }
 }
 
