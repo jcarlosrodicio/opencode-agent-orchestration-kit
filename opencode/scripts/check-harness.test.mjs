@@ -571,12 +571,12 @@ function writeLoopFixture(cwd, command) {
 }
 
 const validAutonomousCommand = `---
-description: Runs a bounded, local autonomous workflow.
+description: Runs a bounded autonomous workflow that ends at an open pull request.
 agent: lead
 ---
 
 authorization: explicit_command_invocation
-execution_scope: local_checkout_only
+execution_scope: feature_branch_to_pull_request
 max_iterations_per_invocation: 6
 planned_iteration_budget: task_specific_1_to_6
 hard_safety_ceiling: 6
@@ -589,8 +589,14 @@ human_view_path: .opencode/loops/<slug>.md
 worktree_mode: prohibited
 scheduling: prohibited
 parallelism: prohibited
-external_writes: prohibited
-auto_commit_push_merge_deploy: prohibited
+delivery_path: oak_deliver_only
+merge_deploy_release_publish: prohibited
+default_branch_push: prohibited
+force_push: prohibited
+ci_fix_attempts_per_job: 2
+stop_reasons: closed_list_of_seven
+autonomy_log: docs/ai/runs/<date>-<slug>/autonomy.md
+run_context: oak_run_required
 reviewer_execution: task_subagent_only
 reviewer_evidence: required_subagent_attestation
 
@@ -599,6 +605,8 @@ developer -> reviewer -> developer (state sync)
 oak state init --root .
 task reviewer
 oak state attest-review --root .
+oak deliver pr --root .
+Never merge
 
 Do not create worktrees, schedule runs, execute parallel branches, use network or write-capable MCP connectors, or publish changes.
 two iterations without observable progress
@@ -612,6 +620,27 @@ function writeAutonomousFixture(cwd, command) {
   const docsPath = path.join(cwd, "docs/ai/harness/commands.md");
   fs.appendFileSync(docsPath, "\n## `/autonomous`\n");
 }
+
+test("harness rejects autonomous delivery that may merge, force-push or bypass oak deliver", () => {
+  const cwd = makeFixture();
+  try {
+    writeAutonomousFixture(
+      cwd,
+      validAutonomousCommand
+        .replace("merge_deploy_release_publish: prohibited\n", "")
+        .replace("force_push: prohibited\n", "")
+        .replace("delivery_path: oak_deliver_only\n", ""),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted an autonomous delivery without its limits");
+    assert.match(result.stderr, /commands\/autonomous\.md: missing merge_deploy_release_publish: prohibited/);
+    assert.match(result.stderr, /commands\/autonomous\.md: missing force_push: prohibited/);
+    assert.match(result.stderr, /commands\/autonomous\.md: missing delivery_path: oak_deliver_only/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
 
 test("harness rejects autonomous work without reviewer-subagent attestation", () => {
   const cwd = makeFixture();

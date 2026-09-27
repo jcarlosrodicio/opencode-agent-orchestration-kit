@@ -32,9 +32,9 @@ Its bounded workflows deliberately constrain execution:
 
 - `/loop` requires a human-approved contract before writes and allows a
   worktree only through explicit opt-in.
-- `/autonomous` is local-checkout-only and prohibits worktrees, parallelism,
-  network access, write-enabled connectors, commits, pushes, merges,
-  deployments, releases, and publication.
+- `/autonomous` works on a feature branch and ends at an open pull request
+  through `oak deliver`; it prohibits worktrees, parallelism, write-enabled
+  connectors, merges, deployments, releases, and publication.
 - Both use finite iteration budgets, deterministic validation, durable state,
   and reviewer-only completion.
 

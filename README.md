@@ -79,17 +79,19 @@ into unlimited or unattended execution:
 - `/loop` requires an approved task contract before writes, allows at most
   three iterations per invocation within a task-specific one-to-six iteration
   budget, and can resume from durable state. Worktrees are explicit opt-in.
-- `/autonomous` is local-checkout-only, uses a task-specific one-to-six
-  iteration budget, runs deterministic validation in every iteration, and
-  stops as soon as an independent `reviewer` approves the result.
+- `/autonomous` works on a feature branch, uses a task-specific one-to-six
+  iteration budget, runs deterministic validation in every iteration, stops
+  iterating as soon as an independent `reviewer` approves the result, and
+  ends at an open pull request through `oak deliver`.
 - Both workflows use a schema-versioned JSON snapshot, append-only JSONL
   history, an exclusive lock, contract hashing, idempotent action IDs, and
   explicit recovery for interrupted writes.
 
-The `/autonomous` contract prohibits network access, worktrees, parallel
-execution, scheduling, write-enabled connectors, commits, pushes, merges,
-deployments, releases, and publication. Sensitive or expanded scope stops for
-human review. See the [`/loop`](opencode/commands/loop.md) and
+The `/autonomous` contract ends at an open pull request through `oak deliver`;
+it never merges, deploys, releases or publishes, and it prohibits worktrees,
+parallel execution, scheduling, write-enabled connectors, pushes to the default
+branch, and force-pushes. Its seven stop reasons, including sensitive or
+expanded scope, stop for human review. See the [`/loop`](opencode/commands/loop.md) and
 [`/autonomous`](opencode/commands/autonomous.md) contracts for the exact
 boundaries.
 
@@ -235,9 +237,10 @@ Use the smallest useful flow:
 - `/feature` when the work deserves full orchestration.
 - `/loop` when you want an approved, resumable implementation-review cycle with
   crash-recoverable structured state and a three-iteration cap.
-- `/autonomous` for one explicitly requested local task with a task-specific
+- `/autonomous` for one explicitly requested task with a task-specific
   one-to-six-iteration budget, a hard ceiling of six, durable state, and
-  reviewer-only closure. Final approval stops the cycle immediately.
+  reviewer-only closure. Final approval stops the cycle, and the run ends at an
+  open pull request.
 
 ### Small-gate fast path
 
