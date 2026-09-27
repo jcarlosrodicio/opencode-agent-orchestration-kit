@@ -751,10 +751,30 @@ test("collector tags execution trees with the run that recorded their sessions",
 });
 
 function createV2FixtureDb(dbPath, { withV1Tables = false } = {}) {
+  if (withV1Tables) {
+    // OpenCode 2 imported ses_v2_root from these tables; ses_root_1 was created by
+    // OpenCode 1 after switching back, so it exists only here.
+    createFixtureDb(dbPath);
+    run("sqlite3", [
+      dbPath,
+      `
+      insert into session (id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, path, agent, model) values
+        ('ses_v2_root', 'proj_1', null, 'calm-otter', '/tmp/repo', 'V1 copy', '1.18.4', 1000, 1900, '', 'lead', '{"id":"m","providerID":"p"}');
+      insert into message (id, session_id, time_created, time_updated, data) values
+        ('msg_v1_copy_user', 'ses_v2_root', 1000, 1000, '{"role":"user"}');
+      insert into part (id, message_id, session_id, time_created, time_updated, data) values
+        ('prt_v1_copy_user', 'msg_v1_copy_user', 'ses_v2_root', 1000, 1000, '{"type":"text","text":"Stale OpenCode 1 copy."}');
+      `,
+    ]);
+  }
+  const content = Array.from({ length: 11 }, (_, index) =>
+    index === 2 ? { type: "text", text: "First text part." }
+      : index === 10 ? { type: "text", text: "Eleventh content part." }
+        : { type: "reasoning", text: "hidden" },
+  );
   run("sqlite3", [
     dbPath,
     `
-    ${withV1Tables ? "create table session (id text primary key); create table message (id text); create table part (id text);" : ""}
     create table session_v2 (
       id text primary key, project_id text not null, workspace_id text, parent_id text,
       slug text not null, directory text not null, path text, title text, version text not null,
@@ -769,13 +789,15 @@ function createV2FixtureDb(dbPath, { withV1Tables = false } = {}) {
     );
     insert into session_v2 (id, project_id, parent_id, slug, directory, path, title, version, agent, model, cost, tokens_input, tokens_output, time_created, time_updated) values
       ('ses_v2_root', 'proj_1', null, 'calm-otter', '/tmp/repo', '', 'V2 root', '2.0.18', 'lead', '{"id":"m","providerID":"p"}', 1, 100, 20, 1000, 2000),
-      ('ses_v2_child', 'proj_1', 'ses_v2_root', 'keen-otter', '/tmp/repo', '', 'V2 child (@researcher subagent)', '2.0.18', 'researcher', '{"id":"m","providerID":"p"}', 0.5, 10, 5, 1100, 2100);
+      ('ses_v2_child', 'proj_1', 'ses_v2_root', 'keen-otter', '/tmp/repo', '', 'V2 child (@researcher subagent)', '2.0.18', 'researcher', '{"id":"m","providerID":"p"}', 0.5, 10, 5, 1100, 2100),
+      ('ses_v2_many', 'proj_1', null, 'busy-otter', '/tmp/repo', '', 'V2 many parts', '2.0.18', 'lead', '{"id":"m","providerID":"p"}', 0, 1, 1, 5000, 5100);
     insert into session_message (id, session_id, type, seq, time_created, time_updated, data) values
       ('msg_v2_user_root', 'ses_v2_root', 'user', 1, 1000, 1000, '{"text":"Investigate the v2 issue.","time":{"created":1000}}'),
       ('msg_v2_reasoning_root', 'ses_v2_root', 'assistant', 2, 1200, 1300, '{"agent":"lead","content":[{"type":"reasoning","text":"hidden"},{"type":"text","text":"Lead summary for the v2 issue."}]}'),
       ('msg_v2_shell_root', 'ses_v2_root', 'shell', 3, 1250, 1250, '{"command":"ls"}'),
       ('msg_v2_user_child', 'ses_v2_child', 'user', 1, 1100, 1100, '{"text":"Research the v2 issue."}'),
-      ('msg_v2_assistant_child', 'ses_v2_child', 'assistant', 2, 1400, 1500, '{"agent":"researcher","content":[{"type":"text","text":"Research findings for v2."}]}');
+      ('msg_v2_assistant_child', 'ses_v2_child', 'assistant', 2, 1400, 1500, '{"agent":"researcher","content":[{"type":"text","text":"Research findings for v2."}]}'),
+      ('msg_v2_many', 'ses_v2_many', 'assistant', 1, 5000, 5100, '${JSON.stringify({ agent: "lead", content })}');
     `,
   ]);
 }
@@ -795,13 +817,40 @@ test("exact root collector reads an OpenCode 2 database", async () => {
   }
 });
 
-test("OpenCode 2 tables win when a migrated database still has OpenCode 1 tables", async () => {
+test("OpenCode 2 rows win for a session that is in both schemas", async () => {
   const tmp = makeTempDir();
   try {
     const dbPath = path.join(tmp, "opencode.db");
     createV2FixtureDb(dbPath, { withV1Tables: true });
     const tree = await collectExecutionTreeByRoot(dbPath, "ses_v2_root");
     assert.equal(tree.root_session_id, "ses_v2_root");
+    assert.equal(tree.root_session.user_prompt, "Investigate the v2 issue.");
+    assert.deepEqual(tree.child_sessions.map((row) => row.session_id), ["ses_v2_child"]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("OpenCode 1 sessions missing from the OpenCode 2 tables are still collected", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createV2FixtureDb(dbPath, { withV1Tables: true });
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+    assert.equal(tree.root_session.user_prompt, "Investigate the harness issue carefully.");
+    assert.deepEqual(tree.child_sessions.map((row) => row.session_id).sort(), ["ses_child_1", "ses_grandchild_1"]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("OpenCode 2 content parts keep their numeric order", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createV2FixtureDb(dbPath);
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_v2_many");
+    assert.equal(tree.root_session.assistant_summary, "First text part.");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

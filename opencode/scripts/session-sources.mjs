@@ -10,12 +10,16 @@ const SESSION_COLUMNS = [
   "tokens_output", "tokens_reasoning", "tokens_cache_read", "tokens_cache_write",
 ].join(", ");
 
-export function pickSessionSchema(rows) {
+// Schemas in precedence order. OpenCode 2 imports OpenCode 1 sessions on first
+// start, so its rows win for a session present in both; sessions that OpenCode 1
+// created after switching back exist only in the OpenCode 1 tables.
+export function pickSessionSchemas(rows) {
   const names = new Set(rows.map((row) => row.name));
-  // OpenCode 2 imports OpenCode 1 rows on first start, so its tables win.
-  if (names.has("session_v2")) return "v2";
-  if (names.has("session")) return "v1"; // oak:v1-only
-  throw new Error("OpenCode database has neither a session nor a session_v2 table");
+  const schemas = [];
+  if (names.has("session_v2")) schemas.push("v2");
+  if (names.has("session")) schemas.push("v1"); // oak:v1-only
+  if (schemas.length === 0) throw new Error("OpenCode database has neither a session nor a session_v2 table");
+  return schemas;
 }
 
 export function sessionQueries(schema, { fullRescan, cutoffFilter }) {
@@ -38,7 +42,7 @@ export function sessionQueries(schema, { fullRescan, cutoffFilter }) {
         json_object('type', 'text', 'text', json_extract(data, '$.text')) as data
       from session_message where type = 'user' ${cutoffFilter}
       union all
-      select m.id || ':' || c.key, m.id, m.session_id, m.time_created, m.time_updated, c.value
+      select m.id || ':' || printf('%06d', c.key), m.id, m.session_id, m.time_created, m.time_updated, c.value
       from session_message m, json_each(m.data, '$.content') c
       where m.type = 'assistant' and json_extract(c.value, '$.type') = 'text' ${cutoffFilter.replace("time_created", "m.time_created")}
       order by 3, 4, 1;`,

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { SESSION_TABLES_SQL, pickSessionSchema, sessionQueries } from "./session-sources.mjs";
+import { SESSION_TABLES_SQL, pickSessionSchemas, sessionQueries } from "./session-sources.mjs";
 
 function fail(message) {
   console.error(message);
@@ -329,18 +329,29 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
   const cutoff = !fullRescan && previousCursor ? previousCursor.cursor_end_time_updated_max : null;
   const cutoffFilter = cutoff ? `AND time_created > ${Number(cutoff)}` : "";
 
-  const schema = pickSessionSchema(await streamSqliteJson(dbPath, SESSION_TABLES_SQL, 300_000));
-  const queries = sessionQueries(schema, { fullRescan, cutoffFilter });
+  const sessions = [];
+  const messages = [];
+  const parts = [];
+  const collected = new Set();
+  for (const schema of pickSessionSchemas(await streamSqliteJson(dbPath, SESSION_TABLES_SQL, 300_000))) {
+    const queries = sessionQueries(schema, { fullRescan, cutoffFilter });
+    const owned = (row) => !collected.has(row.session_id);
 
-  // Session query: always full (lightweight, needed for parent resolution)
-  const sessions = await streamSqliteJson(dbPath, queries.sessions, 300_000);
+    // Session query: always full (lightweight, needed for parent resolution)
+    const schemaSessions = (await streamSqliteJson(dbPath, queries.sessions, 300_000)).filter((row) => !collected.has(row.id));
 
-  // Message query: extract only role from JSON data (reduces output from ~31MB to ~200KB)
-  // Apply time cutoff when not in full-rescan mode
-  const messages = await streamSqliteJson(dbPath, queries.messages, 300_000);
+    // Message query: extract only role from JSON data (reduces output from ~31MB to ~200KB)
+    // Apply time cutoff when not in full-rescan mode
+    messages.push(...(await streamSqliteJson(dbPath, queries.messages, 300_000)).filter(owned));
 
-  // Part query: need full data for text extraction, but apply time cutoff to reduce rows scanned
-  const parts = await streamSqliteJson(dbPath, queries.parts, 300_000);
+    // Part query: need full data for text extraction, but apply time cutoff to reduce rows scanned
+    parts.push(...(await streamSqliteJson(dbPath, queries.parts, 300_000)).filter(owned));
+
+    sessions.push(...schemaSessions);
+    for (const session of schemaSessions) collected.add(session.id);
+  }
+  // Same order as the session SQL: time_updated desc, id desc (binary).
+  sessions.sort((a, b) => (b.time_updated ?? 0) - (a.time_updated ?? 0) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 
   const messagesBySession = new Map();
   for (const message of messages) {
