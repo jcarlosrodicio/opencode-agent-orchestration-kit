@@ -59,6 +59,11 @@ typecheck/v2/package.json
 typecheck/v2/package-lock.json
 typecheck/v2/tsconfig.json
 opencode/plugins/mission-runtime.ts
+opencode/runtime/v1/mission-runtime.ts
+opencode/runtime/v2/mission-runtime.ts
+opencode/runtime/v2/mission-events.mjs
+opencode/runtime/v2/mission-events.d.mts
+opencode/runtime/v2/mission-events.test.mjs
 opencode/plugins/mission-runtime.test.mjs
 opencode/tools/open_design.ts
 opencode/tools/open-design-http.mjs

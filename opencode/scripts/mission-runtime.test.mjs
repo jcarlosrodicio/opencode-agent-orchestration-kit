@@ -88,7 +88,7 @@ test("notification failures are logged and never escape the observer", async () 
 });
 
 test("plugin is an observer only and uses an optional TUI notification", () => {
-  const source = fs.readFileSync(path.join(root, "plugins/mission-runtime.ts"), "utf8");
+  const source = fs.readFileSync(path.join(root, "runtime/v1/mission-runtime.ts"), "utf8");
   assert.match(source, /event:/);
   assert.match(source, /chat\.message/);
   assert.match(source, /showToast/);

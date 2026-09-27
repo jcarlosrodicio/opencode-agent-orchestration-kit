@@ -37,11 +37,22 @@ test("observer ignores child sessions and duplicate root events", async () => {
 });
 
 test("plugin has event and notification hooks and writes only run events", () => {
-  const source = fs.readFileSync(path.join(root, "plugins/mission-runtime.ts"), "utf8");
-  assert.match(source, /MissionRuntimePlugin/);
+  const source = fs.readFileSync(path.join(root, "runtime/v1/mission-runtime.ts"), "utf8");
+  assert.match(source, /missionRuntimeV1/);
   assert.match(source, /event:/);
   assert.match(source, /chat\.message/);
   assert.match(source, /showToast/);
   assert.doesNotMatch(source, /writeFile|appendFile|rename|\.opencode\/loops/);
   assert.match(source, /appendRunEvent/);
+  const entry = fs.readFileSync(path.join(root, "plugins/mission-runtime.ts"), "utf8");
+  assert.match(entry, /server: missionRuntimeV1/);
+  assert.match(entry, /setup: missionRuntimeV2/);
+});
+
+test("OpenCode 2 adapter records run events from the event stream only", () => {
+  const source = fs.readFileSync(path.join(root, "runtime/v2/mission-runtime.ts"), "utf8");
+  assert.match(source, /ctx\.event\.subscribe/);
+  assert.match(source, /appendRunEvent/);
+  assert.match(source, /"agent_session"/);
+  assert.doesNotMatch(source, /writeFile|appendFile|rename|\.opencode\/loops/);
 });

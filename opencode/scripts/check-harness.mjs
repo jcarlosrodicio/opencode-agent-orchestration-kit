@@ -3115,10 +3115,13 @@ function checkMissionRuntimeContract() {
     "scripts/mission-status.mjs",
     "scripts/mission-runtime-observer.mjs",
     "scripts/mission-runtime.test.mjs",
-    "plugins/mission-runtime.ts",
+    "runtime/v1/mission-runtime.ts",
     "plugins/mission-runtime.test.mjs",
     "commands/loop-status.md",
     "docs/ai/specs/mission-runtime.md",
+    "plugins/mission-runtime.ts",
+    "runtime/v2/mission-runtime.ts",
+    "runtime/v2/mission-events.mjs",
   ];
   for (const rel of required) {
     if (!exists(rel)) fail(`${rel}: missing mission runtime surface`);
@@ -3135,15 +3138,26 @@ function checkMissionRuntimeContract() {
     if (!observer.includes(token)) fail(`${required[1]}: missing observer token ${token}`);
   }
 
-  const plugin = read("plugins/mission-runtime.ts");
+  const plugin = read("runtime/v1/mission-runtime.ts");
   for (const token of ["event:", "chat.message", "showToast", "mission-runtime-observer.mjs"]) {
     if (!plugin.includes(token)) fail(`${required[3]}: missing plugin token ${token}`);
   }
-  if (/writeFile|appendFile|rename|\.opencode\/loops/.test(`${observer}\n${plugin}`)) {
+  const entry = read("plugins/mission-runtime.ts");
+  for (const token of ["oak.mission-runtime", "server:", "setup:"]) {
+    if (!entry.includes(token)) fail(`plugins/mission-runtime.ts: missing plugin token ${token}`);
+  }
+  const v2Plugin = read("runtime/v2/mission-runtime.ts");
+  const v2Events = read("runtime/v2/mission-events.mjs");
+  if (!v2Plugin.includes("event.subscribe")) {
+    fail("runtime/v2/mission-runtime.ts: missing plugin token event.subscribe");
+  }
+  if (/writeFile|appendFile|rename|\.opencode\/loops/.test(`${observer}\n${plugin}\n${entry}\n${v2Plugin}\n${v2Events}`)) {
     fail("mission runtime observer: must not write durable loop state");
   }
-  if (!plugin.includes("appendRunEvent")) {
-    fail("plugins/mission-runtime.ts: run events must go through appendRunEvent only");
+  for (const rel of ["runtime/v1/mission-runtime.ts", "runtime/v2/mission-runtime.ts"]) {
+    if (!read(rel).includes("appendRunEvent")) {
+      fail(`${rel}: run events must go through appendRunEvent only`);
+    }
   }
 }
 
