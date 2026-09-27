@@ -2,17 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { familyUsage, formatTokens } from "./token-usage.mjs";
 
-const tokens = (input, output, reasoning = 0) => ({ input, output, reasoning, cache: { read: 999, write: 999 } });
+const tokens = (input, output, reasoning = 0, read = 0, write = 0) => ({ input, output, reasoning, cache: { read, write } });
 
-test("sums the viewed session and all of its descendants, excluding cache tokens", () => {
+test("sums the viewed session and all of its descendants, including cache tokens like OpenCode 1 totals", () => {
   const sessions = [
-    { id: "root", tokens: tokens(100, 50) },
-    { id: "child", parentID: "root", tokens: tokens(10, 5, 1) },
+    { id: "root", tokens: tokens(100, 50, 0, 1000, 5) },
+    { id: "child", parentID: "root", tokens: tokens(10, 5, 1, 2) },
     { id: "grandchild", parentID: "child", tokens: tokens(1, 1) },
     { id: "sibling-root", tokens: tokens(7, 7) },
   ];
-  assert.deepEqual(familyUsage("root", sessions), { lead: 150, subagents: 18, sessions: 2 });
-  assert.deepEqual(familyUsage("child", sessions), { lead: 16, subagents: 2, sessions: 1 });
+  assert.deepEqual(familyUsage("root", sessions), { lead: 1155, subagents: 20, sessions: 2 });
+  assert.deepEqual(familyUsage("child", sessions), { lead: 18, subagents: 2, sessions: 1 });
 });
 
 test("tolerates missing tokens and cycles", () => {

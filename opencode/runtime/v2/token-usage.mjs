@@ -1,8 +1,10 @@
-// Matches the OpenCode 1 sidebar (plugins/token-tree-usage.tsx): cache tokens are excluded.
+// Matches the OpenCode 1 sidebar (plugins/token-tree-usage.tsx), which shows
+// OpenCode 1 message totals; those include cache reads and writes.
 function sessionTokens(session) {
   const tokens = session?.tokens;
   if (!tokens) return 0;
-  return (tokens.input ?? 0) + (tokens.output ?? 0) + (tokens.reasoning ?? 0);
+  return (tokens.input ?? 0) + (tokens.output ?? 0) + (tokens.reasoning ?? 0)
+    + (tokens.cache?.read ?? 0) + (tokens.cache?.write ?? 0);
 }
 
 export function familyUsage(sessionID, sessions) {
