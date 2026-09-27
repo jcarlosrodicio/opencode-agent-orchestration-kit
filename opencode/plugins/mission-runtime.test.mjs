@@ -36,7 +36,7 @@ test("observer ignores child sessions and duplicate root events", async () => {
   assert.deepEqual(observer.stats().child_session_ids, ["child"]);
 });
 
-test("plugin has event and notification hooks but no durable state writes", () => {
+test("plugin has event and notification hooks and writes only run events", () => {
   const source = fs.readFileSync(path.join(root, "plugins/mission-runtime.ts"), "utf8");
   assert.match(source, /MissionRuntimePlugin/);
   assert.match(source, /event:/);

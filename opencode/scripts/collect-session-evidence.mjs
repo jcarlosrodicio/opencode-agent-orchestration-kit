@@ -72,6 +72,7 @@ function parseArgs(argv) {
       args.fullRescan = true;
     } else if (token === "--run") {
       args.run = argv[++i];
+      if (!args.run) fail("--run requires a run-summary.json path");
     } else {
       fail(`Unknown argument: ${token}`);
     }

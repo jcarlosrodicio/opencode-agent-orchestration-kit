@@ -109,9 +109,10 @@ number are not grounds to drop it. Correct the citation instead.
 Never invent findings to look thorough. An empty Blocking group is a valid
 result.
 
-Write the report to `docs/ai/runs/<YYYY-MM-DD>-<slug>/adversarial-review.md`
-when a run folder exists. Otherwise put it in the review output under the
-heading `Adversarial coverage`. Never leave the report only in the session.
+Return the full report in the review output under the heading
+`Adversarial coverage`. The reviewer is read-only, so the workflow's state-sync
+step copies it verbatim to `docs/ai/runs/<YYYY-MM-DD>-<slug>/adversarial-review.md`
+when a run folder exists. Never leave the report only in the session.
 
 ## Mapping to OAK verdicts
 
@@ -126,7 +127,8 @@ The canonical verdict is the one the reviewer returns.
 
 ## Run event
 
-When a run is open, record counts only:
+When a run is open, end the report with these counts. The state-sync step, not
+the reviewer, records them:
 
 ```bash
 oak run event --type review review=adversarial files_in_change=<n> files_reviewed=<n> files_skipped=<n> blocking=<n> should_fix=<n> nit=<n> verdict=<safe_to_commit|not_safe_to_commit>

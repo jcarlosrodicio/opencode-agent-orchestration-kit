@@ -63,12 +63,16 @@ reuse earlier approval.
 3. **Plan.** Review the plan against the objective, the non-goals and the Task
    Contract, and record that self-review in the autonomy log.
 4. **Cycle.** Run the cycle below within the planned iteration budget.
-5. **Close.** After the reviewer's approval, the state-sync step runs
-   `oak state attest-review --root .`, then
-   `oak state record --status completed`, then
-   `oak run close --root . --output docs/ai/runs/<date>-<slug>/run-summary.json`.
+5. **Close.** After the reviewer's approval, the state-sync step runs, with the
+   reviewer child session's real id:
+   - `oak state attest-review --root . --slug <slug> --reviewer-session-id <id> --reviewer-agent reviewer --reviewer-verdict APPROVE`;
+   - `oak state record --root . --slug <slug> --status completed` with the
+     session, action and iteration flags of the loop;
+   - `oak run close --root . --output docs/ai/runs/<date>-<slug>/run-summary.json`.
 6. **Deliver.** `developer` makes atomic commits with `commit` (explicit paths,
-   hooks never bypassed) and runs `oak deliver pr --root .`. The pull-request
+   hooks never bypassed) and runs
+   `oak deliver pr --root . --slug <slug> --title "<type>: <summary>" --body-file <file>`.
+   The pull-request
    body follows What / Why / How / Verification / Risk, and also:
    - says on its first line that the run was unsupervised;
    - links `autonomy.md` and `run-summary.json`;
@@ -77,8 +81,9 @@ reuse earlier approval.
    job with the failure classification in `debugging-and-error-recovery`,
    quoting the log line that decides it:
    - caused by this change: fix it as a correction reviewed by `task reviewer`,
-     commit it, and deliver again with `oak deliver pr --root .`; at most two
-     attempts per job, then stop;
+     commit it, and deliver again with the same `oak deliver pr --root .`
+     command, which updates the open pull request; at most two attempts per
+     job, then stop;
    - a flake: record the deciding line in the autonomy log without spending an
      attempt, and leave the job for the human, since OAK has no re-run action;
    - already failing on the base branch: stop reason 2.
@@ -97,9 +102,11 @@ runtime surface, `runtime-verification`. Before the change goes to its final
 review, `developer` runs `update-docs`, so the reviewer sees the docs too.
 `lead` invokes `reviewer` only as a
 subagent with `task reviewer`; never run `opencode run --agent reviewer`. The
-reviewer applies `adversarial-review`, writes
-`docs/ai/runs/<date>-<slug>/adversarial-review.md` and records a `review` run
-event. It must not read the autonomy log; a correction pass reads it first.
+reviewer applies `adversarial-review` and stays read-only: it returns the
+report and its counts, and the state-sync `developer` copies the report
+verbatim to `docs/ai/runs/<date>-<slug>/adversarial-review.md` and records the
+`review` run event. The reviewer must not read the autonomy log; a correction
+pass reads it first.
 
 Only that child session's final `pass` or `pass_with_observations` may complete
 the objective. Preserve stage, verdict, causality, and evidence. The state-sync

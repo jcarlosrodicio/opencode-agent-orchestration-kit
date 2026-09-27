@@ -92,7 +92,9 @@ oak state attest-review --root /path/to/project --slug task-slug \
 
 This stores `<slug>.review.json`, bound to the approved contract. Completion
 fails closed unless the attestation identifies the `reviewer` subagent and an
-`APPROVE` verdict.
+`APPROVE` verdict. `migrate` keeps the status of a legacy loop, so a loop completed
+before attestations existed stays `completed`; `oak deliver` still refuses it
+without an attestation.
 
 ## Task run context
 
@@ -109,13 +111,14 @@ oak run close --root /path/to/project --output docs/ai/runs/2026-09-27-task-slug
 - `start` writes `<root>/.opencode/runs/active.json` (schema `oak.run/1`) with
   a `run_id` of the form `oak_<YYYYMMDDTHHMMSSZ>_<8 hex>`, the change slug, the
   current branch, and the repository name. It is idempotent on the same branch
-  and refuses only while a run from another branch is open. The directory
+  and refuses while a run for another branch or another change is open. The directory
   carries its own `.gitignore`, so the context never shows up in `git status`.
 - `event` appends one `oak.event/1` line to `active.events.jsonl`. The type
   is one of `agent_session`, `review`, `runtime_verification`, `verify`,
   `delivery`, or `ci`; keys are lowercase; integer values stay numbers and
-  control characters are stripped. Without an open run it succeeds and records
-  nothing.
+  control characters are stripped. Other values must be symbolic (ids, enums,
+  branch names), never prose or absolute paths. Without an open run it
+  succeeds and records nothing.
 - `status` reports the run and its event count, and flags it as stale when it
   belongs to another branch or is older than seven days.
 - `close` writes an `oak.run.summary/1` file inside the root, which is meant to
@@ -141,17 +144,17 @@ oak deliver checks --root /path/to/project --pr 7
 1. the loop `<slug>` is `completed`;
 2. its `<slug>.review.json` attestation is a reviewer `APPROVE` bound to the
    approved contract;
-3. the current branch is not the default branch, `main`, `master`, or a
-   detached `HEAD`;
+3. the current branch is a plain feature branch name (no leading `+` or `-`)
+   and not the default branch, `main`, `master`, or a detached `HEAD`;
 4. the working tree is clean, apart from OAK's own `.opencode/loops` and
    `.opencode/runs` state;
 5. the branch has at least one commit ahead of `origin/<default>`;
 6. the body file is a regular file inside the root with no absolute home path,
    and the title has 1-200 characters.
 
-It then runs `git push --set-upstream origin <branch>`, never forced, and
-`gh pr create` against the default branch, or reuses the branch's open pull
-request when a later delivery (such as a CI fix) finds one. It records a
+It then runs `git push --set-upstream origin HEAD:refs/heads/<branch>`, never
+forced, and `gh pr create` against the default branch with a private copy of
+the validated body, or reuses the branch's open pull request when a later delivery (such as a CI fix) finds one. It records a
 `delivery` event when a task run is open. `checks` returns `gh pr checks` as JSON and treats
 the pending exit status 8 as success.
 

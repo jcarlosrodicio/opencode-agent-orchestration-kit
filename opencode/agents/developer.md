@@ -33,14 +33,29 @@ permission:
     "git add --update*": deny
     "git add .": deny
     "git add . *": deny
+    "git add -*A*": deny
+    "git add * -A*": deny
+    "git add * .": deny
+    "git add ./": deny
+    "git add ./ *": deny
+    "git add :/*": deny
+    "git add -f*": deny
+    "git add * -f*": deny
+    "git add *--force*": deny
     "git commit * -a*": deny
     "git commit *--all*": deny
     "git commit * -n*": deny
     "git commit *--no-v*": deny
+    "git commit -a*": deny
+    "git commit -n*": deny
+    "git commit *--amend*": deny
+    "git commit * -- *": deny
     "git push*": deny
     "gh *": deny
     "git merge*": deny
     "git reset --hard*": deny
+    "git -C *": deny
+    "git -c *": deny
   webfetch: ask
   websearch: ask
   todowrite: allow
