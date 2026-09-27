@@ -388,6 +388,7 @@ function validateWorkflowActions(root, data, fsOps) {
   for (const relative of [
     ".github/workflows/check.yml",
     ".github/workflows/compatibility-canary.yml",
+    ".github/workflows/opencode-v2.yml",
   ]) {
     const workflow = readText(root, relative, fsOps);
     const seen = new Map([...approved.keys()].map((action) => [action, 0]));

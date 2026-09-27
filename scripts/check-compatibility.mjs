@@ -261,6 +261,9 @@ export function extractMarkedSection(text, start, end) {
     if (start.includes("compatibility-canary")) {
       throw invalid("compatibility canary must contain exactly one marker pair");
     }
+    if (start.includes("opencode-v2")) {
+      throw invalid("OpenCode 2 workflow must contain exactly one opencode-v2 marker pair");
+    }
     throw invalid("workflow must contain exactly one compatibility blocking marker pair");
   }
   if (last <= first) {
@@ -272,6 +275,9 @@ export function extractMarkedSection(text, start, end) {
     }
     if (start.includes("compatibility-canary")) {
       throw invalid("compatibility canary markers must be in order");
+    }
+    if (start.includes("opencode-v2")) {
+      throw invalid("OpenCode 2 workflow markers must be in order");
     }
     throw invalid("workflow compatibility blocking markers must be in order");
   }
@@ -678,11 +684,29 @@ function validateCompatibilityCanary(root, data, fsOps) {
   }
 }
 
+function validateOpenCodeV2Workflow(root, data, fsOps) {
+  const workflow = readRegularText(root, ".github/workflows/opencode-v2.yml", fsOps);
+  const section = extractMarkedSection(workflow, "# opencode-v2:start", "# opencode-v2:end");
+  for (const token of [
+    "run: npm run typecheck:v2",
+    "run: npm --prefix typecheck/v2 ci --ignore-scripts",
+    `opencode: "${data.opencode_v2.minimum_tested}"`,
+    `opencode: ${data.opencode_v2.canary}`,
+    'run: node scripts/opencode-v2-smoke.mjs "${{ matrix.mode }}" "${{ matrix.opencode }}"',
+  ]) {
+    if (!section.includes(token)) throw invalid(`OpenCode 2 workflow must contain: ${token}`);
+  }
+  if (/\$\{\{\s*secrets\./.test(workflow) || /^\s*permissions:\s*write-all/m.test(workflow)) {
+    throw invalid("OpenCode 2 workflow must not use secrets or write permissions");
+  }
+}
+
 function validateSurfaces(root, data, fsOps) {
   validatePackages(root, data, fsOps);
   validateDocumentation(root, data, fsOps);
   validateWorkflow(root, data, fsOps);
   validateCompatibilityCanary(root, data, fsOps);
+  validateOpenCodeV2Workflow(root, data, fsOps);
   const installSmoke = readRegularText(root, "scripts/install-smoke.sh", fsOps);
   if (!/^\s*npm ci --ignore-scripts\s*$/m.test(installSmoke)) {
     throw invalid("installation smoke must use npm ci --ignore-scripts");

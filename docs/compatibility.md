@@ -93,7 +93,9 @@ Open Design service access, Impeccable, or the token plugin.
 The default-config smoke instead packs the npm artifact, extracts that local
 tarball, installs its frozen dependencies, and loads the unmodified starter
 configuration. It proves that the starter, with no external plugins, and the
-bundled token plugin can load at the stable boundary. This release-blocking
+bundled token plugin can load at the stable boundary. It also imports every
+server plugin file with the Bun runtime embedded in that OpenCode binary, fails
+when a server hook throws, and requires the Open Design tools to register. This release-blocking
 default check preserves the shipped starter behavior; it does not promote the
 token plugin from `experimental` and does not extend the core compatibility
 promise to it.

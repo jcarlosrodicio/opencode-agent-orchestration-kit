@@ -1,0 +1,64 @@
+name: OpenCode 2
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+  schedule:
+    - cron: "37 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # opencode-v2:start
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Install OpenCode 1 tool dependencies
+        run: npm --prefix opencode ci --ignore-scripts
+
+      - name: Install OpenCode 2 type dependencies
+        run: npm --prefix typecheck/v2 ci --ignore-scripts
+
+      - name: Typecheck OpenCode 2 adapters
+        run: npm run typecheck:v2
+
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: core
+            opencode: "2.0.18"
+          - mode: default
+            opencode: "2.0.18"
+          - mode: core
+            opencode: latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Smoke OpenCode 2
+        run: node scripts/opencode-v2-smoke.mjs "${{ matrix.mode }}" "${{ matrix.opencode }}"
+  # opencode-v2:end

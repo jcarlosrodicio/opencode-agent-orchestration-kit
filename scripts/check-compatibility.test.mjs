@@ -298,6 +298,72 @@ jobs:
         run: npm run installation-smoke
 `;
 
+const VALID_OPENCODE_V2_WORKFLOW = `name: OpenCode 2
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+  schedule:
+    - cron: "37 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # opencode-v2:start
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Install OpenCode 1 tool dependencies
+        run: npm --prefix opencode ci --ignore-scripts
+
+      - name: Install OpenCode 2 type dependencies
+        run: npm --prefix typecheck/v2 ci --ignore-scripts
+
+      - name: Typecheck OpenCode 2 adapters
+        run: npm run typecheck:v2
+
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: core
+            opencode: "2.0.18"
+          - mode: default
+            opencode: "2.0.18"
+          - mode: core
+            opencode: latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Smoke OpenCode 2
+        run: node scripts/opencode-v2-smoke.mjs "\${{ matrix.mode }}" "\${{ matrix.opencode }}"
+  # opencode-v2:end
+`;
+
 function writeJson(root, relative, value) {
   const full = path.join(root, relative);
   fs.mkdirSync(path.dirname(full), { recursive: true });
@@ -326,6 +392,7 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   writeText(root, "docs/installation.md", INSTALLATION);
   writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW);
   writeText(root, ".github/workflows/compatibility-canary.yml", VALID_CANARY_WORKFLOW);
+  writeText(root, ".github/workflows/opencode-v2.yml", VALID_OPENCODE_V2_WORKFLOW);
   writeText(root, "scripts/install-smoke.sh", "#!/usr/bin/env bash\nnpm ci --ignore-scripts\n");
   return root;
 }
@@ -389,6 +456,19 @@ for (const [label, mutate, message] of [
     mutate(data);
     const root = makeFixture(t, data);
     assertInvalidCompatibility(() => checkCompatibility(root, { surfaces: false }), message);
+  });
+}
+
+for (const [label, mutate, message] of [
+  ["without the latest canary", (text) => text.replace("            opencode: latest\n", ""), /OpenCode 2 workflow must contain: opencode: latest/],
+  ["without the type workspace install", (text) => text.replace("run: npm --prefix typecheck/v2 ci --ignore-scripts", "run: true"), /OpenCode 2 workflow must contain: run: npm --prefix typecheck\/v2 ci --ignore-scripts/],
+  ["with secrets", (text) => `${text}\n# \${{ secrets.TOKEN }}\n`, /must not use secrets or write permissions/],
+  ["without markers", (text) => text.replace("  # opencode-v2:end\n", ""), /exactly one opencode-v2 marker pair/],
+]) {
+  test(`OpenCode 2 workflow is rejected ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/opencode-v2.yml", mutate(VALID_OPENCODE_V2_WORKFLOW));
+    assertInvalidCompatibility(() => checkCompatibility(root), message);
   });
 }
 
@@ -1343,6 +1423,21 @@ case "$1" in
     grep -q '^mode: primary$' "$OPENCODE_CONFIG_DIR/agents/lead.md"
     printf '{\"name\":\"lead\",\"mode\":\"primary\",\"config\":\"%s\"${leak}}\\n' "$OPENCODE_CONFIG_DIR"
     ;;
+  -e)
+    test "$#" -eq 2
+    test "$BUN_BE_BUN" = 1
+    test "$OAK_PLUGIN_DIR" = "$OPENCODE_CONFIG_DIR/plugins"
+    ${options.pluginImportFailure ? "exit 1" : ":"}
+    ;;
+  --print-logs)
+    test "$#" -eq 6
+    test "$2" = --log-level
+    test "$3" = ERROR
+    test "$4" = debug
+    test "$5" = agent
+    test "$6" = designer
+    printf '{\"name\":\"designer\",\"mode\":\"subagent\",\"tools\":{\"open_design_health\":${options.designerTools === false ? "false" : "true"}}}\\n'
+    ;;
   *) exit 43;;
 esac
 `);
@@ -1387,6 +1482,20 @@ test("default OpenCode compatibility smoke packs and loads the unmodified packag
     "opencode compatibility smoke ok: mode=default requested=1.18.4 resolved=1.18.4\n",
   );
 });
+
+for (const [label, option, message] of [
+  ["a plugin that fails to import", { pluginImportFailure: true }, /an OAK plugin failed to import/],
+  ["unregistered Open Design tools", { designerTools: false }, /Open Design tools did not register/],
+]) {
+  test(`default OpenCode compatibility smoke rejects ${label}`, (t) => {
+    const root = makeCompatibilitySmokeFixture(t, { mode: "default", request: "1.18.4", ...option });
+    const result = runCompatibilitySmoke(root, ["default", "1.18.4"]);
+
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, message);
+  });
+}
 
 test("default OpenCode compatibility smoke does not fall back when npm pack fails", (t) => {
   const root = makeCompatibilitySmokeFixture(t, {

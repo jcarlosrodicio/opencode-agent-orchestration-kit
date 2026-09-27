@@ -37,6 +37,9 @@ scripts/package-smoke.test.mjs
 scripts/benchmark-tool-paths.mjs
 scripts/benchmark-tool-paths.test.mjs
 scripts/opencode-compat-smoke.sh
+scripts/opencode-v2-smoke.mjs
+scripts/opencode-v2-smoke.test.mjs
+.github/workflows/opencode-v2.yml
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
 scripts/oak.mjs

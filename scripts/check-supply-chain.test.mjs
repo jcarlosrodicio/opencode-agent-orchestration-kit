@@ -129,6 +129,10 @@ function writeValidSurfaceFiles(root) {
     path.join(root, ".github/workflows/compatibility-canary.yml"),
     `# compatibility-canary:start\nsteps:\n  - uses: ${CHECKOUT_USE}\n  - uses: ${SETUP_NODE_USE}\n  - run: bash scripts/opencode-compat-smoke.sh latest\n# compatibility-canary:end\n`,
   );
+  fs.writeFileSync(
+    path.join(root, ".github/workflows/opencode-v2.yml"),
+    `steps:\n  - uses: ${CHECKOUT_USE}\n  - uses: ${SETUP_NODE_USE}\n  - run: npm --prefix typecheck/v2 ci --ignore-scripts\n`,
+  );
   fs.mkdirSync(path.join(root, "docker/open-design"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "docker/open-design/Dockerfile"),
