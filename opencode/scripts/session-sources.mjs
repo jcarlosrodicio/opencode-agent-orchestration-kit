@@ -10,9 +10,8 @@ const SESSION_COLUMNS = [
   "tokens_output", "tokens_reasoning", "tokens_cache_read", "tokens_cache_write",
 ].join(", ");
 
-// Schemas in precedence order. OpenCode 2 imports OpenCode 1 sessions on first
-// start, so its rows win for a session present in both; sessions that OpenCode 1
-// created after switching back exist only in the OpenCode 1 tables.
+// Schemas present in the database, OpenCode 2 first. OpenCode 2 imports
+// OpenCode 1 sessions on first start, so a database can hold both.
 export function pickSessionSchemas(rows) {
   const names = new Set(rows.map((row) => row.name));
   const schemas = [];

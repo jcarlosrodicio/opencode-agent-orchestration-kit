@@ -750,7 +750,7 @@ test("collector tags execution trees with the run that recorded their sessions",
   }
 });
 
-function createV2FixtureDb(dbPath, { withV1Tables = false } = {}) {
+function createV2FixtureDb(dbPath, { withV1Tables = false, v1CopyUpdated = 1900 } = {}) {
   if (withV1Tables) {
     // OpenCode 2 imported ses_v2_root from these tables; ses_root_1 was created by
     // OpenCode 1 after switching back, so it exists only here.
@@ -759,11 +759,11 @@ function createV2FixtureDb(dbPath, { withV1Tables = false } = {}) {
       dbPath,
       `
       insert into session (id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, path, agent, model) values
-        ('ses_v2_root', 'proj_1', null, 'calm-otter', '/tmp/repo', 'V1 copy', '1.18.4', 1000, 1900, '', 'lead', '{"id":"m","providerID":"p"}');
+        ('ses_v2_root', 'proj_1', null, 'calm-otter', '/tmp/repo', 'V1 copy', '1.18.4', 1000, ${v1CopyUpdated}, '', 'lead', '{"id":"m","providerID":"p"}');
       insert into message (id, session_id, time_created, time_updated, data) values
         ('msg_v1_copy_user', 'ses_v2_root', 1000, 1000, '{"role":"user"}');
       insert into part (id, message_id, session_id, time_created, time_updated, data) values
-        ('prt_v1_copy_user', 'msg_v1_copy_user', 'ses_v2_root', 1000, 1000, '{"type":"text","text":"Stale OpenCode 1 copy."}');
+        ('prt_v1_copy_user', 'msg_v1_copy_user', 'ses_v2_root', 1000, 1000, '{"type":"text","text":"OpenCode 1 copy."}');
       `,
     ]);
   }
@@ -824,8 +824,45 @@ test("OpenCode 2 rows win for a session that is in both schemas", async () => {
     createV2FixtureDb(dbPath, { withV1Tables: true });
     const tree = await collectExecutionTreeByRoot(dbPath, "ses_v2_root");
     assert.equal(tree.root_session_id, "ses_v2_root");
+    assert.equal(tree.root_session.title, "V2 root");
+    assert.equal(tree.root_session.version, "2.0.18");
     assert.equal(tree.root_session.user_prompt, "Investigate the v2 issue.");
+    assert.equal(tree.root_session.message_count, 2);
     assert.deepEqual(tree.child_sessions.map((row) => row.session_id), ["ses_v2_child"]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("an imported session that OpenCode 1 kept using is read from the OpenCode 1 tables", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createV2FixtureDb(dbPath, { withV1Tables: true, v1CopyUpdated: 9000 });
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_v2_root");
+    assert.equal(tree.root_session.title, "V1 copy");
+    assert.equal(tree.root_session.user_prompt, "OpenCode 1 copy.");
+    assert.equal(tree.root_session.message_count, 1);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("a database with more parts than a call can spread is collected", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    run("sqlite3", [
+      dbPath,
+      `
+      with recursive n(i) as (select 1 union all select i + 1 from n where i < 200000)
+      insert into part (id, message_id, session_id, time_created, time_updated, data)
+      select 'prt_bulk_' || i, 'msg_assistant_root_2', 'ses_root_2', 3300, 3300, '{"type":"step-start"}' from n;
+      `,
+    ]);
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_root_1");
+    assert.equal(tree.root_session.user_prompt, "Investigate the harness issue carefully.");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

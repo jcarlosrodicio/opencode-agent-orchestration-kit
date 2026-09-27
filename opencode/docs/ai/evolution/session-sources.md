@@ -40,10 +40,11 @@ mission-runtime plugin while that run was open. Trees from other work get
 - `opencode-raw-json`: `ses_*.json` raw exports
 
 OpenCode 2 stores sessions in `session_v2` and messages in `session_message`.
-`collect-session-evidence.mjs` reads both schemas when a database has both.
-OpenCode 2 imports OpenCode 1 sessions on first start, so its rows win for a
-session present in both. Sessions that OpenCode 1 creates after switching back
-exist only in the OpenCode 1 tables and are collected from there.
+`collect-session-evidence.mjs` reads both schemas when a database has both,
+because OpenCode 2 imports OpenCode 1 sessions on first start and OpenCode 1
+keeps writing only its own tables after switching back. A session present in
+both schemas is read from the copy with the latest `time_updated`; on a tie the
+OpenCode 2 copy wins.
 
 ## Collection and staging
 
