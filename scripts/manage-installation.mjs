@@ -1789,7 +1789,7 @@ export function createInstallationManager(options) {
         const banner = String(observed.stdout ?? "").split(/\r?\n/, 1)[0].trim().replace(/^opencode\s+/, "");
         const parsed = parseRuntimeVersion(banner, "OpenCode");
         const line = opencodeCompatibilityLine(parsed.canonical, compatibility);
-        opencodeCheck = line === "v1"
+        opencodeCheck = line === "v1" || (line === "v2" && compatibility.opencode_v2.status === "supported")
           ? doctorCheck("opencode-version", "pass", `OpenCode ${parsed.canonical} is supported`)
           : line === "v2"
             ? doctorCheck("opencode-version", "info", `OpenCode ${parsed.canonical} is supported experimentally`)

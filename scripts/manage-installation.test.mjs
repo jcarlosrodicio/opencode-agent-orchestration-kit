@@ -370,6 +370,21 @@ test("[D002] doctor diagnostic node-version uses the canonical engine", async (t
   }
 });
 
+test("[D003] doctor treats OpenCode 2 as supported once the contract promotes it", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const promoted = doctorCompatibility();
+  promoted.opencode_v2 = { ...promoted.opencode_v2, status: "supported" };
+  const result = await managerFixture(sourceRoot, {
+    compatibilityProvider: () => promoted,
+    nodeVersionProvider: () => "v24.14.1",
+    commandRunner: () => ({ status: 0, stdout: "opencode v2.0.18\n", stderr: "" }),
+  }).run("doctor", { targetRoot });
+  for (const id of ["opencode-version", "compatibility"]) {
+    assert.equal(result.report.checks.find((entry) => entry.id === id).status, "pass", id);
+  }
+});
+
 test("[D003] doctor diagnostic opencode-version is bounded and sanitized", async (t) => {
   for (const [version, expected] of [
     ["1.18.4", "pass"],
