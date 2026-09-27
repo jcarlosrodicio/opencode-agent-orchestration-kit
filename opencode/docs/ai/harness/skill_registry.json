@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T09:10:53Z",
+  "generated_at": "2026-09-27T09:11:44Z",
   "schema_version": 2,
   "skills": [
     {
@@ -344,6 +344,27 @@
       "status": "active",
       "description": "Optimizes application performance. Use when performance requirements exist, when you suspect performance regressions, or when Core Web Vitals or load times need improvement. Use when profiling reveals bottlenecks that need fixing.",
       "load_path": "skills/performance-optimization/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "runtime-verification",
+      "source": "built-in",
+      "phase": "verify",
+      "domains": [
+        "testing",
+        "evaluation"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use after tests and validation pass and before the final review, whenever a change could show up at runtime - a screen, a command, an endpoint, a job or a data store - to prove the change works in the running system, including its failure path, with repeatable steps and minimal evidence.",
+      "load_path": "skills/runtime-verification/SKILL.md",
       "origin": null
     },
     {

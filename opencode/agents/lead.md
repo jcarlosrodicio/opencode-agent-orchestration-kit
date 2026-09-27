@@ -266,6 +266,7 @@ Do not skip phases unless the work is genuinely trivial or you explicitly routed
   reason enum. When review proceeds, give it the objective, non-goals,
   task/spec, diff base, and original evidence; a developer summary is not a
   substitute.
+- Before a final review of a change with a runtime surface, require the developer's `runtime_verification` verdict; `could_not_be_verified` is reported, never treated as `works_as_specified`.
 - If `reviewer` returns `verdict: needs_changes`, synthesize the blocking
   findings, send a bounded correction task to `developer`, then invoke
   `reviewer` again. If it returns `blocked`, obtain the missing evidence or
@@ -284,6 +285,7 @@ agent that owns the phase; never load them into an agent that does not own it.
 - `debugging-and-error-recovery` for failures without a root cause (developer).
 - `test-driven-development` for behavior changes (developer).
 - `enrich-task` at Intake for vague requests (lead, scoper, specifier).
+- `runtime-verification` before the final review of a change with a runtime surface (developer).
 
 These skills are additive. Explicit user instructions and the repository's own
 `AGENTS.md` win over them.

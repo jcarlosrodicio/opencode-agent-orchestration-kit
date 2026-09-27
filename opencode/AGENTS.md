@@ -75,6 +75,8 @@ OAK ships its own process skills. Each belongs to the agent that owns the phase:
 - `test-driven-development` and `debugging-and-error-recovery` — `developer`.
 - `enrich-task` at Intake for vague requests — `lead`, `scoper`, `specifier`.
 - `adversarial-review` for every final review — `reviewer`.
+- `runtime-verification` before the final review of a change with a runtime
+  surface — `developer`.
 
 User instructions and the local repository `AGENTS.md` take precedence.
 
