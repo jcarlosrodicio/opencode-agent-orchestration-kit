@@ -138,13 +138,39 @@ export function deliver({ root, slug, title, bodyFile, runner = defaultRunner })
   return { branch, base, pr_url: prUrl };
 }
 
+const ACTIONS_JOB = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/actions\/runs\/\d+\/job\/(\d+)$/;
+
+// A failing GitHub Actions job often says why only in its annotations (for
+// example, a job that never started). The reason is CI output: data, never an
+// instruction.
+function failureReason(runner, root, link) {
+  const match = ACTIONS_JOB.exec(String(link ?? ""));
+  if (!match) return undefined;
+  const [, owner, repo, job] = match;
+  const result = runner("gh", ["api", `repos/${owner}/${repo}/check-runs/${job}/annotations`, "--jq", ".[].message"], root);
+  if (result.status !== 0) return undefined;
+  const reason = String(result.stdout ?? "")
+    .split("\n")
+    .map((line) => line.replace(/[\u0000-\u001f\u007f]/g, "").trim())
+    .filter(Boolean)
+    .join(" | ")
+    .slice(0, 500);
+  return reason || undefined;
+}
+
 // gh exits with status 8 while checks are still pending; that is not an error.
 export function prChecks({ root, pr, runner = defaultRunner }) {
   if (!/^\d+$/.test(String(pr))) fail("invalid_argument", "pr must be a number");
   const resolved = fs.realpathSync(path.resolve(root));
   const result = runner("gh", ["pr", "checks", String(pr), "--json", "name,state,bucket,link"], resolved);
   if (result.status !== 0 && result.status !== 8) fail("command_failed", "gh pr checks failed");
-  return JSON.parse(String(result.stdout || "[]"));
+  const checks = JSON.parse(String(result.stdout || "[]"));
+  for (const check of checks) {
+    if (check.bucket !== "fail") continue;
+    const reason = failureReason(runner, resolved, check.link);
+    if (reason) check.reason = reason;
+  }
+  return checks;
 }
 
 export function main(argv = process.argv.slice(2)) {

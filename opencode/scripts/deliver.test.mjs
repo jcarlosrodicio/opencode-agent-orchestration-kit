@@ -209,3 +209,37 @@ for (const leak of ["[shot](/home/someone/x.png)", "</home/someone/x>", "path=/h
     assert.throws(() => deliver({ root, slug: "task", title: "Add x", bodyFile: "pr-body.md", runner: fakeRunner().runner }), (error) => error.code === "unsafe_body");
   });
 }
+
+test("checks attaches the reason of a failing GitHub Actions job from its annotations", (t) => {
+  const root = completedLoop();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const calls = [];
+  const link = "https://github.com/example/repo/actions/runs/36336266127/job/108667575936";
+  const runner = (command, args) => {
+    calls.push([command, args]);
+    if (args[0] === "pr") {
+      return { status: 0, stdout: JSON.stringify([
+        { name: "test", state: "FAILURE", bucket: "fail", link },
+        { name: "lint", state: "SUCCESS", bucket: "pass", link: "https://github.com/example/repo/actions/runs/1/job/2" },
+      ]) };
+    }
+    return { status: 0, stdout: "The job was not started because recent account payments have failed.\nThe ubuntu-latest label will migrate.\n" };
+  };
+  const checks = prChecks({ root, pr: 7, runner });
+  assert.equal(checks[0].reason, "The job was not started because recent account payments have failed. | The ubuntu-latest label will migrate.");
+  assert.equal(Object.hasOwn(checks[1], "reason"), false);
+  assert.deepEqual(calls[1], ["gh", ["api", "repos/example/repo/check-runs/108667575936/annotations", "--jq", ".[].message"]]);
+  assert.equal(calls.length, 2, "annotations are fetched only for failing checks");
+});
+
+test("checks never builds an API path from an unexpected link", (t) => {
+  const root = completedLoop();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const calls = [];
+  const runner = (command, args) => {
+    calls.push(args);
+    return { status: 0, stdout: JSON.stringify([{ name: "x", state: "FAILURE", bucket: "fail", link: "https://evil.test/a/b/actions/runs/1/job/2" }]) };
+  };
+  assert.equal(prChecks({ root, pr: 7, runner })[0].reason, undefined);
+  assert.equal(calls.length, 1);
+});

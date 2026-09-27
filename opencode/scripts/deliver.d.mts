@@ -32,6 +32,6 @@ export function prChecks(options: {
   root: string;
   pr: number | string;
   runner?: CommandRunner;
-}): Array<{ name: string; state: string; bucket: string; link: string }>;
+}): Array<{ name: string; state: string; bucket: string; link: string; reason?: string }>;
 
 export function main(argv?: string[]): void;
