@@ -60,6 +60,8 @@ opencode/runtime/v2/shell-export-guard.ts
 opencode/scripts/shell-export-guard-core.mjs
 opencode/scripts/shell-export-guard-core.d.mts
 opencode/scripts/shell-export-guard-core.test.mjs
+opencode/scripts/session-sources.mjs
+opencode/scripts/session-sources.d.mts
 typecheck/v2/package.json
 typecheck/v2/package-lock.json
 typecheck/v2/tsconfig.json

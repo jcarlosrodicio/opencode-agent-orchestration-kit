@@ -749,3 +749,60 @@ test("collector tags execution trees with the run that recorded their sessions",
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+function createV2FixtureDb(dbPath, { withV1Tables = false } = {}) {
+  run("sqlite3", [
+    dbPath,
+    `
+    ${withV1Tables ? "create table session (id text primary key); create table message (id text); create table part (id text);" : ""}
+    create table session_v2 (
+      id text primary key, project_id text not null, workspace_id text, parent_id text,
+      slug text not null, directory text not null, path text, title text, version text not null,
+      cost real default 0 not null, tokens_input integer default 0 not null,
+      tokens_output integer default 0 not null, tokens_reasoning integer default 0 not null,
+      tokens_cache_read integer default 0 not null, tokens_cache_write integer default 0 not null,
+      agent text, model text, time_created integer not null, time_updated integer not null
+    );
+    create table session_message (
+      id text primary key, session_id text not null, type text not null, seq integer not null,
+      time_created integer not null, time_updated integer not null, data text not null
+    );
+    insert into session_v2 (id, project_id, parent_id, slug, directory, path, title, version, agent, model, cost, tokens_input, tokens_output, time_created, time_updated) values
+      ('ses_v2_root', 'proj_1', null, 'calm-otter', '/tmp/repo', '', 'V2 root', '2.0.18', 'lead', '{"id":"m","providerID":"p"}', 1, 100, 20, 1000, 2000),
+      ('ses_v2_child', 'proj_1', 'ses_v2_root', 'keen-otter', '/tmp/repo', '', 'V2 child (@researcher subagent)', '2.0.18', 'researcher', '{"id":"m","providerID":"p"}', 0.5, 10, 5, 1100, 2100);
+    insert into session_message (id, session_id, type, seq, time_created, time_updated, data) values
+      ('msg_v2_user_root', 'ses_v2_root', 'user', 1, 1000, 1000, '{"text":"Investigate the v2 issue.","time":{"created":1000}}'),
+      ('msg_v2_reasoning_root', 'ses_v2_root', 'assistant', 2, 1200, 1300, '{"agent":"lead","content":[{"type":"reasoning","text":"hidden"},{"type":"text","text":"Lead summary for the v2 issue."}]}'),
+      ('msg_v2_shell_root', 'ses_v2_root', 'shell', 3, 1250, 1250, '{"command":"ls"}'),
+      ('msg_v2_user_child', 'ses_v2_child', 'user', 1, 1100, 1100, '{"text":"Research the v2 issue."}'),
+      ('msg_v2_assistant_child', 'ses_v2_child', 'assistant', 2, 1400, 1500, '{"agent":"researcher","content":[{"type":"text","text":"Research findings for v2."}]}');
+    `,
+  ]);
+}
+
+test("exact root collector reads an OpenCode 2 database", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createV2FixtureDb(dbPath);
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_v2_root");
+    assert.equal(tree.root_session_id, "ses_v2_root");
+    assert.deepEqual(tree.child_sessions.map((row) => row.session_id), ["ses_v2_child"]);
+    assert.equal(tree.root_session.user_prompt, "Investigate the v2 issue.");
+    assert.equal(tree.root_session.assistant_summary, "Lead summary for the v2 issue.");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("OpenCode 2 tables win when a migrated database still has OpenCode 1 tables", async () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createV2FixtureDb(dbPath, { withV1Tables: true });
+    const tree = await collectExecutionTreeByRoot(dbPath, "ses_v2_root");
+    assert.equal(tree.root_session_id, "ses_v2_root");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

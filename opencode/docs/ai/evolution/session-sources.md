@@ -39,6 +39,12 @@ mission-runtime plugin while that run was open. Trees from other work get
 - `opencode-sqlite`: local SQLite with `session`, `message`, and `part`
 - `opencode-raw-json`: `ses_*.json` raw exports
 
+OpenCode 2 stores sessions in `session_v2` and messages in `session_message`.
+`collect-session-evidence.mjs` detects the schema per database and prefers the
+OpenCode 2 tables, because OpenCode 2 imports OpenCode 1 sessions on first start.
+Sessions created by OpenCode 1 after that import stay only in the OpenCode 1
+tables and are not collected from a migrated database.
+
 ## Collection and staging
 
 Before `evaluator`, stage session evidence with:
