@@ -728,3 +728,24 @@ test("phase-0 telemetry measures diff size for a real local git repo", async () 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("collector tags execution trees with the run that recorded their sessions", () => {
+  const tmp = makeTempDir();
+  try {
+    const dbPath = path.join(tmp, "opencode.db");
+    createFixtureDb(dbPath);
+    const summaryPath = path.join(tmp, "run-summary.json");
+    writeJson(summaryPath, {
+      schema: "oak.run.summary/1",
+      run: { run_id: "oak_20260926T100000Z_a1b2c3d4" },
+      events: [{ type: "agent_session", session_id: "ses_child_1" }],
+    });
+    const outDir = path.join(tmp, "out");
+    run(process.execPath, ["scripts/collect-session-evidence.mjs", "--output-dir", outDir, "--source", dbPath, "--full-rescan", "--run", summaryPath], { cwd: root });
+    const trees = fs.readFileSync(path.join(outDir, "execution-trees.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    assert.equal(trees.find((tree) => tree.root_session_id === "ses_root_1").run_id, "oak_20260926T100000Z_a1b2c3d4");
+    assert.equal(trees.find((tree) => tree.root_session_id === "ses_root_2").run_id, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

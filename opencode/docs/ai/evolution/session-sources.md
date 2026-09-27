@@ -29,6 +29,11 @@ The primary unit is an `execution tree`:
 Sidecars should review the full tree first and only descend to individual child
 sessions for fine-grained diagnosis.
 
+An execution tree carries `run_id` when collected with
+`--run <run-summary.json>` and any of its sessions was recorded by the
+mission-runtime plugin while that run was open. Trees from other work get
+`run_id: null`; without `--run` the field is omitted.
+
 ## Supported formats
 
 - `opencode-sqlite`: local SQLite with `session`, `message`, and `part`

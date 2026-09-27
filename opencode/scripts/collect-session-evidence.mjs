@@ -70,11 +70,28 @@ function parseArgs(argv) {
       args.sources.push(argv[++i]);
     } else if (token === "--full-rescan") {
       args.fullRescan = true;
+    } else if (token === "--run") {
+      args.run = argv[++i];
     } else {
       fail(`Unknown argument: ${token}`);
     }
   }
   return args;
+}
+
+// A run summary lists the sessions the mission-runtime plugin recorded while
+// the run was open; trees containing any of them belong to that run.
+function loadRunSessions(summaryPath) {
+  const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+  if (summary?.schema !== "oak.run.summary/1" || typeof summary.run?.run_id !== "string") {
+    fail(`--run must reference an oak.run.summary/1 file: ${summaryPath}`);
+  }
+  const sessionIds = new Set(
+    (Array.isArray(summary.events) ? summary.events : [])
+      .filter((event) => event?.type === "agent_session" && typeof event.session_id === "string")
+      .map((event) => event.session_id),
+  );
+  return { runId: summary.run.run_id, sessionIds };
 }
 
 function defaultSources() {
@@ -780,8 +797,12 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   const built = buildExecutionTrees(sqliteRows, rawRows, previousCursor, args.fullRescan, userTurnTimesBySession);
+  const runSessions = args.run ? loadRunSessions(path.resolve(args.run)) : null;
   for (const tree of built.trees) {
     tree.telemetry.diff_size = measureDiffSize(tree.root_directory);
+    if (runSessions) {
+      tree.run_id = tree.session_ids.some((id) => runSessions.sessionIds.has(id)) ? runSessions.runId : null;
+    }
   }
   const acceptedSessionIds = new Set(built.trees.flatMap((tree) => tree.session_ids));
   const filteredSessionRows = sortSessions(sqliteRows.filter((row) => acceptedSessionIds.has(row.session_id)));

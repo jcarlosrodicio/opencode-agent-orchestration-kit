@@ -43,4 +43,5 @@ test("plugin has event and notification hooks but no durable state writes", () =
   assert.match(source, /chat\.message/);
   assert.match(source, /showToast/);
   assert.doesNotMatch(source, /writeFile|appendFile|rename|\.opencode\/loops/);
+  assert.match(source, /appendRunEvent/);
 });

@@ -3099,6 +3099,9 @@ function checkMissionRuntimeContract() {
   if (/writeFile|appendFile|rename|\.opencode\/loops/.test(`${observer}\n${plugin}`)) {
     fail("mission runtime observer: must not write durable loop state");
   }
+  if (!plugin.includes("appendRunEvent")) {
+    fail("plugins/mission-runtime.ts: run events must go through appendRunEvent only");
+  }
 }
 
 checkConfig();
