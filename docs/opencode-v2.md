@@ -33,6 +33,12 @@ One repository and one installed payload serve both lines.
 - Commands with `subtask: true` run as background child sessions.
 - OpenCode 2 renames `task` to `subagent` and `bash` to `shell`.
   `opencode/AGENTS.md` maps the names for every agent.
+- The shell export guard checks calls to the `shell` tool, as it checks the
+  `bash` tool on OpenCode 1. It does not hook the OpenCode 2 shell service, so
+  a shell that does not come from the `shell` tool is not checked.
+- One OpenCode 2 server can serve several projects. Task-run session links
+  only record sessions of the plugin's own directory, but the CLI plugin shows
+  mission toasts for every session its server reports.
 
 ## Switching between OpenCode 1 and 2
 
