@@ -23,6 +23,13 @@ const VALID_COMPATIBILITY = {
     stable_tested: "1.18.4",
     canary: "latest",
   },
+  opencode_v2: {
+    status: "experimental",
+    supported_range: ">=2.0.18 <3.0.0",
+    minimum_tested: "2.0.18",
+    canary: "latest",
+    plugin_sdk: "2.0.18",
+  },
   sdk: {
     opencode_plugin: "1.14.41",
     opentui_core: "0.2.5",
@@ -42,6 +49,13 @@ const REVISED_COMPATIBILITY = {
     minimum_tested: "1.15.0",
     stable_tested: "1.19.0",
     canary: "latest",
+  },
+  opencode_v2: {
+    status: "experimental",
+    supported_range: ">=2.0.18 <3.0.0",
+    minimum_tested: "2.0.18",
+    canary: "latest",
+    plugin_sdk: "2.0.18",
   },
   sdk: {
     opencode_plugin: "1.15.0",
@@ -96,8 +110,11 @@ Canonical Node engine: \`${VALID_COMPATIBILITY.node.engines}\`.
 | OpenCode 1.14.41 | tested | minimum boundary in the blocking core smoke |
 | OpenCode 1.18.4 | tested | pinned stable boundary in the blocking core smoke |
 | OpenCode >=1.14.41 <2.0.0 | supported | boundary-tested compatibility promise |
-| OpenCode <1.14.41 or >=2.0.0 | unsupported | requires a reviewed policy change |
+| OpenCode 2.0.18 | tested | minimum OpenCode 2 boundary in the non-blocking OpenCode 2 workflow |
+| OpenCode >=2.0.18 <3.0.0 | experimental | dual-runtime adapters; non-blocking CI; see docs/opencode-v2.md |
+| OpenCode <1.14.41, >=2.0.0 <2.0.18, or >=3.0.0 | unsupported | requires a reviewed policy change |
 | \`@opencode-ai/plugin\` 1.14.41 | tested | exact pin with install, import, and typecheck evidence |
+| \`@opencode/plugin\` 2.0.18 | tested | type-only pin in typecheck/v2; never installed with the harness |
 | OpenTUI core/solid 0.2.5 | tested | exact pins with install, import, and typecheck evidence |
 | Ubuntu GitHub runner | tested | blocking Node 22 and 24 jobs |
 | macOS GitHub runner | tested | blocking Node 24 job; runner details recorded |
@@ -300,6 +317,10 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   writeJson(root, "package.json", ROOT_PACKAGE);
   writeJson(root, "opencode/package.json", PACKAGED_PACKAGE);
   writeJson(root, "opencode/package-lock.json", PACKAGED_LOCK);
+  writeJson(root, "typecheck/v2/package.json", {
+    private: true,
+    devDependencies: { "@opencode/plugin": compatibility.opencode_v2?.plugin_sdk ?? "2.0.18" },
+  });
   writeText(root, "docs/compatibility.md", COMPATIBILITY_MATRIX);
   writeText(root, "README.md", README);
   writeText(root, "docs/installation.md", INSTALLATION);
@@ -354,6 +375,29 @@ test("alternative supported OpenCode range is rejected", (t) => {
   assert.throws(
     () => checkCompatibility(root, { surfaces: false }),
     /supported_range must begin at minimum_tested and end before 2.0.0/,
+  );
+});
+
+for (const [label, mutate, message] of [
+  ["an OpenCode 2 range that skips minimum_tested", (data) => { data.opencode_v2.supported_range = ">=2.0.0 <3.0.0"; }, /opencode_v2.supported_range must begin at minimum_tested and end before 3.0.0/],
+  ["an OpenCode 2 minimum outside 2.x", (data) => { data.opencode_v2.minimum_tested = "1.18.4"; }, /opencode_v2.minimum_tested must be a 2.x release/],
+  ["an unknown OpenCode 2 status", (data) => { data.opencode_v2.status = "stable"; }, /opencode_v2.status must be experimental or supported/],
+  ["a missing OpenCode 2 contract", (data) => { delete data.opencode_v2; }, /compatibility keys must be exactly/],
+]) {
+  test(`OpenCode 2 compatibility rejects ${label}`, (t) => {
+    const data = structuredClone(VALID_COMPATIBILITY);
+    mutate(data);
+    const root = makeFixture(t, data);
+    assertInvalidCompatibility(() => checkCompatibility(root, { surfaces: false }), message);
+  });
+}
+
+test("OpenCode 2 type pin drift names the typecheck workspace", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "typecheck/v2/package.json", { private: true, devDependencies: { "@opencode/plugin": "2.0.19" } });
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /typecheck\/v2\/package\.json @opencode\/plugin must match compatibility\.json opencode_v2\.plugin_sdk/,
   );
 });
 

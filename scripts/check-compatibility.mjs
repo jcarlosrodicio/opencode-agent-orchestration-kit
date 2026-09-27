@@ -9,9 +9,10 @@ import { compareStableVersions, parseStableVersion } from "./version.mjs";
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = path.dirname(path.dirname(SCRIPT_PATH));
 const EXACT_KEYS = {
-  root: ["schema_version", "node", "opencode", "sdk"],
+  root: ["schema_version", "node", "opencode", "opencode_v2", "sdk"],
   node: ["engines", "blocking_majors", "canary_major"],
   opencode: ["supported_range", "minimum_tested", "stable_tested", "canary"],
+  opencode_v2: ["status", "supported_range", "minimum_tested", "canary", "plugin_sdk"],
   sdk: ["opencode_plugin", "opentui_core", "opentui_solid"],
 };
 const STATUS_TERMS = new Set(["tested", "supported", "experimental", "unsupported"]);
@@ -69,8 +70,11 @@ function expectedMatrixStatuses(data) {
     [`OpenCode ${data.opencode.minimum_tested}`, "tested"],
     [`OpenCode ${data.opencode.stable_tested}`, "tested"],
     [`OpenCode ${data.opencode.supported_range}`, "supported"],
-    [`OpenCode <${data.opencode.minimum_tested} or >=2.0.0`, "unsupported"],
+    [`OpenCode ${data.opencode_v2.minimum_tested}`, "tested"],
+    [`OpenCode ${data.opencode_v2.supported_range}`, data.opencode_v2.status],
+    [`OpenCode <${data.opencode.minimum_tested}, >=2.0.0 <${data.opencode_v2.minimum_tested}, or >=3.0.0`, "unsupported"],
     [`@opencode-ai/plugin ${data.sdk.opencode_plugin}`, "tested"],
+    [`@opencode/plugin ${data.opencode_v2.plugin_sdk}`, "tested"],
     [openTuiSurface, "tested"],
     ...STATIC_MATRIX_STATUSES,
   ]);
@@ -142,6 +146,24 @@ function validateCanonicalData(data) {
     throw invalid("supported_range must begin at minimum_tested and end before 2.0.0");
   }
   if (data.opencode.canary !== "latest") throw invalid("opencode.canary must be latest");
+  assertExactKeys(data.opencode_v2, EXACT_KEYS.opencode_v2, "opencode_v2");
+  if (!["experimental", "supported"].includes(data.opencode_v2.status)) {
+    throw invalid("opencode_v2.status must be experimental or supported");
+  }
+  for (const field of ["minimum_tested", "plugin_sdk"]) {
+    try {
+      parseStableVersion(data.opencode_v2[field]);
+    } catch {
+      throw invalid(`opencode_v2.${field} must use MAJOR.MINOR.PATCH`);
+    }
+  }
+  if (parseStableVersion(data.opencode_v2.minimum_tested).major !== 2) {
+    throw invalid("opencode_v2.minimum_tested must be a 2.x release");
+  }
+  if (data.opencode_v2.supported_range !== `>=${data.opencode_v2.minimum_tested} <3.0.0`) {
+    throw invalid("opencode_v2.supported_range must begin at minimum_tested and end before 3.0.0");
+  }
+  if (data.opencode_v2.canary !== "latest") throw invalid("opencode_v2.canary must be latest");
   for (const [field, value] of Object.entries(data.sdk)) {
     try {
       parseStableVersion(value);
@@ -218,6 +240,10 @@ function validatePackages(root, data, fsOps) {
       );
     }
   }
+  const typecheckV2 = readJson(root, "typecheck/v2/package.json", fsOps);
+  if (typecheckV2.devDependencies?.["@opencode/plugin"] !== data.opencode_v2.plugin_sdk) {
+    throw invalid("typecheck/v2/package.json @opencode/plugin must match compatibility.json opencode_v2.plugin_sdk");
+  }
 }
 
 export function extractMarkedSection(text, start, end) {
@@ -289,6 +315,8 @@ function validateDocumentation(root, data, fsOps) {
     data.opencode.supported_range,
     data.opencode.minimum_tested,
     data.opencode.stable_tested,
+    data.opencode_v2.supported_range,
+    data.opencode_v2.minimum_tested,
     ...data.node.blocking_majors.map((major) => `Node.js ${major}`),
     `Node.js ${data.node.canary_major}`,
     "WSL2",

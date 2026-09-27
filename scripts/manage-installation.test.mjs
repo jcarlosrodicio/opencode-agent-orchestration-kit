@@ -220,6 +220,13 @@ function doctorCompatibility(overrides = {}) {
       stable_tested: "1.18.4",
       canary: "latest",
     },
+    opencode_v2: {
+      status: "experimental",
+      supported_range: ">=2.0.18 <3.0.0",
+      minimum_tested: "2.0.18",
+      canary: "latest",
+      plugin_sdk: "2.0.18",
+    },
     sdk: {
       opencode_plugin: "1.14.41",
       opentui_core: "0.2.5",
@@ -369,6 +376,10 @@ test("[D003] doctor diagnostic opencode-version is bounded and sanitized", async
     ["1.14.41", "pass"],
     ["1.14.40", "action-required"],
     ["2.0.0", "action-required"],
+    ["2.0.17", "action-required"],
+    ["2.0.18", "info"],
+    ["2.9.1", "info"],
+    ["3.0.0", "action-required"],
     ["invalid", "action-required"],
   ]) {
     await t.test(version, async (child) => {

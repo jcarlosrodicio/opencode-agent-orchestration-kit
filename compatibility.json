@@ -11,6 +11,13 @@
     "stable_tested": "1.18.4",
     "canary": "latest"
   },
+  "opencode_v2": {
+    "status": "experimental",
+    "supported_range": ">=2.0.18 <3.0.0",
+    "minimum_tested": "2.0.18",
+    "canary": "latest",
+    "plugin_sdk": "2.0.18"
+  },
   "sdk": {
     "opencode_plugin": "1.14.41",
     "opentui_core": "0.2.5",
