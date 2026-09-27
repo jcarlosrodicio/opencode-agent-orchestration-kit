@@ -119,6 +119,18 @@ function writeValidDocumentation(root) {
 
 function writeValidSurfaceFiles(root) {
   fs.mkdirSync(path.join(root, "opencode"), { recursive: true });
+  fs.mkdirSync(path.join(root, "typecheck/v2"), { recursive: true });
+  fs.writeFileSync(path.join(root, "typecheck/v2/package-lock.json"), `${JSON.stringify({
+    lockfileVersion: 3,
+    packages: {
+      "": {},
+      "node_modules/typescript": {
+        version: "5.9.3",
+        resolved: "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+        integrity: "sha512-typescript",
+      },
+    },
+  })}\n`);
   fs.writeFileSync(path.join(root, "opencode/opencode.json"), `${JSON.stringify({})}\n`);
   fs.mkdirSync(path.join(root, ".github/workflows"), { recursive: true });
   fs.writeFileSync(
@@ -676,6 +688,19 @@ for (const [dependency, mutation] of [
     });
   });
 }
+
+test("surface validation rejects a non-registry entry in the OpenCode 2 type workspace lockfile", () => {
+  withSurfaceFixture((root) => {
+    const relative = "typecheck/v2/package-lock.json";
+    const lock = JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
+    lock.packages["node_modules/typescript"].resolved = "https://example.invalid/typescript.tgz";
+    fs.writeFileSync(path.join(root, relative), `${JSON.stringify(lock)}\n`);
+    assert.throws(
+      () => checkSupplyChain(root),
+      /typecheck\/v2\/package-lock\.json node_modules\/typescript must include a canonical npm registry resolved URL/,
+    );
+  });
+});
 
 test("surface validation rejects a lockfile not regenerated to the Babel override", () => {
   withSurfaceFixture((root) => {
