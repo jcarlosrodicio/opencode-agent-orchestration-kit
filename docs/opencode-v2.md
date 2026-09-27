@@ -36,9 +36,12 @@ One repository and one installed payload serve both lines.
 - The shell export guard checks calls to the `shell` tool, as it checks the
   `bash` tool on OpenCode 1. It does not hook the OpenCode 2 shell service, so
   a shell that does not come from the `shell` tool is not checked.
-- One OpenCode 2 server can serve several projects. Task-run session links
-  only record sessions of the plugin's own directory, but the CLI plugin shows
-  mission toasts for every session its server reports.
+- One OpenCode 2 server can serve several projects, and its event stream
+  covers all of them. Task-run session links skip a session once an event
+  places it in another directory; a session whose events carried no location
+  before that can still be linked, for example one created before the plugin
+  subscribed. The CLI plugin shows mission toasts for every session its server
+  reports.
 
 ## Switching between OpenCode 1 and 2
 
@@ -99,31 +102,49 @@ Rules:
   `oak:v1-only` on the line or at the top of the file.
 - Unit-tested behavior lives in `.mjs` files with a sibling `.d.mts`. The
   `.ts` and `.tsx` files stay thin adapters.
-- OpenCode 2 adapters use `import type` only, so the harness ships no OpenCode
-  2 dependency. Their types are checked in `typecheck/v2/` with
-  `npm run typecheck:v2`.
+- The OpenCode 2 core adapters use `import type` only, so the harness ships no
+  OpenCode 2 dependency. The CLI plugin `oak-tui/tui.tsx` imports `solid-js`
+  and the `@opentui/solid` JSX runtime at runtime. They resolve from the
+  shipped `opencode/package.json`, which pins the OpenCode 1 versions today,
+  while `typecheck/v2/` checks the plugin against the OpenCode 2 versions.
+- Types are checked in `typecheck/v2/` with `npm run typecheck:v2`.
 
 ## Retiring OpenCode 1 (checklist)
 
 1. Delete `opencode/runtime/v1/`, `opencode/plugins/token-tree-usage.tsx`,
    `opencode/tui.json` and `opencode/tools/open_design.ts`.
 2. Remove every line marked `oak:v1-only`, and every block between
-   `oak:v1-only — start` and `oak:v1-only — end`: `rg -n "oak:v1-only"`. This drops
-   the `server` keys from the plugin entries, the OpenCode 1 branch in
+   `oak:v1-only — start` and `oak:v1-only — end`: `rg -n "oak:v1-only"`. This
+   drops the `server` keys from the plugin entries, the OpenCode 1 branch in
    `opencode/scripts/session-sources.mjs` and the OpenCode 1 line in the
    doctor.
-3. Remove the `opencode` key from `compatibility.json`. Rename `opencode_v2` to
-   `opencode`, and fold the checker's OpenCode 2 code into the main path.
-4. Drop `@opencode-ai/plugin` and `@opentui/*` 0.2.5 from
-   `opencode/package.json` and the `typecheck` script. Move the `typecheck/v2`
-   pins into the shipped manifest only if a runtime import becomes necessary.
-5. Replace `scripts/opencode-compat-smoke.sh` with
-   `scripts/opencode-v2-smoke.mjs`, and merge `.github/workflows/opencode-v2.yml`
-   into `check.yml` as blocking jobs.
-6. Rewrite the prompts to `subagent` and `shell`, update the pinned tokens in
+3. Remove the `opencode` key from `compatibility.json` and rename
+   `opencode_v2` to `opencode`. Fold the OpenCode 2 code of
+   `scripts/check-compatibility.mjs` into its main path, and point the doctor
+   in `scripts/manage-installation.mjs` (which reads `compatibility.opencode_v2`)
+   and its test fixtures at the renamed key.
+4. In `opencode/package.json`, drop `@opencode-ai/plugin` and move
+   `@opentui/core` and `@opentui/solid` to the pins in `typecheck/v2`: the CLI
+   plugin `oak-tui/tui.tsx` imports them at runtime. Update the `sdk` pins in
+   `compatibility.json`, delete the root `typecheck` script and make
+   `typecheck:v2` the only type check.
+5. Remove the deleted files from the contract checks: the required files and
+   the `tui.json` and `token-tree-usage.tsx` greps in `scripts/check.sh`,
+   `REQUIRED_FILES` in `scripts/check-public-boundary.mjs`, and the shell
+   export guard, Open Design and mission runtime surfaces in
+   `opencode/scripts/check-harness.mjs`.
+6. Retire or port the tests built on OpenCode 1: the OpenCode 1 fixtures in
+   `opencode/scripts/collect-session-evidence.test.mjs`, the 1.x doctor cases,
+   the check-harness tests of the removed surfaces, and the mission runtime
+   tests that read `runtime/v1/mission-runtime.ts`.
+7. Replace `scripts/opencode-compat-smoke.sh` with
+   `scripts/opencode-v2-smoke.mjs`, merge `.github/workflows/opencode-v2.yml`
+   into `check.yml` as blocking jobs, and move the workflow guards in
+   `scripts/check-compatibility.mjs` with them.
+8. Rewrite the prompts to `subagent` and `shell`, update the pinned tokens in
    `opencode/scripts/check-harness.mjs`, and delete the tool-name glossary in
    `opencode/AGENTS.md`.
-7. Convert `opencode.json` and the agent frontmatter to native OpenCode 2 keys
+9. Convert `opencode.json` and the agent frontmatter to native OpenCode 2 keys
    (`agents`, `permissions` arrays, `plugins`) only after OpenCode 1 is gone.
    Never mix OpenCode 1 and OpenCode 2 keys inside one agent file.
 
