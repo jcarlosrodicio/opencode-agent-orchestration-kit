@@ -3,6 +3,8 @@
 Open Design is an optional workbench for editable design projects and generated visual artifacts.
 
 This kit integrates through `opencode/tools/open_design.ts` and `opencode/skills/open-design/SKILL.md`.
+The tool definitions live in `opencode/tools/open-design-tools.mjs`. OpenCode 2
+registers the same `open_design_*` tools from `opencode/plugins/open-design.ts`.
 
 ## OPEN_DESIGN_URL
 

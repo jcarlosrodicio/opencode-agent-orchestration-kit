@@ -3,6 +3,8 @@
 Prerequisites include Node.js `^22.9.0 || ^24.0.0` and npm. See the
 [compatibility matrix](compatibility.md) for supported OpenCode versions,
 platform status, exact integration pins, and evidence.
+OpenCode 2 (`>=2.0.18 <3.0.0`) is supported experimentally; see
+[OpenCode 2 support](opencode-v2.md).
 
 ## Install the published CLI package
 

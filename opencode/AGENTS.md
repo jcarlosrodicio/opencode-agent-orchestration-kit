@@ -109,3 +109,10 @@ To change agents, commands, skills, tools, or global rules:
 
 Real rollback requires git. If the harness is not versioned, do not promise
 automatic rollback.
+
+## Tool names across OpenCode versions
+
+OpenCode 2 renames two tools that these instructions mention: `task` is
+`subagent`, and `bash` is `shell`. Every rule that names the OpenCode 1 tool
+applies to its OpenCode 2 name as well.
+<!-- oak:v1-only: when OpenCode 1 is retired, rewrite the prompts to the OpenCode 2 names and delete this section. -->
