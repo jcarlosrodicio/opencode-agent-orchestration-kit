@@ -49,6 +49,11 @@ opencode/.gitignore
 opencode/package.json
 opencode/package-lock.json
 opencode/plugins/token-tree-usage.tsx
+opencode/plugins/oak-tui/server.ts
+opencode/plugins/oak-tui/tui.tsx
+opencode/runtime/v2/token-usage.mjs
+opencode/runtime/v2/token-usage.d.mts
+opencode/runtime/v2/token-usage.test.mjs
 opencode/plugins/shell-export-guard.ts
 opencode/runtime/v1/shell-export-guard.ts
 opencode/runtime/v2/shell-export-guard.ts
@@ -266,6 +271,9 @@ NODE
 grep -q 'Lead' opencode/plugins/token-tree-usage.tsx
 grep -q 'Subagents' opencode/plugins/token-tree-usage.tsx
 grep -q 'Partial total' opencode/plugins/token-tree-usage.tsx
+grep -q 'sidebar.content' opencode/plugins/oak-tui/tui.tsx
+grep -q 'Subagents' opencode/plugins/oak-tui/tui.tsx
+grep -q 'setup() {}' opencode/plugins/token-tree-usage.tsx
 
 node scripts/check-public-boundary.mjs
 
