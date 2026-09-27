@@ -3005,30 +3005,33 @@ function checkRuntimePermissionPolicy() {
 
 function checkOpenDesignToolContract() {
   const rel = "tools/open_design.ts";
-  if (!exists(rel)) {
-    fail(`${rel}: missing Open Design tool`);
-    return;
+  const sharedRel = "tools/open-design-tools.mjs";
+  const surfaces = [rel, sharedRel, "runtime/v2/open-design.ts", "plugins/open-design.ts"];
+  for (const surface of surfaces) {
+    if (!exists(surface)) fail(`${surface}: missing Open Design tool`);
   }
+  if (!surfaces.every(exists)) return;
 
-  const source = read(rel);
+  const shared = read(sharedRel);
   for (const [label, present] of [
-    ["base URL environment", source.includes("OPEN_DESIGN_URL")],
-    ["base URL argument", source.includes("baseUrl: tool.schema.string().optional()")],
-    ["trailing slash normalization", source.includes('raw.replace(/\\/+$/, "")')],
-    ["project-path guard", source.includes("projects(?:\\/|$)")],
+    ["base URL environment", shared.includes("OPEN_DESIGN_URL")],
+    ["base URL argument", shared.includes('baseUrl: "optional"')],
+    ["trailing slash normalization", shared.includes('raw.replace(/\\/+$/, "")')],
+    ["project-path guard", shared.includes("projects(?:\\/|$)")],
   ]) {
-    if (!present) fail(`${rel}: missing Open Design ${label}`);
+    if (!present) fail(`${sharedRel}: missing Open Design ${label}`);
   }
 
+  const source = `${read(rel)}\n${shared}`;
   if (/randomUUID|node:crypto/.test(source)) {
-    fail(`${rel}: Open Design tool must not depend on randomUUID or node:crypto`);
+    fail(`${sharedRel}: Open Design tool must not depend on randomUUID or node:crypto`);
   }
   const privateHostMarker = ["juancan", "as"].join("");
   const nasVendorMarker = ["syn", "ology"].join("");
   const usersPath = ["/", "Users", "/"].join("");
   const homePath = ["/", "home", "/"].join("");
   if (new RegExp(`${privateHostMarker}|${nasVendorMarker}|${usersPath}|${homePath}`, "i").test(source)) {
-    fail(`${rel}: Open Design tool contains a private endpoint or local path`);
+    fail(`${sharedRel}: Open Design tool contains a private endpoint or local path`);
   }
 }
 

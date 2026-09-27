@@ -38,7 +38,7 @@ test("Open Design exposes bounded HTTP and SSE transport helpers", () => {
 });
 
 test("the Open Design tool delegates network reads to the bounded transport", () => {
-  const source = fs.readFileSync(path.join(ROOT, "opencode/tools/open_design.ts"), "utf8");
+  const source = fs.readFileSync(path.join(ROOT, "opencode/tools/open-design-tools.mjs"), "utf8");
   assert.match(source, /from ["']\.\/open-design-http\.mjs["']/);
   assert.doesNotMatch(source, /await fetch\(/);
   assert.doesNotMatch(source, /await res\.text\(/);

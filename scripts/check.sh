@@ -62,6 +62,11 @@ opencode/plugins/mission-runtime.ts
 opencode/plugins/mission-runtime.test.mjs
 opencode/tools/open_design.ts
 opencode/tools/open-design-http.mjs
+opencode/tools/open-design-tools.mjs
+opencode/tools/open-design-tools.d.mts
+opencode/runtime/v2/open-design.ts
+opencode/plugins/open-design.ts
+scripts/open-design-tools.test.mjs
 opencode/tools/open-design-http.d.mts
 opencode/scripts/check-harness.mjs
 opencode/scripts/mission-runtime-observer.mjs
@@ -223,10 +228,10 @@ grep -q 'evaluator' opencode/commands/evolve.md
 grep -q 'debugger' opencode/commands/evolve.md
 grep -q 'evolver' opencode/commands/evolve.md
 
-grep -q 'OPEN_DESIGN_URL' opencode/tools/open_design.ts
-grep -q 'baseUrl: tool.schema.string().optional()' opencode/tools/open_design.ts
-! grep -q 'randomUUID' opencode/tools/open_design.ts
-! grep -q 'from "node:crypto"' opencode/tools/open_design.ts
+grep -q 'OPEN_DESIGN_URL' opencode/tools/open-design-tools.mjs
+grep -q 'baseUrl: "optional"' opencode/tools/open-design-tools.mjs
+! grep -q 'randomUUID' opencode/tools/open-design-tools.mjs opencode/tools/open_design.ts
+! grep -q 'from "node:crypto"' opencode/tools/open-design-tools.mjs opencode/tools/open_design.ts
 
 node <<'NODE'
 const fs = require('fs')

@@ -176,23 +176,23 @@ for (const [label, mutate, diagnostic] of [
       'if (/\\/projects(?:\\/|$)/.test(url)) {',
       "if (false) {",
     ),
-    /tools\/open_design\.ts: missing Open Design project-path guard/,
+    /tools\/open-design-tools\.mjs: missing Open Design project-path guard/,
   ],
   [
     "using randomUUID",
     (source) => `${source}\nconst randomUUID = true\n`,
-    /tools\/open_design\.ts: Open Design tool must not depend on randomUUID/,
+    /tools\/open-design-tools\.mjs: Open Design tool must not depend on randomUUID/,
   ],
   [
     "containing a private endpoint",
     (source) => `${source}\nconst endpoint = "https://private.synology.example"\n`,
-    /tools\/open_design\.ts: Open Design tool contains a private endpoint or local path/,
+    /tools\/open-design-tools\.mjs: Open Design tool contains a private endpoint or local path/,
   ],
 ]) {
   test(`Open Design contract rejects ${label}`, () => {
     const cwd = makeFixture();
     try {
-      const rel = "tools/open_design.ts";
+      const rel = "tools/open-design-tools.mjs";
       const source = fs.readFileSync(path.join(cwd, rel), "utf8");
       write(rel, mutate(source), cwd);
 
