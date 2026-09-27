@@ -63,5 +63,7 @@ Use these sections:
 - **Verification**: the commands actually run, and what was not covered.
 - **Risk**: what could break, and how to roll it back.
 
-Link task artifacts and reports instead of copying them into the body. Write the
+Refer to task artifacts and reports by their full repository path in
+backticks instead of copying them into the body; relative Markdown links do not
+resolve in a pull-request body. Write the
 body to a file and pass it to `oak deliver`.

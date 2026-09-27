@@ -31,11 +31,12 @@ export const MissionRuntimePlugin: Plugin = async ({ client, directory }) => {
 
   // Link each session to the open task run, if any. Best effort: it must never
   // affect the session itself.
+  // A session is marked as recorded only once an event was written, so a
+  // session that started before the run opened is still linked later.
   function recordSession(info: { id: string; parentID?: string }) {
     if (recordedSessions.has(info.id)) return
-    recordedSessions.add(info.id)
     try {
-      appendRunEvent({
+      const recorded = appendRunEvent({
         root: directory,
         type: "agent_session",
         fields: {
@@ -45,6 +46,7 @@ export const MissionRuntimePlugin: Plugin = async ({ client, directory }) => {
           runtime: "opencode",
         },
       })
+      if (recorded) recordedSessions.add(info.id)
     } catch {
       // Recording is best effort and must never affect the session.
     }
@@ -60,6 +62,9 @@ export const MissionRuntimePlugin: Plugin = async ({ client, directory }) => {
     event: async ({ event }) => {
       if (event.type === "session.created" && event.properties.info?.id) {
         recordSession(event.properties.info)
+      } else {
+        const sessionID = (event.properties as { sessionID?: unknown } | undefined)?.sessionID
+        if (typeof sessionID === "string" && sessionID) recordSession({ id: sessionID })
       }
       await observer.observe(event)
     },

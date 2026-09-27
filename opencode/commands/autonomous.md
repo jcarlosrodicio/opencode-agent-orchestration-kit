@@ -64,7 +64,10 @@ oak run start --root . --slug <slug>
 oak state init --root . --slug <slug> --contract .opencode/loops/<slug>.md --git-baseline <BASE> --session-id <RUN> --action-id init-1 --planned-iterations <1-6>
 oak state resume --root . --slug <slug> --contract .opencode/loops/<slug>.md --session-id <RUN> --action-id resume-1
 # after each iteration <n>:
+oak run event --root . --type runtime_verification surface=<none|command|endpoint|store|screen> verdict=<verdict> evidence_count=<n>
 oak state record --root . --slug <slug> --session-id <RUN> --action-id iteration-<n> --iteration <n> --completed-step <step> --blocking-cause null
+# after each review, with the counts the reviewer returned:
+oak run event --root . --type review review=adversarial files_in_change=<n> files_reviewed=<n> files_skipped=<n> blocking=<n> should_fix=<n> nit=<n> verdict=<safe_to_commit|not_safe_to_commit>
 # after the final reviewer approval:
 oak state attest-review --root . --slug <slug> --reviewer-session-id <reviewer child session id> --reviewer-agent reviewer --reviewer-verdict APPROVE
 oak state record --root . --slug <slug> --session-id <RUN> --action-id completed --iteration <n> --completed-step reviewer_approved --blocking-cause null --status completed
@@ -97,11 +100,15 @@ never delete or recreate the branch, to recover: that is stop reason 5.
    The pull-request
    body follows What / Why / How / Verification / Risk, and also:
    - says on its first line that the run was unsupervised;
-   - links `autonomy.md` and `run-summary.json`;
+   - names `autonomy.md`, `adversarial-review.md` and `run-summary.json` by
+     their full repository path in backticks (relative Markdown links do not
+     resolve in a pull-request body);
    - lists every decision taken without asking.
 7. **CI.** Poll `oak deliver checks --root . --pr <n>`. Classify every failing
    job with the failure classification in `debugging-and-error-recovery`,
-   quoting the log line that decides it:
+   quoting the line that decides it; a failing check carries it in `reason`
+   when GitHub reports one. A job that never started (billing, quota or
+   runner availability) is stop reason 3, not a flake:
    - caused by this change: fix it as a correction reviewed by `task reviewer`,
      commit it, and deliver again with the same `oak deliver pr --root .`
      command, which updates the open pull request; at most two attempts per
