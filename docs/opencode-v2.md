@@ -42,8 +42,9 @@ One repository and one installed payload serve both lines.
   imports the OpenCode 1 sessions and leaves the OpenCode 1 tables in place.
   OpenCode 1 cannot open a database that OpenCode 2 created from scratch; it
   fails with `Database is not empty and has no session table`.
-- Run `oak doctor` after switching. It reports `info` for `opencode-version` on
-  an OpenCode 2 release inside the supported range.
+- Run `oak doctor` after switching. On an OpenCode 2 release inside the
+  supported range it reports `info` for `opencode-version` and
+  `compatibility`.
 - To try OpenCode 2 without touching your setup, isolate it: point
   `OPENCODE_CONFIG_DIR` and the XDG directories (`XDG_CONFIG_HOME`,
   `XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME`) at temporary

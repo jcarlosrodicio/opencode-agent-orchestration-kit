@@ -1785,7 +1785,9 @@ export function createInstallationManager(options) {
           "install OpenCode or correct PATH",
         );
       } else {
-        const parsed = parseRuntimeVersion(String(observed.stdout ?? "").split(/\r?\n/, 1)[0], "OpenCode");
+        // OpenCode 2 prefixes its version with `opencode v`; OpenCode 1 prints it bare.
+        const banner = String(observed.stdout ?? "").split(/\r?\n/, 1)[0].trim().replace(/^opencode\s+/, "");
+        const parsed = parseRuntimeVersion(banner, "OpenCode");
         const line = opencodeCompatibilityLine(parsed.canonical, compatibility);
         opencodeCheck = line === "v1"
           ? doctorCheck("opencode-version", "pass", `OpenCode ${parsed.canonical} is supported`)
@@ -1824,9 +1826,11 @@ export function createInstallationManager(options) {
         ownership.executables,
         registry,
         nodeCheck.status === "pass"
-          && opencodeCheck.status === "pass"
+          && ["pass", "info"].includes(opencodeCheck.status)
           && dependencies.status !== "action-required"
-          ? doctorCheck("compatibility", "pass", "runtime compatibility is satisfied")
+          ? opencodeCheck.status === "pass"
+            ? doctorCheck("compatibility", "pass", "runtime compatibility is satisfied")
+            : doctorCheck("compatibility", "info", "runtime compatibility is experimental")
           : doctorCheck(
             "compatibility",
             "action-required",
