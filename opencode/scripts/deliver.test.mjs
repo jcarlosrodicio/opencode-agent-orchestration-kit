@@ -27,12 +27,13 @@ function fakeRunner(overrides = {}) {
     "git status": "",
     "git rev-list": "2",
     "git push": "",
-    "gh pr": "https://github.com/example/repo/pull/7",
+    "gh pr create": "https://github.com/example/repo/pull/7",
     ...overrides,
   };
   const runner = (command, args) => {
     calls.push([command, args]);
-    const reply = replies[`${command} ${args[0]}`];
+    const key = command === "gh" ? `${command} ${args[0]} ${args[1]}` : `${command} ${args[0]}`;
+    const reply = replies[key];
     return reply === undefined ? { status: 1, stdout: "", stderr: "unexpected" } : { status: 0, stdout: `${reply}\n`, stderr: "" };
   };
   return { runner, calls };
@@ -80,7 +81,7 @@ test("pushes without force and opens the PR against the default branch", (t) => 
   const result = deliver({ root, slug: "task", title: "Add x", bodyFile: "pr-body.md", runner: fake.runner });
   assert.deepEqual(result, { branch: "feat/x", base: "main", pr_url: "https://github.com/example/repo/pull/7" });
   assert.deepEqual(fake.calls.find(([command, args]) => command === "git" && args[0] === "push"), ["git", ["push", "--set-upstream", "origin", "feat/x"]]);
-  const pr = fake.calls.find(([command]) => command === "gh");
+  const pr = fake.calls.find(([command, args]) => command === "gh" && args[1] === "create");
   assert.deepEqual(pr[1].slice(0, 8), ["pr", "create", "--base", "main", "--head", "feat/x", "--title", "Add x"]);
   const flat = fake.calls.flatMap(([command, args]) => [command, ...args]);
   for (const forbidden of ["--force", "--force-with-lease", "merge", "--auto"]) assert.equal(flat.includes(forbidden), false, forbidden);
@@ -118,3 +119,14 @@ test("refuses a malformed attestation file", (t) => {
 });
 
 test("refuses a missing body file", (t) => refusal(t, "unsafe_body", { input: { bodyFile: "missing.md" } }));
+
+test("a second delivery pushes to the existing pull request instead of opening another", (t) => {
+  const root = completedLoop();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const fake = fakeRunner({ "gh pr view": "https://github.com/example/repo/pull/7" });
+  const result = deliver({ root, slug: "task", title: "Add x", bodyFile: "pr-body.md", runner: fake.runner });
+  assert.equal(result.pr_url, "https://github.com/example/repo/pull/7");
+  assert.equal(fake.calls.some(([command, args]) => command === "gh" && args[1] === "create"), false);
+  assert.deepEqual(fake.calls.find(([command, args]) => command === "gh" && args[1] === "view")[1], ["pr", "view", "feat/x", "--json", "url", "--jq", ".url"]);
+  assert.ok(fake.calls.some(([command, args]) => command === "git" && args[0] === "push"));
+});

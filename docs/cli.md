@@ -150,8 +150,9 @@ oak deliver checks --root /path/to/project --pr 7
    and the title has 1-200 characters.
 
 It then runs `git push --set-upstream origin <branch>`, never forced, and
-`gh pr create` against the default branch, and records a `delivery` event
-when a task run is open. `checks` returns `gh pr checks` as JSON and treats
+`gh pr create` against the default branch, or reuses the branch's open pull
+request when a later delivery (such as a CI fix) finds one. It records a
+`delivery` event when a task run is open. `checks` returns `gh pr checks` as JSON and treats
 the pending exit status 8 as success.
 
 There is no merge, auto-merge, release, or deploy action, by design.

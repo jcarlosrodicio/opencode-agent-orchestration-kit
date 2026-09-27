@@ -79,9 +79,13 @@ export function deliver({ root, slug, title, bodyFile, runner = defaultRunner })
   if (typeof title !== "string" || title.length === 0 || title.length > 200) fail("unsafe_body", "title must be 1-200 characters");
 
   run(runner, resolved, "git", ["push", "--set-upstream", "origin", branch]);
-  const prUrl = run(runner, resolved, "gh", ["pr", "create", "--base", base, "--head", branch, "--title", title, "--body-file", body]);
+  // A later delivery (for example a CI fix) updates the pull request it opened.
+  const existing = runner("gh", ["pr", "view", branch, "--json", "url", "--jq", ".url"], resolved);
+  const existingUrl = existing.status === 0 ? String(existing.stdout ?? "").trim() : "";
+  const prUrl = existingUrl
+    || run(runner, resolved, "gh", ["pr", "create", "--base", base, "--head", branch, "--title", title, "--body-file", body]);
   try {
-    appendRunEvent({ root: resolved, type: "delivery", fields: { branch, base, outcome: "pr_opened" } });
+    appendRunEvent({ root: resolved, type: "delivery", fields: { branch, base, outcome: existingUrl ? "pr_updated" : "pr_opened" } });
   } catch {
     // The run context is optional; delivery never fails because of it.
   }
