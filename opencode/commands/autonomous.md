@@ -46,29 +46,51 @@ The run ends at an open pull request with its CI classified. Never merge.
 Write the Task Contract to `.opencode/loops/<slug>.md`. Before starting, `lead`
 sets a task-specific planned iteration budget from 1 to 6; six remains a hard
 safety ceiling, not a consumption target. If state does not exist, initialize
-it with `oak state init --root . --planned-iterations <1-6>`; otherwise inspect
-and resume it. Never delete or reinitialize existing state. An explicit schema
+it with the `oak state init --root .` command below; otherwise inspect and
+resume it. Never delete or reinitialize existing state. An explicit schema
 migration requires renewed human approval before `oak state resume`; do not
 reuse earlier approval.
+
+## State commands
+
+Run these exactly, in this order. `<RUN>` is the `run_id` that
+`oak run start` prints; use it as the loop's `--session-id` everywhere, so the
+lease taken by `resume` matches every later `record`. `<BASE>` is the output
+of `git rev-parse HEAD` right after branching.
+
+```bash
+git switch -c <type>/<slug>
+oak run start --root . --slug <slug>
+oak state init --root . --slug <slug> --contract .opencode/loops/<slug>.md --git-baseline <BASE> --session-id <RUN> --action-id init-1 --planned-iterations <1-6>
+oak state resume --root . --slug <slug> --contract .opencode/loops/<slug>.md --session-id <RUN> --action-id resume-1
+# after each iteration <n>:
+oak state record --root . --slug <slug> --session-id <RUN> --action-id iteration-<n> --iteration <n> --completed-step <step> --blocking-cause null
+# after the final reviewer approval:
+oak state attest-review --root . --slug <slug> --reviewer-session-id <reviewer child session id> --reviewer-agent reviewer --reviewer-verdict APPROVE
+oak state record --root . --slug <slug> --session-id <RUN> --action-id completed --iteration <n> --completed-step reviewer_approved --blocking-cause null --status completed
+oak state release --root . --slug <slug> --session-id <RUN> --action-id release
+oak run close --root . --output docs/ai/runs/<date>-<slug>/run-summary.json
+```
+
+If one of these commands fails, read its error code and fix the argument it
+names. Never delete, move or edit anything under `.opencode/` or `.git/`, and
+never delete or recreate the branch, to recover: that is stop reason 5.
 
 ## Stages
 
 1. **Enrich.** Run `enrich-task` on the objective. Sort each open question into
    Decided (answered by the roadmap, docs or code, and logged) or Blocking (it
    matches a stop reason below).
-2. **Branch.** `developer` runs `git switch -c <type>/<slug>` from an
-   up-to-date base and never works on the default branch. Then
-   `oak run start --root . --slug <slug>` opens the task run. Subagents join
-   this run; they never start their own.
+2. **Branch.** `developer` runs the first four state commands: it branches from
+   an up-to-date base (never working on the default branch), opens the task run,
+   and initializes and resumes the loop. Subagents join this run; they never
+   start their own.
 3. **Plan.** Review the plan against the objective, the non-goals and the Task
    Contract, and record that self-review in the autonomy log.
 4. **Cycle.** Run the cycle below within the planned iteration budget.
-5. **Close.** After the reviewer's approval, the state-sync step runs, with the
-   reviewer child session's real id:
-   - `oak state attest-review --root . --slug <slug> --reviewer-session-id <id> --reviewer-agent reviewer --reviewer-verdict APPROVE`;
-   - `oak state record --root . --slug <slug> --status completed` with the
-     session, action and iteration flags of the loop;
-   - `oak run close --root . --output docs/ai/runs/<date>-<slug>/run-summary.json`.
+5. **Close.** After the reviewer's approval, the state-sync step runs the last
+   four state commands above: `attest-review` with the reviewer child session's
+   real id, `record --status completed`, `release`, and `oak run close`.
 6. **Deliver.** `developer` makes atomic commits with `commit` (explicit paths,
    hooks never bypassed) and runs
    `oak deliver pr --root . --slug <slug> --title "<type>: <summary>" --body-file <file>`.
@@ -180,7 +202,8 @@ No secrets and no machine paths.
 ## Hard limits
 
 - Never bypass hooks or weaken a failing test.
-- Never hand-write run events or edit `.opencode/runs` directly.
+- Never hand-write run events or edit `.opencode/runs` directly, and never
+  delete or edit `.opencode/` or `.git/` contents to recover from an error.
 - Never push to the default branch, force-push, merge, or enable auto-merge.
 - Never deploy, publish, run production migrations, or touch credentials or CI
   variables. Never write a real `.env`.

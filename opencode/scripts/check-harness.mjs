@@ -3070,6 +3070,10 @@ const DEVELOPER_GIT_DENIES = [
   "git reset --hard*",
   "git -C *",
   "git -c *",
+  "rm *.opencode*",
+  "git branch -d*",
+  "git branch -D*",
+  "git branch --delete*",
 ];
 const DEVELOPER_GIT_ALLOWS = [
   ["git add ", "git add *"],

@@ -64,6 +64,10 @@ permission:
     "git reset --hard*": deny
     "git -C *": deny
     "git -c *": deny
+    "rm *.opencode*": deny
+    "git branch -d*": deny
+    "git branch -D*": deny
+    "git branch --delete*": deny
   webfetch: ask
   websearch: ask
   todowrite: allow
