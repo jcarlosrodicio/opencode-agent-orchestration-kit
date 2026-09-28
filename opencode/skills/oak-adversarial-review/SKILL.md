@@ -1,5 +1,5 @@
 ---
-name: adversarial-review
+name: oak-adversarial-review
 description: Use for every final review of a diff - an independent pass that assumes the change is wrong, accounts for every changed file, attacks it along fixed dimensions, fact-checks its own findings and ends in an explicit verdict. Use also when the user asks for a red-team or devil's-advocate review.
 phase: review
 domains:
@@ -111,7 +111,7 @@ result.
 
 Return the full report in the review output under the heading
 `Adversarial coverage`. The reviewer is read-only, so the workflow's state-sync
-step copies it verbatim to `docs/ai/runs/<YYYY-MM-DD>-<slug>/adversarial-review.md`
+step copies it verbatim to `docs/ai/runs/<YYYY-MM-DD>-<slug>/oak-adversarial-review.md`
 when a run folder exists. Never leave the report only in the session.
 
 ## Mapping to OAK verdicts

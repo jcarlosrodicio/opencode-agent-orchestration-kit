@@ -1,29 +1,7 @@
 {
-  "generated_at": "2026-09-27T09:56:11Z",
+  "generated_at": "2026-09-28T06:46:20Z",
   "schema_version": 2,
   "skills": [
-    {
-      "name": "adversarial-review",
-      "source": "built-in",
-      "phase": "review",
-      "domains": [
-        "review",
-        "security",
-        "testing"
-      ],
-      "stacks": [
-        "any"
-      ],
-      "allowed_agents": [
-        "reviewer"
-      ],
-      "surfaces": [],
-      "skill_source": "built-in",
-      "status": "active",
-      "description": "Use for every final review of a diff - an independent pass that assumes the change is wrong, accounts for every changed file, attacks it along fixed dimensions, fact-checks its own findings and ends in an explicit verdict. Use also when the user asks for a red-team or devil's-advocate review.",
-      "load_path": "skills/adversarial-review/SKILL.md",
-      "origin": null
-    },
     {
       "name": "api-and-interface-design",
       "source": "built-in",
@@ -133,26 +111,6 @@
       "status": "active",
       "description": "Simplifies code for clarity. Use when refactoring code for clarity without changing behavior. Use when code works but is harder to read, maintain, or extend than it should be. Use when reviewing code that has accumulated unnecessary complexity.",
       "load_path": "skills/code-simplification/SKILL.md",
-      "origin": null
-    },
-    {
-      "name": "commit",
-      "source": "built-in",
-      "phase": "ship",
-      "domains": [
-        "release"
-      ],
-      "stacks": [
-        "any"
-      ],
-      "allowed_agents": [
-        "developer"
-      ],
-      "surfaces": [],
-      "skill_source": "built-in",
-      "status": "active",
-      "description": "Use when the user asks to commit or open a pull request, or when /autonomous reaches delivery - produces atomic commits that stage explicit paths only, with messages and a pull-request body written from the actual diff.",
-      "load_path": "skills/commit/SKILL.md",
       "origin": null
     },
     {
@@ -266,29 +224,6 @@
       "origin": "addyosmani/agent-skills"
     },
     {
-      "name": "enrich-task",
-      "source": "built-in",
-      "phase": "define",
-      "domains": [
-        "specification",
-        "research"
-      ],
-      "stacks": [
-        "any"
-      ],
-      "allowed_agents": [
-        "lead",
-        "scoper",
-        "specifier"
-      ],
-      "surfaces": [],
-      "skill_source": "built-in",
-      "status": "active",
-      "description": "Use before specifying any feature, fix or refactor that arrives as a short request, roadmap line, screenshot or one-paragraph idea - turns it into an implementable specification with scope, reuse, requirements, acceptance criteria, hostile test cases and the open questions the request leaves ambiguous.",
-      "load_path": "skills/enrich-task/SKILL.md",
-      "origin": null
-    },
-    {
       "name": "iterative-retrieval",
       "source": "built-in",
       "phase": "operate",
@@ -315,6 +250,112 @@
       "description": "Pattern for progressively refining context retrieval to solve the subagent context problem. Use when spawning subagents that need codebase context they cannot predict upfront, or when building multi-agent workflows where context is progressively refined.",
       "load_path": "skills/iterative-retrieval/SKILL.md",
       "origin": "affaan-m/ecc"
+    },
+    {
+      "name": "oak-adversarial-review",
+      "source": "built-in",
+      "phase": "review",
+      "domains": [
+        "review",
+        "security",
+        "testing"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "reviewer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use for every final review of a diff - an independent pass that assumes the change is wrong, accounts for every changed file, attacks it along fixed dimensions, fact-checks its own findings and ends in an explicit verdict. Use also when the user asks for a red-team or devil's-advocate review.",
+      "load_path": "skills/oak-adversarial-review/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "oak-commit",
+      "source": "built-in",
+      "phase": "ship",
+      "domains": [
+        "release"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use when the user asks to commit or open a pull request, or when /autonomous reaches delivery - produces atomic commits that stage explicit paths only, with messages and a pull-request body written from the actual diff.",
+      "load_path": "skills/oak-commit/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "oak-enrich-task",
+      "source": "built-in",
+      "phase": "define",
+      "domains": [
+        "specification",
+        "research"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "lead",
+        "scoper",
+        "specifier"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use before specifying any feature, fix or refactor that arrives as a short request, roadmap line, screenshot or one-paragraph idea - turns it into an implementable specification with scope, reuse, requirements, acceptance criteria, hostile test cases and the open questions the request leaves ambiguous.",
+      "load_path": "skills/oak-enrich-task/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "oak-runtime-verification",
+      "source": "built-in",
+      "phase": "verify",
+      "domains": [
+        "testing",
+        "evaluation"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use after tests and validation pass and before the final review, whenever a change could show up at runtime - a screen, a command, an endpoint, a job or a data store - to prove the change works in the running system, including its failure path, with repeatable steps and minimal evidence.",
+      "load_path": "skills/oak-runtime-verification/SKILL.md",
+      "origin": null
+    },
+    {
+      "name": "oak-update-docs",
+      "source": "built-in",
+      "phase": "ship",
+      "domains": [
+        "documentation"
+      ],
+      "stacks": [
+        "any"
+      ],
+      "allowed_agents": [
+        "developer"
+      ],
+      "surfaces": [],
+      "skill_source": "built-in",
+      "status": "active",
+      "description": "Use as the last step of any change that altered behavior, contracts, schema, architecture, setup or a roadmap item, before committing - updates the documentation the repository treats as its source of truth so the next session starts from accurate context.",
+      "load_path": "skills/oak-update-docs/SKILL.md",
+      "origin": null
     },
     {
       "name": "open-design",
@@ -364,27 +405,6 @@
       "status": "active",
       "description": "Optimizes application performance. Use when performance requirements exist, when you suspect performance regressions, or when Core Web Vitals or load times need improvement. Use when profiling reveals bottlenecks that need fixing.",
       "load_path": "skills/performance-optimization/SKILL.md",
-      "origin": null
-    },
-    {
-      "name": "runtime-verification",
-      "source": "built-in",
-      "phase": "verify",
-      "domains": [
-        "testing",
-        "evaluation"
-      ],
-      "stacks": [
-        "any"
-      ],
-      "allowed_agents": [
-        "developer"
-      ],
-      "surfaces": [],
-      "skill_source": "built-in",
-      "status": "active",
-      "description": "Use after tests and validation pass and before the final review, whenever a change could show up at runtime - a screen, a command, an endpoint, a job or a data store - to prove the change works in the running system, including its failure path, with repeatable steps and minimal evidence.",
-      "load_path": "skills/runtime-verification/SKILL.md",
       "origin": null
     },
     {
@@ -468,26 +488,6 @@
       "status": "active",
       "description": "Drives development with tests. Use when implementing any logic, fixing any bug, or changing any behavior. Use when you need to prove that code works, when a bug report arrives, or when you're about to modify existing functionality.",
       "load_path": "skills/test-driven-development/SKILL.md",
-      "origin": null
-    },
-    {
-      "name": "update-docs",
-      "source": "built-in",
-      "phase": "ship",
-      "domains": [
-        "documentation"
-      ],
-      "stacks": [
-        "any"
-      ],
-      "allowed_agents": [
-        "developer"
-      ],
-      "surfaces": [],
-      "skill_source": "built-in",
-      "status": "active",
-      "description": "Use as the last step of any change that altered behavior, contracts, schema, architecture, setup or a roadmap item, before committing - updates the documentation the repository treats as its source of truth so the next session starts from accurate context.",
-      "load_path": "skills/update-docs/SKILL.md",
       "origin": null
     },
     {

@@ -1,5 +1,5 @@
 ---
-name: update-docs
+name: oak-update-docs
 description: Use as the last step of any change that altered behavior, contracts, schema, architecture, setup or a roadmap item, before committing - updates the documentation the repository treats as its source of truth so the next session starts from accurate context.
 phase: ship
 domains:
