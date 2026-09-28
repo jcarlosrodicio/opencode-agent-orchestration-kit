@@ -103,8 +103,13 @@ git diff --check
 test -z "$(git status --porcelain)"
 TAG="$(git describe --tags --exact-match)"
 node scripts/version.mjs --check-tag "$TAG"
-npm publish "dist/opencode-agent-orchestration-kit-${VERSION}.tgz"
+npm publish "./dist/opencode-agent-orchestration-kit-${VERSION}.tgz"
 ```
+
+Keep the leading `./`: npm reads `dist/<name>.tgz` as a GitHub `owner/repo`
+shorthand and fails with a git error. With two-factor authentication, npm asks
+the maintainer for a one-time password or a browser confirmation; publication
+stays a human step.
 
 The Node checksum command is canonical on macOS and Linux; neither `shasum`
 nor `sha256sum` is required. `dist/` is ignored, so its artifacts do not make
