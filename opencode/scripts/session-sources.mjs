@@ -21,21 +21,21 @@ export function pickSessionSchemas(rows) {
   return schemas;
 }
 
-export function sessionQueries(schema, { fullRescan, cutoffFilter }) {
+// summarizeSqlite reads only message roles and text parts. Tool output makes up
+// most of a real database, so the queries never load message data or other parts.
+export function sessionQueries(schema, { cutoffFilter }) {
   // oak:v1-only — start
   if (schema === "v1") {
     return {
       sessions: `select ${SESSION_COLUMNS} from session order by time_updated desc, id desc;`,
-      messages: fullRescan
-        ? "select id, session_id, time_created, time_updated, data from message order by session_id, time_created, id;"
-        : `select id, session_id, time_created, time_updated, json_extract(data, '$.role') as role from message where 1=1 ${cutoffFilter} order by session_id, time_created, id;`,
-      parts: `select id, message_id, session_id, time_created, time_updated, data from part where 1=1 ${cutoffFilter} order by session_id, time_created, id;`,
+      messages: `select id, session_id, time_created, time_updated, json_extract(data, '$.role') as role from message where 1=1 ${cutoffFilter} order by session_id, time_created, id;`,
+      parts: `select id, message_id, session_id, time_created, time_updated, data from part where json_extract(data, '$.type') = 'text' ${cutoffFilter} order by session_id, time_created, id;`,
     };
   }
   // oak:v1-only — end
   return {
     sessions: `select ${SESSION_COLUMNS} from session_v2 order by time_updated desc, id desc;`,
-    messages: `select id, session_id, time_created, time_updated, type as role${fullRescan ? ", data" : ""} from session_message where type in ('user', 'assistant') ${cutoffFilter} order by session_id, time_created, id;`,
+    messages: `select id, session_id, time_created, time_updated, type as role from session_message where type in ('user', 'assistant') ${cutoffFilter} order by session_id, time_created, id;`,
     parts: `
       select id, id as message_id, session_id, time_created, time_updated,
         json_object('type', 'text', 'text', json_extract(data, '$.text')) as data

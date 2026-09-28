@@ -331,7 +331,7 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
 
   const schemas = pickSessionSchemas(await streamSqliteJson(dbPath, SESSION_TABLES_SQL, 300_000)).map((schema) => ({
     schema,
-    queries: sessionQueries(schema, { fullRescan, cutoffFilter }),
+    queries: sessionQueries(schema, { cutoffFilter }),
   }));
 
   // Session query: always full (lightweight, needed for parent resolution)
@@ -361,7 +361,7 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
     // Apply time cutoff when not in full-rescan mode
     for (const row of await streamSqliteJson(dbPath, queries.messages, 300_000)) if (owned(row)) messages.push(row);
 
-    // Part query: need full data for text extraction, but apply time cutoff to reduce rows scanned
+    // Part query: text parts only, with the time cutoff when not in full-rescan mode
     for (const row of await streamSqliteJson(dbPath, queries.parts, 300_000)) if (owned(row)) parts.push(row);
   }
 
@@ -401,10 +401,8 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
     const userMessages = [];
     const assistantMessages = [];
     for (const message of sessionMessages) {
-      // In incremental mode, role is extracted directly from SQL; in full-rescan, parse from data JSON.
-      // Cache parseJson(message.data) to avoid parsing twice when message.role is falsy (m2).
-      const parsedData = parseJson(message.data);
-      const role = message.role || (parsedData.ok ? parsedData.value?.role : null);
+      // The message query extracts the role in SQL.
+      const role = message.role;
       if (role === "user") userMessages.push(message);
       if (role === "assistant") assistantMessages.push(message);
     }
