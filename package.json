@@ -1,6 +1,6 @@
 {
   "name": "opencode-agent-orchestration-kit",
-  "version": "1.0.45",
+  "version": "1.1.0",
   "private": false,
   "description": "Open-source multi-agent orchestration harness for OpenCode with specialized agents, durable workflows, review gates, and reproducible software-engineering processes.",
   "keywords": [
