@@ -1,5 +1,5 @@
 ---
-name: enrich-task
+name: oak-enrich-task
 description: Use before specifying any feature, fix or refactor that arrives as a short request, roadmap line, screenshot or one-paragraph idea - turns it into an implementable specification with scope, reuse, requirements, acceptance criteria, hostile test cases and the open questions the request leaves ambiguous.
 phase: define
 domains:

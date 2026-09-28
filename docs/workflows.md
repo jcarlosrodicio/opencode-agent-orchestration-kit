@@ -36,18 +36,18 @@ Designer reads product/design docs, optionally uses Impeccable, then creates or 
 
 One explicit invocation runs the whole task without human gates:
 
-1. `enrich-task` turns the objective into a specification and sorts its open
+1. `oak-enrich-task` turns the objective into a specification and sorts its open
    questions into decided and blocking.
 2. `developer` creates a `<type>/<slug>` feature branch and opens a task run
    with `oak run start`.
 3. The plan is self-reviewed and logged in `docs/ai/runs/<date>-<slug>/autonomy.md`.
 4. The cycle repeats within a one-to-six iteration budget: a focused change,
-   deterministic validation, `runtime-verification` when there is a runtime
-   surface, `update-docs`, and a fresh `reviewer` subagent applying
-   `adversarial-review`.
+   deterministic validation, `oak-runtime-verification` when there is a runtime
+   surface, `oak-update-docs`, and a fresh `reviewer` subagent applying
+   `oak-adversarial-review`.
 5. After approval, `oak state attest-review`, `oak state record --status
    completed`, and `oak run close` write the attestation and the run summary.
-6. `developer` commits with `commit` and runs `oak deliver pr`.
+6. `developer` commits with `oak-commit` and runs `oak deliver pr`.
 7. CI is polled with `oak deliver checks` and every failing job is classified;
    a failure caused by the change gets at most two reviewed fixes.
 

@@ -95,7 +95,7 @@ Routing decision:
 
 - `developer`: small, clear, localized, verifiable change. Clear means the
   request states the observable outcome. A target that is only a judgment word
-  ("better", "improve", "handle properly") is not clear: load `enrich-task`
+  ("better", "improve", "handle properly") is not clear: load `oak-enrich-task`
   first and ask its blocking open questions before routing.
 - `researcher`: technical/product uncertainty, APIs, libraries, architecture, risks, or need for real evidence before deciding.
 - `designer`: UX/UI, visual design, layout, brand, interaction, or visual criteria.
@@ -245,7 +245,7 @@ because of the count. On-demand AHE templates:
 
 Use explicit phase barriers:
 
-1. Intake and ambiguity check (`enrich-task` when the request lacks acceptance criteria, affected files or non-functional requirements).
+1. Intake and ambiguity check (`oak-enrich-task` when the request lacks acceptance criteria, affected files or non-functional requirements).
 2. Discovery: research and/or design.
 3. Lead synthesis.
 4. Specification.
@@ -291,8 +291,8 @@ agent that owns the phase; never load them into an agent that does not own it.
 
 - `debugging-and-error-recovery` for failures without a root cause (developer).
 - `test-driven-development` for behavior changes (developer).
-- `enrich-task` at Intake for vague requests (lead, scoper, specifier).
-- `runtime-verification` before the final review of a change with a runtime surface (developer).
+- `oak-enrich-task` at Intake for vague requests (lead, scoper, specifier).
+- `oak-runtime-verification` before the final review of a change with a runtime surface (developer).
 
 These skills are additive. Explicit user instructions and the repository's own
 `AGENTS.md` win over them.

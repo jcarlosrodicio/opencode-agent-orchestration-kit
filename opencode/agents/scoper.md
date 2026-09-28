@@ -21,7 +21,7 @@ permission:
   external_directory: deny
   skill:
     "*": deny
-    "enrich-task": allow
+    "oak-enrich-task": allow
   task:
     "*": deny
     researcher: allow

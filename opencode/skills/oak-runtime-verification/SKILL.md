@@ -1,5 +1,5 @@
 ---
-name: runtime-verification
+name: oak-runtime-verification
 description: Use after tests and validation pass and before the final review, whenever a change could show up at runtime - a screen, a command, an endpoint, a job or a data store - to prove the change works in the running system, including its failure path, with repeatable steps and minimal evidence.
 phase: verify
 domains:

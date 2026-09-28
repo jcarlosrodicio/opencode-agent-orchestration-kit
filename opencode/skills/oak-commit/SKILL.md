@@ -1,5 +1,5 @@
 ---
-name: commit
+name: oak-commit
 description: Use when the user asks to commit or open a pull request, or when /autonomous reaches delivery - produces atomic commits that stage explicit paths only, with messages and a pull-request body written from the actual diff.
 phase: ship
 domains:

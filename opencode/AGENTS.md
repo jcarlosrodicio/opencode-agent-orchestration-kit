@@ -73,12 +73,12 @@ See `docs/ai/harness/commands.md` for command contracts.
 OAK ships its own process skills. Each belongs to the agent that owns the phase:
 
 - `test-driven-development` and `debugging-and-error-recovery` — `developer`.
-- `enrich-task` at Intake for vague requests — `lead`, `scoper`, `specifier`.
-- `adversarial-review` for every final review — `reviewer`.
-- `runtime-verification` before the final review of a change with a runtime
+- `oak-enrich-task` at Intake for vague requests — `lead`, `scoper`, `specifier`.
+- `oak-adversarial-review` for every final review — `reviewer`.
+- `oak-runtime-verification` before the final review of a change with a runtime
   surface — `developer`.
-- `update-docs` before closeout when the change made documentation stale, and
-  `commit` only when the human asks or at `/autonomous` delivery — `developer`.
+- `oak-update-docs` before closeout when the change made documentation stale, and
+  `oak-commit` only when the human asks or at `/autonomous` delivery — `developer`.
   Pushing and pull requests go through `oak deliver` only.
 
 User instructions and the local repository `AGENTS.md` take precedence.

@@ -76,14 +76,14 @@ permission:
     "*": deny
     "api-and-interface-design": allow
     "code-simplification": allow
-    "commit": allow
+    "oak-commit": allow
     "debugging-and-error-recovery": allow
     "documentation-and-adrs": allow
-    "runtime-verification": allow
+    "oak-runtime-verification": allow
     "security-and-hardening": allow
     "source-driven-development": allow
     "test-driven-development": allow
-    "update-docs": allow
+    "oak-update-docs": allow
 ---
 
 
@@ -147,10 +147,10 @@ If your handoff prompt contains a `Skill Resolution` block:
 - `test-driven-development` for behavior changes when tests are feasible.
 - `debugging-and-error-recovery` when a failure is not understood; classify it
   before retrying (see that skill).
-- `runtime-verification` after validation passes and before the final review,
+- `oak-runtime-verification` after validation passes and before the final review,
   whenever the change has a runtime surface.
-- `update-docs` before closeout whenever the change made documentation stale.
-- `commit` only when the human asks, or at `/autonomous` delivery. Never stage
+- `oak-update-docs` before closeout whenever the change made documentation stale.
+- `oak-commit` only when the human asks, or at `/autonomous` delivery. Never stage
   with `-A`/`.`, never bypass hooks; pushing and pull requests go through
   `oak deliver` only.
 
@@ -223,7 +223,7 @@ Before closeout, also add a `Verification Envelope`:
 - `results`: relevant result for each command.
 - `not_run`: validations not run and why.
 - `evidence`: paths, outputs, or observable checks reviewed.
-- `runtime_verification`: surface, verdict and report location from `runtime-verification`; `surface: none` needs a one-line reason.
+- `runtime_verification`: surface, verdict and report location from `oak-runtime-verification`; `surface: none` needs a one-line reason.
 
 ## Output
 

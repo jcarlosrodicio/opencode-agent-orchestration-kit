@@ -81,7 +81,7 @@ never delete or recreate the branch, to recover: that is stop reason 5.
 
 ## Stages
 
-1. **Enrich.** Run `enrich-task` on the objective. Sort each open question into
+1. **Enrich.** Run `oak-enrich-task` on the objective. Sort each open question into
    Decided (answered by the roadmap, docs or code, and logged) or Blocking (it
    matches a stop reason below).
 2. **Branch.** `developer` runs the first four state commands: it branches from
@@ -94,13 +94,13 @@ never delete or recreate the branch, to recover: that is stop reason 5.
 5. **Close.** After the reviewer's approval, the state-sync step runs the last
    four state commands above: `attest-review` with the reviewer child session's
    real id, `record --status completed`, `release`, and `oak run close`.
-6. **Deliver.** `developer` makes atomic commits with `commit` (explicit paths,
+6. **Deliver.** `developer` makes atomic commits with `oak-commit` (explicit paths,
    hooks never bypassed) and runs
    `oak deliver pr --root . --slug <slug> --title "<type>: <summary>" --body-file <file>`.
    The pull-request
    body follows What / Why / How / Verification / Risk, and also:
    - says on its first line that the run was unsupervised;
-   - names `autonomy.md`, `adversarial-review.md` and `run-summary.json` by
+   - names `autonomy.md`, `oak-adversarial-review.md` and `run-summary.json` by
      their full repository path in backticks (relative Markdown links do not
      resolve in a pull-request body);
    - lists every decision taken without asking.
@@ -127,13 +127,13 @@ developer -> reviewer -> developer (state sync)
 
 For at most the planned iteration budget, `developer` makes one focused change,
 runs at least one relevant deterministic validation and, when the change has a
-runtime surface, `runtime-verification`. Before the change goes to its final
-review, `developer` runs `update-docs`, so the reviewer sees the docs too.
+runtime surface, `oak-runtime-verification`. Before the change goes to its final
+review, `developer` runs `oak-update-docs`, so the reviewer sees the docs too.
 `lead` invokes `reviewer` only as a
 subagent with `task reviewer`; never run `opencode run --agent reviewer`. The
-reviewer applies `adversarial-review` and stays read-only: it returns the
+reviewer applies `oak-adversarial-review` and stays read-only: it returns the
 report and its counts, and the state-sync `developer` copies the report
-verbatim to `docs/ai/runs/<date>-<slug>/adversarial-review.md` and records the
+verbatim to `docs/ai/runs/<date>-<slug>/oak-adversarial-review.md` and records the
 `review` run event. The reviewer must not read the autonomy log; a correction
 pass reads it first.
 
