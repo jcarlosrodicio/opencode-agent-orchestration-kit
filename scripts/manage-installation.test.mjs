@@ -220,6 +220,13 @@ function doctorCompatibility(overrides = {}) {
       stable_tested: "1.18.4",
       canary: "latest",
     },
+    opencode_v2: {
+      status: "experimental",
+      supported_range: ">=2.0.18 <3.0.0",
+      minimum_tested: "2.0.18",
+      canary: "latest",
+      plugin_sdk: "2.0.18",
+    },
     sdk: {
       opencode_plugin: "1.14.41",
       opentui_core: "0.2.5",
@@ -363,12 +370,32 @@ test("[D002] doctor diagnostic node-version uses the canonical engine", async (t
   }
 });
 
+test("[D003] doctor treats OpenCode 2 as supported once the contract promotes it", async (t) => {
+  const { sourceRoot, targetRoot } = makeFixture(t);
+  put(sourceRoot, "agents/lead.md", "lead\n");
+  const promoted = doctorCompatibility();
+  promoted.opencode_v2 = { ...promoted.opencode_v2, status: "supported" };
+  const result = await managerFixture(sourceRoot, {
+    compatibilityProvider: () => promoted,
+    nodeVersionProvider: () => "v24.14.1",
+    commandRunner: () => ({ status: 0, stdout: "opencode v2.0.18\n", stderr: "" }),
+  }).run("doctor", { targetRoot });
+  for (const id of ["opencode-version", "compatibility"]) {
+    assert.equal(result.report.checks.find((entry) => entry.id === id).status, "pass", id);
+  }
+});
+
 test("[D003] doctor diagnostic opencode-version is bounded and sanitized", async (t) => {
   for (const [version, expected] of [
     ["1.18.4", "pass"],
     ["1.14.41", "pass"],
     ["1.14.40", "action-required"],
     ["2.0.0", "action-required"],
+    ["2.0.17", "action-required"],
+    ["2.0.18", "info"],
+    ["opencode v2.0.18", "info"],
+    ["2.9.1", "info"],
+    ["3.0.0", "action-required"],
     ["invalid", "action-required"],
   ]) {
     await t.test(version, async (child) => {
@@ -386,6 +413,8 @@ test("[D003] doctor diagnostic opencode-version is bounded and sanitized", async
       }).run("doctor", { targetRoot });
       const check = result.report.checks.find((entry) => entry.id === "opencode-version");
       assert.equal(check.status, expected);
+      const compatibility = result.report.checks.find((entry) => entry.id === "compatibility");
+      assert.equal(compatibility.status, expected);
       assert.equal(JSON.stringify(result.report).includes(canary), false);
       assert.equal(calls[0].command, "opencode");
       assert.deepEqual(calls[0].args, ["--version"]);

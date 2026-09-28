@@ -228,24 +228,28 @@ function validatePackages(root, data, fsOps) {
     }
   }
 
+  // CI also installs the OpenCode 2 type workspace, so its lockfile follows the same rules.
+  for (const relative of ["opencode/package-lock.json", "typecheck/v2/package-lock.json"]) {
+    const packages = readJson(root, relative, fsOps).packages;
+    if (!packages || typeof packages !== "object" || Array.isArray(packages)) {
+      throw invalid(`${relative} packages must be an object`);
+    }
+    for (const [name, entry] of Object.entries(packages)) {
+      if (name === "") continue;
+      if (
+        !entry
+        || typeof entry !== "object"
+        || typeof entry.resolved !== "string"
+        || !/^https:\/\/registry\.npmjs\.org\/[^?#\s]+$/.test(entry.resolved)
+      ) {
+        throw invalid(`${relative} ${name} must include a canonical npm registry resolved URL`);
+      }
+      if (typeof entry.integrity !== "string" || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(entry.integrity)) {
+        throw invalid(`${relative} ${name} must include non-empty sha512 integrity`);
+      }
+    }
+  }
   const lock = readJson(root, "opencode/package-lock.json", fsOps);
-  if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) {
-    throw invalid("opencode/package-lock.json packages must be an object");
-  }
-  for (const [name, entry] of Object.entries(lock.packages)) {
-    if (name === "") continue;
-    if (
-      !entry
-      || typeof entry !== "object"
-      || typeof entry.resolved !== "string"
-      || !/^https:\/\/registry\.npmjs\.org\/[^?#\s]+$/.test(entry.resolved)
-    ) {
-      throw invalid(`opencode/package-lock.json ${name} must include a canonical npm registry resolved URL`);
-    }
-    if (typeof entry.integrity !== "string" || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(entry.integrity)) {
-      throw invalid(`opencode/package-lock.json ${name} must include non-empty sha512 integrity`);
-    }
-  }
   for (const dependency of EXACT_KEYS.overrides) {
     const entry = lock.packages?.[`node_modules/${dependency}`];
     if (entry?.version !== data.npm_overrides[dependency]) {
@@ -388,6 +392,7 @@ function validateWorkflowActions(root, data, fsOps) {
   for (const relative of [
     ".github/workflows/check.yml",
     ".github/workflows/compatibility-canary.yml",
+    ".github/workflows/opencode-v2.yml",
   ]) {
     const workflow = readText(root, relative, fsOps);
     const seen = new Map([...approved.keys()].map((action) => [action, 0]));

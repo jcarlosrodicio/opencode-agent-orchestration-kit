@@ -37,6 +37,9 @@ scripts/package-smoke.test.mjs
 scripts/benchmark-tool-paths.mjs
 scripts/benchmark-tool-paths.test.mjs
 scripts/opencode-compat-smoke.sh
+scripts/opencode-v2-smoke.mjs
+scripts/opencode-v2-smoke.test.mjs
+.github/workflows/opencode-v2.yml
 scripts/manage-installation.mjs
 scripts/manage-installation.test.mjs
 scripts/oak.mjs
@@ -49,11 +52,36 @@ opencode/.gitignore
 opencode/package.json
 opencode/package-lock.json
 opencode/plugins/token-tree-usage.tsx
+opencode/plugins/oak-tui/server.ts
+opencode/plugins/oak-tui/tui.tsx
+opencode/runtime/v2/token-usage.mjs
+opencode/runtime/v2/token-usage.d.mts
+opencode/runtime/v2/token-usage.test.mjs
 opencode/plugins/shell-export-guard.ts
+opencode/runtime/v1/shell-export-guard.ts
+opencode/runtime/v2/shell-export-guard.ts
+opencode/scripts/shell-export-guard-core.mjs
+opencode/scripts/shell-export-guard-core.d.mts
+opencode/scripts/shell-export-guard-core.test.mjs
+opencode/scripts/session-sources.mjs
+opencode/scripts/session-sources.d.mts
+typecheck/v2/package.json
+typecheck/v2/package-lock.json
+typecheck/v2/tsconfig.json
 opencode/plugins/mission-runtime.ts
+opencode/runtime/v1/mission-runtime.ts
+opencode/runtime/v2/mission-runtime.ts
+opencode/runtime/v2/mission-events.mjs
+opencode/runtime/v2/mission-events.d.mts
+opencode/runtime/v2/mission-events.test.mjs
 opencode/plugins/mission-runtime.test.mjs
 opencode/tools/open_design.ts
 opencode/tools/open-design-http.mjs
+opencode/tools/open-design-tools.mjs
+opencode/tools/open-design-tools.d.mts
+opencode/runtime/v2/open-design.ts
+opencode/plugins/open-design.ts
+scripts/open-design-tools.test.mjs
 opencode/tools/open-design-http.d.mts
 opencode/scripts/check-harness.mjs
 opencode/scripts/mission-runtime-observer.mjs
@@ -215,10 +243,10 @@ grep -q 'evaluator' opencode/commands/evolve.md
 grep -q 'debugger' opencode/commands/evolve.md
 grep -q 'evolver' opencode/commands/evolve.md
 
-grep -q 'OPEN_DESIGN_URL' opencode/tools/open_design.ts
-grep -q 'baseUrl: tool.schema.string().optional()' opencode/tools/open_design.ts
-! grep -q 'randomUUID' opencode/tools/open_design.ts
-! grep -q 'from "node:crypto"' opencode/tools/open_design.ts
+grep -q 'OPEN_DESIGN_URL' opencode/tools/open-design-tools.mjs
+grep -q 'baseUrl: "optional"' opencode/tools/open-design-tools.mjs
+! grep -q 'randomUUID' opencode/tools/open-design-tools.mjs opencode/tools/open_design.ts
+! grep -q 'from "node:crypto"' opencode/tools/open-design-tools.mjs opencode/tools/open_design.ts
 
 node <<'NODE'
 const fs = require('fs')
@@ -248,6 +276,9 @@ NODE
 grep -q 'Lead' opencode/plugins/token-tree-usage.tsx
 grep -q 'Subagents' opencode/plugins/token-tree-usage.tsx
 grep -q 'Partial total' opencode/plugins/token-tree-usage.tsx
+grep -q 'sidebar.content' opencode/plugins/oak-tui/tui.tsx
+grep -q 'Subagents' opencode/plugins/oak-tui/tui.tsx
+grep -q 'setup() {}' opencode/plugins/token-tree-usage.tsx
 
 node scripts/check-public-boundary.mjs
 

@@ -252,6 +252,50 @@ if ! printf '%s' "$agent_json" | node -e '
   fail_with_diagnostics "packaged lead did not resolve as a primary agent"
 fi
 
+if [[ "$mode" == "default" ]]; then
+  # OpenCode 1 reports a plugin file that fails to import only as a session
+  # error event, never in its logs. Import every plugin file it scans with the
+  # Bun runtime embedded in the same OpenCode binary, and require the loader's
+  # default-export shape.
+  if ! run_isolated env BUN_BE_BUN=1 OAK_PLUGIN_DIR="$target_config/plugins" \
+    npx --yes --package "opencode-ai@$request" opencode -e '
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const dir = process.env.OAK_PLUGIN_DIR;
+      let failed = false;
+      for (const name of fs.readdirSync(dir).filter((entry) => /\.(ts|js)$/.test(entry)).sort()) {
+        try {
+          const mod = await import(path.join(dir, name));
+          if (typeof mod.default?.server !== "function") throw new Error("missing server");
+        } catch {
+          failed = true;
+          console.error(`plugin ${name} did not load`);
+        }
+      }
+      if (failed) process.exit(1);
+    ' >/dev/null 2>>"$diagnostics_file"; then
+    fail_with_diagnostics "an OAK plugin failed to import"
+  fi
+  # A plugin whose server hook throws is logged as "failed to load plugin".
+  plugin_log="$smoke_root/plugin-load.log"
+  if ! designer_json="$(run_opencode --print-logs --log-level ERROR debug agent designer 2>"$plugin_log")"; then
+    fail_with_diagnostics "OpenCode designer debug command failed"
+  fi
+  if grep -qi 'failed to load plugin' "$plugin_log"; then
+    fail_with_diagnostics "an OAK or configured plugin failed to load"
+  fi
+  if ! printf '%s' "$designer_json" | node -e '
+    let input = "";
+    process.stdin.on("data", (chunk) => { input += chunk; });
+    process.stdin.on("end", () => {
+      const agent = JSON.parse(input);
+      if (agent?.tools?.open_design_health !== true) process.exit(1);
+    });
+  '; then
+    fail_with_diagnostics "Open Design tools did not register"
+  fi
+fi
+
 diagnostics="$(<"$diagnostics_file")"
 if contains_forbidden_path "$diagnostics"; then
   echo "captured diagnostics contained a private path" >&2

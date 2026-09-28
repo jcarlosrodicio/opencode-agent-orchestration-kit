@@ -23,6 +23,13 @@ const VALID_COMPATIBILITY = {
     stable_tested: "1.18.4",
     canary: "latest",
   },
+  opencode_v2: {
+    status: "experimental",
+    supported_range: ">=2.0.18 <3.0.0",
+    minimum_tested: "2.0.18",
+    canary: "latest",
+    plugin_sdk: "2.0.18",
+  },
   sdk: {
     opencode_plugin: "1.14.41",
     opentui_core: "0.2.5",
@@ -42,6 +49,13 @@ const REVISED_COMPATIBILITY = {
     minimum_tested: "1.15.0",
     stable_tested: "1.19.0",
     canary: "latest",
+  },
+  opencode_v2: {
+    status: "experimental",
+    supported_range: ">=2.0.18 <3.0.0",
+    minimum_tested: "2.0.18",
+    canary: "latest",
+    plugin_sdk: "2.0.18",
   },
   sdk: {
     opencode_plugin: "1.15.0",
@@ -96,8 +110,11 @@ Canonical Node engine: \`${VALID_COMPATIBILITY.node.engines}\`.
 | OpenCode 1.14.41 | tested | minimum boundary in the blocking core smoke |
 | OpenCode 1.18.4 | tested | pinned stable boundary in the blocking core smoke |
 | OpenCode >=1.14.41 <2.0.0 | supported | boundary-tested compatibility promise |
-| OpenCode <1.14.41 or >=2.0.0 | unsupported | requires a reviewed policy change |
+| OpenCode 2.0.18 | tested | minimum OpenCode 2 boundary in the non-blocking OpenCode 2 workflow |
+| OpenCode >=2.0.18 <3.0.0 | experimental | dual-runtime adapters; non-blocking CI; see docs/opencode-v2.md |
+| OpenCode <1.14.41, >=2.0.0 <2.0.18, or >=3.0.0 | unsupported | requires a reviewed policy change |
 | \`@opencode-ai/plugin\` 1.14.41 | tested | exact pin with install, import, and typecheck evidence |
+| \`@opencode/plugin\` 2.0.18 | tested | type-only pin in typecheck/v2; never installed with the harness |
 | OpenTUI core/solid 0.2.5 | tested | exact pins with install, import, and typecheck evidence |
 | Ubuntu GitHub runner | tested | blocking Node 22 and 24 jobs |
 | macOS GitHub runner | tested | blocking Node 24 job; runner details recorded |
@@ -281,6 +298,72 @@ jobs:
         run: npm run installation-smoke
 `;
 
+const VALID_OPENCODE_V2_WORKFLOW = `name: OpenCode 2
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+  schedule:
+    - cron: "37 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # opencode-v2:start
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Install OpenCode 1 tool dependencies
+        run: npm --prefix opencode ci --ignore-scripts
+
+      - name: Install OpenCode 2 type dependencies
+        run: npm --prefix typecheck/v2 ci --ignore-scripts
+
+      - name: Typecheck OpenCode 2 adapters
+        run: npm run typecheck:v2
+
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: core
+            opencode: "2.0.18"
+          - mode: default
+            opencode: "2.0.18"
+          - mode: core
+            opencode: latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Smoke OpenCode 2
+        run: node scripts/opencode-v2-smoke.mjs "\${{ matrix.mode }}" "\${{ matrix.opencode }}"
+  # opencode-v2:end
+`;
+
 function writeJson(root, relative, value) {
   const full = path.join(root, relative);
   fs.mkdirSync(path.dirname(full), { recursive: true });
@@ -300,11 +383,16 @@ function makeFixture(t, compatibility = VALID_COMPATIBILITY) {
   writeJson(root, "package.json", ROOT_PACKAGE);
   writeJson(root, "opencode/package.json", PACKAGED_PACKAGE);
   writeJson(root, "opencode/package-lock.json", PACKAGED_LOCK);
+  writeJson(root, "typecheck/v2/package.json", {
+    private: true,
+    devDependencies: { "@opencode/plugin": compatibility.opencode_v2?.plugin_sdk ?? "2.0.18" },
+  });
   writeText(root, "docs/compatibility.md", COMPATIBILITY_MATRIX);
   writeText(root, "README.md", README);
   writeText(root, "docs/installation.md", INSTALLATION);
   writeText(root, ".github/workflows/check.yml", VALID_WORKFLOW);
   writeText(root, ".github/workflows/compatibility-canary.yml", VALID_CANARY_WORKFLOW);
+  writeText(root, ".github/workflows/opencode-v2.yml", VALID_OPENCODE_V2_WORKFLOW);
   writeText(root, "scripts/install-smoke.sh", "#!/usr/bin/env bash\nnpm ci --ignore-scripts\n");
   return root;
 }
@@ -354,6 +442,45 @@ test("alternative supported OpenCode range is rejected", (t) => {
   assert.throws(
     () => checkCompatibility(root, { surfaces: false }),
     /supported_range must begin at minimum_tested and end before 2.0.0/,
+  );
+});
+
+for (const [label, mutate, message] of [
+  ["an OpenCode 2 range that skips minimum_tested", (data) => { data.opencode_v2.supported_range = ">=2.0.0 <3.0.0"; }, /opencode_v2.supported_range must begin at minimum_tested and end before 3.0.0/],
+  ["an OpenCode 2 minimum outside 2.x", (data) => { data.opencode_v2.minimum_tested = "1.18.4"; }, /opencode_v2.minimum_tested must be a 2.x release/],
+  ["an unknown OpenCode 2 status", (data) => { data.opencode_v2.status = "stable"; }, /opencode_v2.status must be experimental or supported/],
+  ["a missing OpenCode 2 contract", (data) => { delete data.opencode_v2; }, /compatibility keys must be exactly/],
+]) {
+  test(`OpenCode 2 compatibility rejects ${label}`, (t) => {
+    const data = structuredClone(VALID_COMPATIBILITY);
+    mutate(data);
+    const root = makeFixture(t, data);
+    assertInvalidCompatibility(() => checkCompatibility(root, { surfaces: false }), message);
+  });
+}
+
+for (const [label, mutate, message] of [
+  ["without the latest canary", (text) => text.replace("            opencode: latest\n", ""), /OpenCode 2 workflow must contain: opencode: latest/],
+  ["without the type workspace install", (text) => text.replace("run: npm --prefix typecheck/v2 ci --ignore-scripts", "run: true"), /OpenCode 2 workflow must contain: run: npm --prefix typecheck\/v2 ci --ignore-scripts/],
+  ["with secrets", (text) => `${text}\n# \${{ secrets.TOKEN }}\n`, /must not use secrets/],
+  ["with write permissions", (text) => text.replace("  contents: read\n", "  contents: write\n"), /must use read-only permissions/],
+  ["with an extra write scope", (text) => text.replace("  contents: read\n", "  contents: read\n  id-token: write\n"), /must use read-only permissions/],
+  ["with job-level permissions", (text) => text.replace("    runs-on: ubuntu-latest\n", "    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n"), /job-level permissions are forbidden/],
+  ["without markers", (text) => text.replace("  # opencode-v2:end\n", ""), /exactly one opencode-v2 marker pair/],
+]) {
+  test(`OpenCode 2 workflow is rejected ${label}`, (t) => {
+    const root = makeFixture(t);
+    writeText(root, ".github/workflows/opencode-v2.yml", mutate(VALID_OPENCODE_V2_WORKFLOW));
+    assertInvalidCompatibility(() => checkCompatibility(root), message);
+  });
+}
+
+test("OpenCode 2 type pin drift names the typecheck workspace", (t) => {
+  const root = makeFixture(t);
+  writeJson(root, "typecheck/v2/package.json", { private: true, devDependencies: { "@opencode/plugin": "2.0.19" } });
+  assertInvalidCompatibility(
+    () => checkCompatibility(root),
+    /typecheck\/v2\/package\.json @opencode\/plugin must match compatibility\.json opencode_v2\.plugin_sdk/,
   );
 });
 
@@ -1299,6 +1426,21 @@ case "$1" in
     grep -q '^mode: primary$' "$OPENCODE_CONFIG_DIR/agents/lead.md"
     printf '{\"name\":\"lead\",\"mode\":\"primary\",\"config\":\"%s\"${leak}}\\n' "$OPENCODE_CONFIG_DIR"
     ;;
+  -e)
+    test "$#" -eq 2
+    test "$BUN_BE_BUN" = 1
+    test "$OAK_PLUGIN_DIR" = "$OPENCODE_CONFIG_DIR/plugins"
+    ${options.pluginImportFailure ? "exit 1" : ":"}
+    ;;
+  --print-logs)
+    test "$#" -eq 6
+    test "$2" = --log-level
+    test "$3" = ERROR
+    test "$4" = debug
+    test "$5" = agent
+    test "$6" = designer
+    printf '{\"name\":\"designer\",\"mode\":\"subagent\",\"tools\":{\"open_design_health\":${options.designerTools === false ? "false" : "true"}}}\\n'
+    ;;
   *) exit 43;;
 esac
 `);
@@ -1343,6 +1485,20 @@ test("default OpenCode compatibility smoke packs and loads the unmodified packag
     "opencode compatibility smoke ok: mode=default requested=1.18.4 resolved=1.18.4\n",
   );
 });
+
+for (const [label, option, message] of [
+  ["a plugin that fails to import", { pluginImportFailure: true }, /an OAK plugin failed to import/],
+  ["unregistered Open Design tools", { designerTools: false }, /Open Design tools did not register/],
+]) {
+  test(`default OpenCode compatibility smoke rejects ${label}`, (t) => {
+    const root = makeCompatibilitySmokeFixture(t, { mode: "default", request: "1.18.4", ...option });
+    const result = runCompatibilitySmoke(root, ["default", "1.18.4"]);
+
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, message);
+  });
+}
 
 test("default OpenCode compatibility smoke does not fall back when npm pack fails", (t) => {
   const root = makeCompatibilitySmokeFixture(t, {

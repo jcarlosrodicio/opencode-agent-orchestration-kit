@@ -117,18 +117,25 @@ function nodeSatisfiesCanonicalEngines(versionValue, engines) {
   });
 }
 
-function opencodeSatisfiesCompatibility(versionValue, compatibility) {
-  const version = parseRuntimeVersion(versionValue, "OpenCode");
-  const minimum = parseRuntimeVersion(compatibility.opencode.minimum_tested, "OpenCode compatibility");
-  const range = /^>=(\d+\.\d+\.\d+) <(\d+\.\d+\.\d+)$/.exec(compatibility.opencode.supported_range);
-  if (!range) throw invalid("OpenCode compatibility contract is invalid");
-  const lower = parseRuntimeVersion(range[1], "OpenCode compatibility");
-  const upper = parseRuntimeVersion(range[2], "OpenCode compatibility");
-  if (lower.canonical !== minimum.canonical) {
+function versionInRange(canonical, range, minimum, label) {
+  const match = /^>=(\d+\.\d+\.\d+) <(\d+\.\d+\.\d+)$/.exec(range);
+  if (!match) throw invalid("OpenCode compatibility contract is invalid");
+  const lower = parseRuntimeVersion(match[1], label);
+  const upper = parseRuntimeVersion(match[2], label);
+  if (lower.canonical !== parseRuntimeVersion(minimum, label).canonical) {
     throw invalid("OpenCode compatibility contract is invalid");
   }
-  return compareStableVersions(version.canonical, minimum.canonical) >= 0
-    && compareStableVersions(version.canonical, upper.canonical) < 0;
+  return compareStableVersions(canonical, lower.canonical) >= 0
+    && compareStableVersions(canonical, upper.canonical) < 0;
+}
+
+function opencodeCompatibilityLine(versionValue, compatibility) {
+  const version = parseRuntimeVersion(versionValue, "OpenCode");
+  const v1 = compatibility.opencode; // oak:v1-only
+  if (versionInRange(version.canonical, v1.supported_range, v1.minimum_tested, "OpenCode compatibility")) return "v1"; // oak:v1-only
+  const v2 = compatibility.opencode_v2;
+  if (v2 && versionInRange(version.canonical, v2.supported_range, v2.minimum_tested, "OpenCode 2 compatibility")) return "v2";
+  return null;
 }
 
 const COMMAND_FLAGS = {
@@ -1778,15 +1785,20 @@ export function createInstallationManager(options) {
           "install OpenCode or correct PATH",
         );
       } else {
-        const parsed = parseRuntimeVersion(String(observed.stdout ?? "").split(/\r?\n/, 1)[0], "OpenCode");
-        opencodeCheck = opencodeSatisfiesCompatibility(parsed.canonical, compatibility)
+        // OpenCode 2 prefixes its version with `opencode v`; OpenCode 1 prints it bare.
+        const banner = String(observed.stdout ?? "").split(/\r?\n/, 1)[0].trim().replace(/^opencode\s+/, "");
+        const parsed = parseRuntimeVersion(banner, "OpenCode");
+        const line = opencodeCompatibilityLine(parsed.canonical, compatibility);
+        opencodeCheck = line === "v1" || (line === "v2" && compatibility.opencode_v2.status === "supported")
           ? doctorCheck("opencode-version", "pass", `OpenCode ${parsed.canonical} is supported`)
-          : doctorCheck(
-            "opencode-version",
-            "action-required",
-            `OpenCode ${parsed.canonical} is outside the supported range`,
-            `use OpenCode ${compatibility.opencode.supported_range}`,
-          );
+          : line === "v2"
+            ? doctorCheck("opencode-version", "info", `OpenCode ${parsed.canonical} is supported experimentally`)
+            : doctorCheck(
+              "opencode-version",
+              "action-required",
+              `OpenCode ${parsed.canonical} is outside the supported range`,
+              `use OpenCode ${compatibility.opencode.supported_range} or ${compatibility.opencode_v2?.supported_range ?? "a supported release"}`,
+            );
       }
     } catch {
       opencodeCheck = doctorCheck(
@@ -1814,9 +1826,11 @@ export function createInstallationManager(options) {
         ownership.executables,
         registry,
         nodeCheck.status === "pass"
-          && opencodeCheck.status === "pass"
+          && ["pass", "info"].includes(opencodeCheck.status)
           && dependencies.status !== "action-required"
-          ? doctorCheck("compatibility", "pass", "runtime compatibility is satisfied")
+          ? opencodeCheck.status === "pass"
+            ? doctorCheck("compatibility", "pass", "runtime compatibility is satisfied")
+            : doctorCheck("compatibility", "info", "runtime compatibility is experimental")
           : doctorCheck(
             "compatibility",
             "action-required",

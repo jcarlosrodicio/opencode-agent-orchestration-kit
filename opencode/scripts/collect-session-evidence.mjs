@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { SESSION_TABLES_SQL, pickSessionSchemas, sessionQueries } from "./session-sources.mjs";
 
 function fail(message) {
   console.error(message);
@@ -328,46 +329,41 @@ async function summarizeSqlite(dbPath, previousCursor, fullRescan) {
   const cutoff = !fullRescan && previousCursor ? previousCursor.cursor_end_time_updated_max : null;
   const cutoffFilter = cutoff ? `AND time_created > ${Number(cutoff)}` : "";
 
+  const schemas = pickSessionSchemas(await streamSqliteJson(dbPath, SESSION_TABLES_SQL, 300_000)).map((schema) => ({
+    schema,
+    queries: sessionQueries(schema, { fullRescan, cutoffFilter }),
+  }));
+
   // Session query: always full (lightweight, needed for parent resolution)
-  const sessions = await streamSqliteJson(
-    dbPath,
-    `
-    select
-      id,
-      project_id,
-      parent_id,
-      slug,
-      directory,
-      title,
-      version,
-      time_created,
-      time_updated,
-      workspace_id,
-      path,
-      agent,
-      model,
-      cost,
-      tokens_input,
-      tokens_output,
-      tokens_reasoning,
-      tokens_cache_read,
-      tokens_cache_write
-    from session
-    order by time_updated desc, id desc;
-    `,
-    300_000,
-  );
+  // A session can be in both schemas: OpenCode 2 imports OpenCode 1 sessions,
+  // and OpenCode 1 can keep using one after switching back. The most recently
+  // updated copy owns the session; on a tie the earlier schema (OpenCode 2) wins.
+  const owners = new Map();
+  for (const { schema, queries } of schemas) {
+    for (const row of await streamSqliteJson(dbPath, queries.sessions, 300_000)) {
+      const owner = owners.get(row.id);
+      if (!owner || (row.time_updated ?? 0) > (owner.row.time_updated ?? 0)) owners.set(row.id, { schema, row });
+    }
+  }
+  // Same order as the session SQL: time_updated desc, id desc (binary).
+  const sessions = [...owners.values()]
+    .map((owner) => owner.row)
+    .sort((a, b) => (b.time_updated ?? 0) - (a.time_updated ?? 0) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 
-  // Message query: extract only role from JSON data (reduces output from ~31MB to ~200KB)
-  // Apply time cutoff when not in full-rescan mode
-  const messageSql = fullRescan
-    ? `select id, session_id, time_created, time_updated, data from message order by session_id, time_created, id;`
-    : `select id, session_id, time_created, time_updated, json_extract(data, '$.role') as role from message where 1=1 ${cutoffFilter} order by session_id, time_created, id;`;
-  const messages = await streamSqliteJson(dbPath, messageSql, 300_000);
+  // Rows are appended one by one: spreading hundreds of thousands of rows into
+  // push() exceeds the engine's argument limit.
+  const messages = [];
+  const parts = [];
+  for (const { schema, queries } of schemas) {
+    const owned = (row) => owners.get(row.session_id)?.schema === schema;
 
-  // Part query: need full data for text extraction, but apply time cutoff to reduce rows scanned
-  const partsSql = `select id, message_id, session_id, time_created, time_updated, data from part where 1=1 ${cutoffFilter} order by session_id, time_created, id;`;
-  const parts = await streamSqliteJson(dbPath, partsSql, 300_000);
+    // Message query: extract only role from JSON data (reduces output from ~31MB to ~200KB)
+    // Apply time cutoff when not in full-rescan mode
+    for (const row of await streamSqliteJson(dbPath, queries.messages, 300_000)) if (owned(row)) messages.push(row);
+
+    // Part query: need full data for text extraction, but apply time cutoff to reduce rows scanned
+    for (const row of await streamSqliteJson(dbPath, queries.parts, 300_000)) if (owned(row)) parts.push(row);
+  }
 
   const messagesBySession = new Map();
   for (const message of messages) {

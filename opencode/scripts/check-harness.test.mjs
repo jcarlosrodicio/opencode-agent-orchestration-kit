@@ -156,6 +156,19 @@ test("shell export guard surfaces are required", () => {
   }
 });
 
+test("shell export guard OpenCode 2 adapter is required", () => {
+  const cwd = makeFixture();
+  try {
+    fs.rmSync(path.join(cwd, "runtime/v2/shell-export-guard.ts"));
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a missing OpenCode 2 guard adapter");
+    assert.match(result.stderr, /runtime\/v2\/shell-export-guard\.ts: missing shell export guard surface/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 for (const [label, mutate, diagnostic] of [
   [
     "missing the Open Design project URL guard",
@@ -163,23 +176,23 @@ for (const [label, mutate, diagnostic] of [
       'if (/\\/projects(?:\\/|$)/.test(url)) {',
       "if (false) {",
     ),
-    /tools\/open_design\.ts: missing Open Design project-path guard/,
+    /tools\/open-design-tools\.mjs: missing Open Design project-path guard/,
   ],
   [
     "using randomUUID",
     (source) => `${source}\nconst randomUUID = true\n`,
-    /tools\/open_design\.ts: Open Design tool must not depend on randomUUID/,
+    /tools\/open-design-tools\.mjs: Open Design tool must not depend on randomUUID/,
   ],
   [
     "containing a private endpoint",
     (source) => `${source}\nconst endpoint = "https://private.synology.example"\n`,
-    /tools\/open_design\.ts: Open Design tool contains a private endpoint or local path/,
+    /tools\/open-design-tools\.mjs: Open Design tool contains a private endpoint or local path/,
   ],
 ]) {
   test(`Open Design contract rejects ${label}`, () => {
     const cwd = makeFixture();
     try {
-      const rel = "tools/open_design.ts";
+      const rel = "tools/open-design-tools.mjs";
       const source = fs.readFileSync(path.join(cwd, rel), "utf8");
       write(rel, mutate(source), cwd);
 

@@ -1,8 +1,9 @@
 # Compatibility
 
 This document is the public compatibility contract for the kit. The canonical
-Node.js engine is `^22.9.0 || ^24.0.0`, and the supported OpenCode range is
-`>=1.14.41 <2.0.0`.
+Node.js engine is `^22.9.0 || ^24.0.0`. The supported OpenCode range is
+`>=1.14.41 <2.0.0`, and OpenCode 2 (`>=2.0.18 <3.0.0`) is supported
+experimentally.
 
 ## Status definitions
 
@@ -26,8 +27,11 @@ while `supported` describes the maintained promise derived from that evidence.
 | OpenCode 1.14.41 | tested | minimum boundary in the blocking core smoke |
 | OpenCode 1.18.4 | tested | pinned stable boundary in the blocking core smoke |
 | OpenCode >=1.14.41 <2.0.0 | supported | boundary-tested compatibility promise |
-| OpenCode <1.14.41 or >=2.0.0 | unsupported | requires a reviewed policy change |
+| OpenCode 2.0.18 | tested | minimum OpenCode 2 boundary in the non-blocking OpenCode 2 workflow |
+| OpenCode >=2.0.18 <3.0.0 | experimental | dual-runtime adapters; non-blocking CI; see docs/opencode-v2.md |
+| OpenCode <1.14.41, >=2.0.0 <2.0.18, or >=3.0.0 | unsupported | requires a reviewed policy change |
 | `@opencode-ai/plugin` 1.14.41 | tested | exact pin with install, import, and typecheck evidence |
+| `@opencode/plugin` 2.0.18 | tested | type-only pin in typecheck/v2; never installed with the harness |
 | OpenTUI core/solid 0.2.5 | tested | exact pins with install, import, and typecheck evidence |
 | Ubuntu GitHub runner | tested | blocking Node 22 and 24 jobs |
 | macOS GitHub runner | tested | blocking Node 24 job; runner details recorded |
@@ -45,6 +49,20 @@ token plugin remain experimental. The smaller supported core contract excludes
 all three. Current immutable external
 identifiers and their release labels live in
 [the supply-chain policy](supply-chain.md).
+
+## OpenCode 2
+
+OpenCode 2 support is experimental: its CI is non-blocking and it is not a
+release guarantee. The same installed harness serves both lines. Known
+differences on OpenCode 2:
+
+- Per-agent `temperature` is currently ignored.
+- The CLI (TUI) plugin configuration moved from `tui.json` to the global
+  `cli.json`.
+- OpenCode 1 and OpenCode 2 share the same config directory and database.
+
+See [OpenCode 2 support](opencode-v2.md) for details and for the OpenCode 1
+retirement checklist.
 
 ## Exact dependency pins
 
@@ -75,7 +93,9 @@ Open Design service access, Impeccable, or the token plugin.
 The default-config smoke instead packs the npm artifact, extracts that local
 tarball, installs its frozen dependencies, and loads the unmodified starter
 configuration. It proves that the starter, with no external plugins, and the
-bundled token plugin can load at the stable boundary. This release-blocking
+bundled token plugin can load at the stable boundary. It also imports every
+server plugin file with the Bun runtime embedded in that OpenCode binary, fails
+when a server hook throws, and requires the Open Design tools to register. This release-blocking
 default check preserves the shipped starter behavior; it does not promote the
 token plugin from `experimental` and does not extend the core compatibility
 promise to it.

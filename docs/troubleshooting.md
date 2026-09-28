@@ -36,6 +36,13 @@ Verify `opencode/skills/open-design/SKILL.md` exists and `OPEN_DESIGN_URL` is se
 
 It should not. `open_design.ts` must not expose URL arguments and must read only `OPEN_DESIGN_URL`.
 
+## Plugin shows as failed on OpenCode 2
+
+Run `opencode plugin list`. A plugin listed with the ID `-` failed to load.
+For details, run `opencode api plugin.list`, find the entry whose
+`source.path` matches, and read its `state`. Right after the server starts,
+the list can be empty until plugins activate; run the command again.
+
 ## Docker permissions
 
 Ensure mounted directories are writable by the container user.

@@ -1,23 +1,13 @@
-import type { Plugin } from "@opencode-ai/plugin";
-import { classifyShellExport } from "../scripts/shell-export-policy.mjs";
+import type { Plugin as V2Plugin } from "@opencode/plugin"
+import { shellExportGuardV1 } from "../runtime/v1/shell-export-guard.ts" // oak:v1-only
+import { shellExportGuardV2 } from "../runtime/v2/shell-export-guard.ts"
 
-const BLOCK_MESSAGE =
-  "Sensitive shell export blocked by policy; use an explicit non-secret value or a scoped secret-aware tool.";
+// One default export serves both runtimes: OpenCode 1 calls `server`,
+// OpenCode 2 calls `setup`. Retiring OpenCode 1 deletes the marked lines.
+const plugin = {
+  id: "oak.shell-export-guard",
+  server: shellExportGuardV1, // oak:v1-only
+  setup: shellExportGuardV2,
+}
 
-export const ShellExportGuardPlugin: Plugin = async () => ({
-  "tool.execute.before": async (input, output) => {
-    const tool = String(input?.tool ?? "").toLowerCase();
-    if (tool !== "bash" && tool !== "shell") return;
-
-    const args = output?.args;
-    if (!args || typeof args !== "object") return;
-
-    const command = (args as Record<string, unknown>).command;
-    if (typeof command !== "string") return;
-
-    const decision = classifyShellExport(command);
-    if (decision.blocked) {
-      throw new Error(`[shell-export-guard:${decision.rule}] ${BLOCK_MESSAGE}`);
-    }
-  },
-});
+export default plugin satisfies Pick<V2Plugin.Plugin, "id" | "setup">

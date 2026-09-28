@@ -1,4 +1,5 @@
 /** @jsxImportSource @opentui/solid */
+// oak:v1-only — whole file
 import type { TuiPlugin, TuiPluginApi, TuiTheme } from '@opencode-ai/plugin/tui';
 import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 
@@ -203,4 +204,6 @@ const tui: TuiPlugin = async api => {
   });
 };
 
-export default { id, tui };
+// oak:v1-only — whole file (loaded through tui.json). The no-op `setup` keeps
+// OpenCode 2 quiet if it migrates tui.json; its sidebar lives in plugins/oak-tui.
+export default { id, tui, setup() {} };

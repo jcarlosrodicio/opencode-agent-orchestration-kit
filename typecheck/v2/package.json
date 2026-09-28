@@ -1,0 +1,13 @@
+{
+  "name": "oak-typecheck-opencode-v2",
+  "private": true,
+  "description": "Type-checking workspace for OAK's OpenCode 2 adapters. It is never installed with the harness.",
+  "devDependencies": {
+    "@opencode/plugin": "2.0.18",
+    "@opencode/theme": "2.0.18",
+    "@opentui/core": "0.5.12",
+    "@opentui/solid": "0.5.12",
+    "solid-js": "1.9.12",
+    "typescript": "5.9.3"
+  }
+}
