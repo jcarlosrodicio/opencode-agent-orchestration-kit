@@ -64,6 +64,9 @@ The goal is not to force every request through a heavy process. Small, clear, lo
 | Product-development workflows | Structured flows for features, plans, scoped research, bounded engineering loops, MVP specs, testing, simplification, and review |
 | Bounded routing | A default `lead` agent that routes simple requests directly and escalates only when needed |
 | Local skills | Practical checklists for testing, debugging, security, performance, documentation, APIs, code review, and more |
+| Process skills | OAK's own skills for each phase: task enrichment, adversarial review, runtime verification, documentation updates, and commits. No external plugin is required |
+| Task runs and delivery | `oak run` links the sessions of one change; `oak deliver` is the only path that pushes a branch and opens a pull request |
+| OpenCode 1 and 2 | One installation loads on OpenCode 1 (supported) and OpenCode 2 (experimental) |
 | Safe installation | Backup-aware install and uninstall scripts, plus a project-local test mode |
 | Validation | Mechanical checks for JSON configuration, agent contracts, command contracts, and harness consistency |
 | Adversarial safety | Portable fixtures for injection, unsafe paths, wrapper/network permissions, approval integrity, supply-chain pins, and corrupt events |
@@ -422,7 +425,7 @@ After a tagged release is published, you can install the same CLI directly
 from GitHub without keeping a checkout:
 
 ```bash
-npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.0.45"
+npm install --global "git+https://github.com/jcarlosrodicio/opencode-agent-orchestration-kit.git#v1.1.0"
 oc-switch
 ```
 
@@ -671,6 +674,22 @@ These skills are available under:
 opencode/skills/
 ```
 
+### Process skills
+
+OAK ships its own process skills, and each belongs to the agent that owns the
+phase. The harness does not depend on any external plugin for its process.
+
+| Skill | Agent | When |
+|---|---|---|
+| `oak-enrich-task` | `lead`, `scoper`, `specifier` | A vague request at intake becomes a specification with its open questions sorted |
+| `oak-adversarial-review` | `reviewer` | Every final review, with a per-file coverage line |
+| `oak-runtime-verification` | `developer` | Before the final review of a change with a runtime surface |
+| `oak-update-docs` | `developer` | Before closeout, when the change made documentation stale |
+| `oak-commit` | `developer` | Only when the human asks, or at `/autonomous` delivery |
+
+Pushing and pull requests go through `oak deliver` only. See
+[workflows](docs/workflows.md) and the [CLI reference](docs/cli.md).
+
 They are designed to help agents make better engineering decisions without forcing every task through every checklist.
 
 ## Optional integrations
@@ -823,7 +842,7 @@ Validate only the canonical identity and current release note with:
 
 ```bash
 npm run check:version
-node scripts/version.mjs --check-tag v1.0.45
+node scripts/version.mjs --check-tag v1.1.0
 ```
 
 Tag validation compares an explicitly supplied tag with the package identity.
