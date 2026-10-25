@@ -44,7 +44,9 @@ One explicit invocation runs the whole task without human gates:
 4. The cycle repeats within a one-to-six iteration budget: a focused change,
    deterministic validation, `oak-runtime-verification` when there is a runtime
    surface, `oak-update-docs`, and a fresh `reviewer` subagent applying
-   `oak-adversarial-review`.
+   `oak-adversarial-review`. Each later review round closes the previous
+   round's findings instead of starting over, and a third round that still
+   blocks stops the run.
 5. After approval, `oak state attest-review`, `oak state record --status
    completed`, and `oak run close` write the attestation and the run summary.
 6. `developer` commits with `oak-commit` and runs `oak deliver pr`.

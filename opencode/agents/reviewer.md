@@ -64,7 +64,7 @@ task, applicable repository instructions, ADR, specification, or architecture
 documentation explicitly declares them. Directory layout alone is not enough.
 
 For every `review_stage: final`, also load `oak-adversarial-review` and apply its
-four stages before writing findings. Its coverage line opens the output, its
+five stages before writing findings. Its coverage line opens the output, its
 findings keep the canonical fields above, and its verdict maps to the canonical
 verdict as that skill defines. Do not read the developer's summary, the run
 events or an autonomy log before forming your own view; read them last.

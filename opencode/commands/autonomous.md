@@ -67,7 +67,7 @@ oak state resume --root . --slug <slug> --contract .opencode/loops/<slug>.md --s
 oak run event --root . --type runtime_verification surface=<none|command|endpoint|store|screen> verdict=<verdict> evidence_count=<n>
 oak state record --root . --slug <slug> --session-id <RUN> --action-id iteration-<n> --iteration <n> --completed-step <step> --blocking-cause null
 # after each review, with the counts the reviewer returned:
-oak run event --root . --type review review=adversarial files_in_change=<n> files_reviewed=<n> files_skipped=<n> blocking=<n> should_fix=<n> nit=<n> verdict=<safe_to_commit|not_safe_to_commit>
+oak run event --root . --type review review=adversarial round=<n> files_in_change=<n> files_reviewed=<n> files_skipped=<n> blocking=<n> should_fix=<n> nit=<n> pre_existing=<n> verdict=<safe_to_commit|not_safe_to_commit>
 # after the final reviewer approval:
 oak state attest-review --root . --slug <slug> --reviewer-session-id <reviewer child session id> --reviewer-agent reviewer --reviewer-verdict APPROVE
 oak state record --root . --slug <slug> --session-id <RUN> --action-id completed --iteration <n> --completed-step reviewer_approved --blocking-cause null --status completed
@@ -132,9 +132,11 @@ review, `developer` runs `oak-update-docs`, so the reviewer sees the docs too.
 `lead` invokes `reviewer` only as a
 subagent with `task reviewer`; never run `opencode run --agent reviewer`. The
 reviewer applies `oak-adversarial-review` and stays read-only: it returns the
-report and its counts, and the state-sync `developer` copies the report
-verbatim to `docs/ai/runs/<date>-<slug>/oak-adversarial-review.md` and records the
-`review` run event. The reviewer must not read the autonomy log; a correction
+report and its counts, and the state-sync `developer` appends the report
+verbatim to `docs/ai/runs/<date>-<slug>/oak-adversarial-review.md` under a
+`## Round <n>` heading, never overwriting an earlier round, and records the
+`review` run event. `lead` tells each later reviewer its round number and that
+file's path. The reviewer must not read the autonomy log; a correction
 pass reads it first.
 
 Only that child session's final `pass` or `pass_with_observations` may complete
@@ -178,7 +180,9 @@ This list is closed. Stop only when:
    public interface, or rewriting pushed history; production, migrations,
    Terraform and Kubernetes land here;
 5. the harness itself blocks;
-6. two attempts at the same failure both failed; attach the output;
+6. two attempts at the same failure both failed; attach the output. A third
+   review round that still blocks lands here too: the fixes are not
+   converging, so attach the review report with its three rounds;
 7. the task looks wrong or already done.
 
 "I would prefer to confirm" is not a stop reason. Provider rate limits and
