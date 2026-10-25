@@ -170,7 +170,8 @@ it as the working rule for behavior or testable logic changes:
 - write the test that reproduces or protects the behavior first when viable;
 - make it pass with the minimum change;
 - refactor only after green;
-- cover relevant edge cases for the changed logic;
+- cover relevant edge cases for the changed logic, with the fewest tests that
+  pin it, following "Which Tests to Write" in `test-driven-development`;
 - report commands and results in the `Verification Envelope`.
 
 If TDD does not apply (docs, copy, config without a viable runner, or behavior
