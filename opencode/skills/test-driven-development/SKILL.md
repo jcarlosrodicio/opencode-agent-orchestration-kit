@@ -100,7 +100,7 @@ Run tests after every refactor step to confirm nothing broke.
 
 ## The Prove-It Pattern (Bug Fixes)
 
-When a bug is reported, **do not start by trying to fix it.** Start by writing a test that reproduces it.
+When a bug is reported, **do not start by trying to fix it.** Start by writing a test that reproduces it. Prefer tightening an existing test that should have caught it; add a new one only when none can (see [Which Tests to Write](#which-tests-to-write)).
 
 ```
 Bug report arrives
@@ -189,6 +189,21 @@ Does it cross a boundary (API, database, file system)?
 Is it a critical user flow that must work end-to-end?
   → E2E test (large) — limit these to critical paths
 ```
+
+## Which Tests to Write
+
+Every test is paid for on every task: the validation gate runs it, CI runs it, and a suite that grows "just in case" becomes the slowest stage of the loop. The question for every new test is **what real bug would reach users that no existing test catches?** If the answer is none, or a cosmetic one, do not write it.
+
+- **Search before you write.** Find the test that already covers the behavior (search for the function, the error code, the message) and extend it. A new test is for what nothing asserts yet.
+- **One test per rule, at the cheapest layer that proves it**, usually a unit test in the module that owns the behavior. Do not prove the same rule again at another layer. A slower test covers the wiring once per path, and only when the details are already unit-tested.
+- **One representative case plus the edges that genuinely differ**: a boundary, an error path. No table of near-identical inputs, and no variant per button, per wording or per runtime when the code path is shared.
+- **Do not test** constructors, getters, equality, copies or one-line delegation; that a constant, a type or an export exists; what the type system or a static check already enforces; the language, a library or the framework; copy, colors, layout or the shape of a view tree; the contents of documentation; or the implementation mirrored line by line. Never write a test that asserts other test files exist.
+- **Tests live with the module they test.** A task, a phase or a bug does not get its own test file. Prefer extending an existing file: many runners pay a per-file cost that can dominate the run.
+- **A bug fix adds at most one regression test**, and only when no existing test can be tightened to catch it.
+- **Slow tests are the exception.** Real processes, real network and real timers only when nothing faster can prove the behavior. Never a fixed sleep: fake the clock, or poll with a timeout.
+- **Always kept:** security, secrets, credentials, permissions, refusals, money, data-transforming migrations and data loss each need a test at their enforcement point. Remove a test there only when the change names the test that still proves the same thing.
+
+The project's own test policy in its `AGENTS.md`, where it has one, wins over this list.
 
 ## Writing Good Tests
 
@@ -396,7 +411,7 @@ For detailed testing patterns, examples, and anti-patterns across frameworks, se
 
 After completing any implementation:
 
-- [ ] Every new behavior has a corresponding test
+- [ ] Every new behavior that [Which Tests to Write](#which-tests-to-write) calls for has a corresponding test
 - [ ] All tests pass: `npm test`
 - [ ] Bug fixes include a reproduction test that failed before the fix
 - [ ] Test names describe the behavior being verified

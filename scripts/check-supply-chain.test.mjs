@@ -43,8 +43,12 @@ const VALID = {
   },
   npm_overrides: {
     "@babel/core": "7.29.7",
-    "brace-expansion": "5.0.9",
+    "brace-expansion": "5.0.12",
+    seroval: "1.6.8",
+    "seroval-plugins": "1.6.8",
+    toml: "5.0.1",
     uuid: "14.0.0",
+    zod: "4.6.7",
   },
 };
 
@@ -88,7 +92,11 @@ function canonicalPolicy() {
 | opencode-ai | ${VALID.external_refs.opencode_ai.version} | exact version |
 | @babel/core override | ${VALID.npm_overrides["@babel/core"]} | exact version |
 | brace-expansion override | ${VALID.npm_overrides["brace-expansion"]} | exact version |
+| seroval override | ${VALID.npm_overrides.seroval} | exact version |
+| seroval-plugins override | ${VALID.npm_overrides["seroval-plugins"]} | exact version |
+| toml override | ${VALID.npm_overrides.toml} | exact version |
 | uuid override | ${VALID.npm_overrides.uuid} | exact version |
+| zod override | ${VALID.npm_overrides.zod} | exact version |
 <!-- supply-chain-pins:end -->
 
 Automated installs with intact shipped manifests use \`npm ci --ignore-scripts\`.
@@ -193,13 +201,33 @@ function withSurfaceFixture(callback) {
         },
         "node_modules/brace-expansion": {
           version: VALID.npm_overrides["brace-expansion"],
-          resolved: "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.9.tgz",
+          resolved: "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.12.tgz",
           integrity: "sha512-braceexpansion",
+        },
+        "node_modules/seroval": {
+          version: VALID.npm_overrides.seroval,
+          resolved: "https://registry.npmjs.org/seroval/-/seroval-1.6.8.tgz",
+          integrity: "sha512-seroval",
+        },
+        "node_modules/seroval-plugins": {
+          version: VALID.npm_overrides["seroval-plugins"],
+          resolved: "https://registry.npmjs.org/seroval-plugins/-/seroval-plugins-1.6.8.tgz",
+          integrity: "sha512-serovalplugins",
+        },
+        "node_modules/toml": {
+          version: VALID.npm_overrides.toml,
+          resolved: "https://registry.npmjs.org/toml/-/toml-5.0.1.tgz",
+          integrity: "sha512-toml",
         },
         "node_modules/uuid": {
           version: VALID.npm_overrides.uuid,
           resolved: "https://registry.npmjs.org/uuid/-/uuid-14.0.0.tgz",
           integrity: "sha512-uuid",
+        },
+        "node_modules/zod": {
+          version: VALID.npm_overrides.zod,
+          resolved: "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz",
+          integrity: "sha512-zod",
         },
         "node_modules/example": {
           version: "1.2.3",
@@ -720,7 +748,7 @@ test("surface validation rejects a lockfile not regenerated to the brace-expansi
     fs.writeFileSync(path.join(root, relative), `${JSON.stringify(lock)}\n`);
     assert.throws(
       () => checkSupplyChain(root),
-      /package-lock\.json brace-expansion must resolve to 5\.0\.9/,
+      /package-lock\.json brace-expansion must resolve to 5\.0\.12/,
     );
   });
 });
