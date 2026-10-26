@@ -32,7 +32,7 @@ const PRIVATE_MARKERS = [
 
 function walk(directory, root = directory, files = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if ([".git", "node_modules"].includes(entry.name)) continue;
+    if ([".git", ".codegraph", "node_modules"].includes(entry.name)) continue;
     if ([".gitignore", "check.sh"].includes(entry.name)) continue;
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) walk(full, root, files);

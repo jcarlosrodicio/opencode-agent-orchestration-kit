@@ -22,6 +22,18 @@ test("the boundary scan reports a private marker without echoing its value", () 
   }
 });
 
+test("the boundary scan skips the local CodeGraph index", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "public-boundary-codegraph-"));
+  try {
+    const leaked = ["/", "Users", "example", "secret"].join("/");
+    fs.mkdirSync(path.join(root, ".codegraph"));
+    fs.writeFileSync(path.join(root, ".codegraph", "daemon.log"), leaked);
+    assert.deepEqual(scanPublicLeaks(root), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("missing boundary documentation fails closed", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "public-boundary-missing-"));
   try {
