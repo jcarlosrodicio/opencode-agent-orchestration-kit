@@ -22,7 +22,7 @@ const EXACT_KEYS = {
   commit: ["commit"],
   image: ["tag", "digest"],
   version: ["version"],
-  overrides: ["@babel/core", "brace-expansion", "seroval", "seroval-plugins", "toml", "uuid", "zod"],
+  overrides: ["@babel/core", "brace-expansion", "glob", "seroval", "seroval-plugins", "toml", "uuid", "zod"],
 };
 
 const COMMIT = /^[0-9a-f]{40}$/;
@@ -106,6 +106,7 @@ export function validateSupplyChainData(data) {
     data.npm_overrides["brace-expansion"],
     "npm_overrides.brace-expansion",
   );
+  assertStableVersion(data.npm_overrides.glob, "npm_overrides.glob");
   assertStableVersion(data.npm_overrides.seroval, "npm_overrides.seroval");
   assertStableVersion(data.npm_overrides["seroval-plugins"], "npm_overrides.seroval-plugins");
   assertStableVersion(data.npm_overrides.toml, "npm_overrides.toml");
@@ -501,6 +502,7 @@ function canonicalDocumentationPinBlock(data) {
 | opencode-ai | ${data.external_refs.opencode_ai.version} | exact version |
 | @babel/core override | ${data.npm_overrides["@babel/core"]} | exact version |
 | brace-expansion override | ${data.npm_overrides["brace-expansion"]} | exact version |
+| glob override | ${data.npm_overrides.glob} | exact version |
 | seroval override | ${data.npm_overrides.seroval} | exact version |
 | seroval-plugins override | ${data.npm_overrides["seroval-plugins"]} | exact version |
 | toml override | ${data.npm_overrides.toml} | exact version |
@@ -532,6 +534,7 @@ function validateDocumentation(root, data, fsOps) {
       "| opencode-ai |",
       "| @babel/core override |",
       "| brace-expansion override |",
+      "| glob override |",
       "| seroval override |",
       "| seroval-plugins override |",
       "| toml override |",

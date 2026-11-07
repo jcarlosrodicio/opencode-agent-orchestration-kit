@@ -16,8 +16,9 @@ the immutable identifier consumed by the repository.
 | opencode-ai | 1.14.31 | exact version |
 | @babel/core override | 7.29.7 | exact version |
 | brace-expansion override | 5.0.12 | exact version |
-| seroval override | 1.6.8 | exact version |
-| seroval-plugins override | 1.6.8 | exact version |
+| glob override | 14.0.2 | exact version |
+| seroval override | 1.6.12 | exact version |
+| seroval-plugins override | 1.6.12 | exact version |
 | toml override | 5.0.1 | exact version |
 | uuid override | 14.0.0 | exact version |
 | zod override | 4.6.7 | exact version |
@@ -37,10 +38,14 @@ the audited low-severity findings without an incompatible downgrade,
 `brace-expansion` 5.0.12 fixes GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895,
 GHSA-6j4f-fj2g-mc7p, GHSA-qhr7-859c-m2p7 and GHSA-q2hr-2g5m-vwhr in the transitive
 OpenTUI/Babel resolution, and `uuid` 14.0.0 preserves the already tested
-lockfile resolution. `seroval` and `seroval-plugins` 1.6.8 fix
-GHSA-p6vx-979v-rg4c and GHSA-jp82-f5mq-hwhp under `solid-js`, which stays at
-1.9.12 because `@opentui/solid` 0.2.5 requires exactly that version; 1.6.8 is
-the line `solid-js` 1.9.17 itself depends on. `toml` 5.0.1 fixes
+lockfile resolution. `seroval` and `seroval-plugins` 1.6.12 fix
+GHSA-p6vx-979v-rg4c, GHSA-jp82-f5mq-hwhp, GHSA-9wx9-5pv9-3349 and
+GHSA-f86p-h4j2-7qgj under `solid-js`, which stays at 1.9.12 because
+`@opentui/solid` 0.2.5 requires exactly that version; 1.6 is the line
+`solid-js` 1.9.17 itself depends on. `glob` 14.0.2 fixes GHSA-3g3m-2fjr-6pw4
+and, through its `minimatch` 11 range, GHSA-g3hv-75wg-m249 under
+`babel-plugin-module-resolver`; that plugin only calls `glob` for its `root`
+option, which `@opentui/solid` does not pass. `toml` 5.0.1 fixes
 GHSA-4qx8-w7c3-pj3p, GHSA-9j65-hcg3-gc64 and GHSA-9qmh-m7c6-f92p, and `zod` 4.6.7
 fixes GHSA-mrhx-c7xc-m3w5, both under the pinned `@opencode-ai/plugin`. Change an override and regenerate the lockfile in the same
 reviewed diff. Review every changed version, `resolved` URL, integrity value,
@@ -92,7 +97,7 @@ For each surface, also record:
   audit, signature audit, import, and full package smoke evidence.
 - `uuid` override: compatibility rationale, manifest/lockfile diff, signature
   audit, import, and typecheck evidence.
-- `seroval`, `seroval-plugins`, `toml` and `zod` overrides: advisory rationale,
+- `glob`, `seroval`, `seroval-plugins`, `toml` and `zod` overrides: advisory rationale,
   manifest/lockfile diff, low audit, signature audit, import, and OpenCode
   compatibility smoke evidence.
 

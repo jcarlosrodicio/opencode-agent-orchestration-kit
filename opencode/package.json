@@ -11,8 +11,9 @@
   "overrides": {
     "@babel/core": "7.29.7",
     "brace-expansion": "5.0.12",
-    "seroval": "1.6.8",
-    "seroval-plugins": "1.6.8",
+    "glob": "14.0.2",
+    "seroval": "1.6.12",
+    "seroval-plugins": "1.6.12",
     "toml": "5.0.1",
     "uuid": "14.0.0",
     "zod": "4.6.7"
