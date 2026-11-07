@@ -44,8 +44,9 @@ const VALID = {
   npm_overrides: {
     "@babel/core": "7.29.7",
     "brace-expansion": "5.0.12",
-    seroval: "1.6.8",
-    "seroval-plugins": "1.6.8",
+    glob: "14.0.2",
+    seroval: "1.6.12",
+    "seroval-plugins": "1.6.12",
     toml: "5.0.1",
     uuid: "14.0.0",
     zod: "4.6.7",
@@ -92,6 +93,7 @@ function canonicalPolicy() {
 | opencode-ai | ${VALID.external_refs.opencode_ai.version} | exact version |
 | @babel/core override | ${VALID.npm_overrides["@babel/core"]} | exact version |
 | brace-expansion override | ${VALID.npm_overrides["brace-expansion"]} | exact version |
+| glob override | ${VALID.npm_overrides.glob} | exact version |
 | seroval override | ${VALID.npm_overrides.seroval} | exact version |
 | seroval-plugins override | ${VALID.npm_overrides["seroval-plugins"]} | exact version |
 | toml override | ${VALID.npm_overrides.toml} | exact version |
@@ -204,14 +206,19 @@ function withSurfaceFixture(callback) {
           resolved: "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.12.tgz",
           integrity: "sha512-braceexpansion",
         },
+        "node_modules/glob": {
+          version: VALID.npm_overrides.glob,
+          resolved: "https://registry.npmjs.org/glob/-/glob-14.0.2.tgz",
+          integrity: "sha512-glob",
+        },
         "node_modules/seroval": {
           version: VALID.npm_overrides.seroval,
-          resolved: "https://registry.npmjs.org/seroval/-/seroval-1.6.8.tgz",
+          resolved: "https://registry.npmjs.org/seroval/-/seroval-1.6.12.tgz",
           integrity: "sha512-seroval",
         },
         "node_modules/seroval-plugins": {
           version: VALID.npm_overrides["seroval-plugins"],
-          resolved: "https://registry.npmjs.org/seroval-plugins/-/seroval-plugins-1.6.8.tgz",
+          resolved: "https://registry.npmjs.org/seroval-plugins/-/seroval-plugins-1.6.12.tgz",
           integrity: "sha512-serovalplugins",
         },
         "node_modules/toml": {
@@ -354,6 +361,10 @@ test("requires exact canonical versions without ranges", () => {
   expectInvalid(
     (data) => { data.npm_overrides["brace-expansion"] = "^5.0.9"; },
     "npm_overrides.brace-expansion",
+  );
+  expectInvalid(
+    (data) => { data.npm_overrides.glob = "^14.0.2"; },
+    "npm_overrides.glob",
   );
   expectInvalid(
     (data) => { data.npm_overrides.uuid = "14.0"; },
@@ -614,6 +625,7 @@ for (const [label, current, replacement] of [
   ["opencode-ai", `| opencode-ai | ${VALID.external_refs.opencode_ai.version} |`, "| opencode-ai | DRIFTED |"],
   ["Babel override", `| @babel/core override | ${VALID.npm_overrides["@babel/core"]} |`, "| @babel/core override | DRIFTED |"],
   ["brace-expansion override", `| brace-expansion override | ${VALID.npm_overrides["brace-expansion"]} |`, "| brace-expansion override | DRIFTED |"],
+  ["glob override", `| glob override | ${VALID.npm_overrides.glob} |`, "| glob override | DRIFTED |"],
   ["uuid override", `| uuid override | ${VALID.npm_overrides.uuid} |`, "| uuid override | DRIFTED |"],
 ]) {
   test(`documentation validation rejects a drifted ${label} pin`, () => {
@@ -702,6 +714,9 @@ for (const [dependency, mutation] of [
   ["brace-expansion", (packageData) => { delete packageData.overrides["brace-expansion"]; }],
   ["brace-expansion range", (packageData) => { packageData.overrides["brace-expansion"] = "^5.0.9"; }],
   ["brace-expansion wrong version", (packageData) => { packageData.overrides["brace-expansion"] = "5.0.7"; }],
+  ["glob", (packageData) => { delete packageData.overrides.glob; }],
+  ["glob range", (packageData) => { packageData.overrides.glob = "^14.0.2"; }],
+  ["glob wrong version", (packageData) => { packageData.overrides.glob = "14.0.1"; }],
   ["uuid", (packageData) => { delete packageData.overrides.uuid; }],
   ["uuid range", (packageData) => { packageData.overrides.uuid = "^14.0.0"; }],
   ["uuid wrong version", (packageData) => { packageData.overrides.uuid = "13.0.0"; }],
