@@ -44,11 +44,10 @@ const VALID = {
   npm_overrides: {
     "@babel/core": "7.29.7",
     "brace-expansion": "5.0.12",
+    effect: "4.0.7",
     glob: "14.0.2",
     seroval: "1.6.12",
     "seroval-plugins": "1.6.12",
-    toml: "5.0.1",
-    uuid: "14.0.0",
     zod: "4.6.7",
   },
 };
@@ -93,11 +92,10 @@ function canonicalPolicy() {
 | opencode-ai | ${VALID.external_refs.opencode_ai.version} | exact version |
 | @babel/core override | ${VALID.npm_overrides["@babel/core"]} | exact version |
 | brace-expansion override | ${VALID.npm_overrides["brace-expansion"]} | exact version |
+| effect override | ${VALID.npm_overrides.effect} | exact version |
 | glob override | ${VALID.npm_overrides.glob} | exact version |
 | seroval override | ${VALID.npm_overrides.seroval} | exact version |
 | seroval-plugins override | ${VALID.npm_overrides["seroval-plugins"]} | exact version |
-| toml override | ${VALID.npm_overrides.toml} | exact version |
-| uuid override | ${VALID.npm_overrides.uuid} | exact version |
 | zod override | ${VALID.npm_overrides.zod} | exact version |
 <!-- supply-chain-pins:end -->
 
@@ -206,6 +204,11 @@ function withSurfaceFixture(callback) {
           resolved: "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.12.tgz",
           integrity: "sha512-braceexpansion",
         },
+        "node_modules/effect": {
+          version: VALID.npm_overrides.effect,
+          resolved: "https://registry.npmjs.org/effect/-/effect-4.0.7.tgz",
+          integrity: "sha512-effect",
+        },
         "node_modules/glob": {
           version: VALID.npm_overrides.glob,
           resolved: "https://registry.npmjs.org/glob/-/glob-14.0.2.tgz",
@@ -220,16 +223,6 @@ function withSurfaceFixture(callback) {
           version: VALID.npm_overrides["seroval-plugins"],
           resolved: "https://registry.npmjs.org/seroval-plugins/-/seroval-plugins-1.6.12.tgz",
           integrity: "sha512-serovalplugins",
-        },
-        "node_modules/toml": {
-          version: VALID.npm_overrides.toml,
-          resolved: "https://registry.npmjs.org/toml/-/toml-5.0.1.tgz",
-          integrity: "sha512-toml",
-        },
-        "node_modules/uuid": {
-          version: VALID.npm_overrides.uuid,
-          resolved: "https://registry.npmjs.org/uuid/-/uuid-14.0.0.tgz",
-          integrity: "sha512-uuid",
         },
         "node_modules/zod": {
           version: VALID.npm_overrides.zod,
@@ -304,7 +297,7 @@ test("rejects missing and unknown keys at every schema level", () => {
   expectInvalid((data) => { data.external_refs.unknown = {}; }, "external_refs keys");
   expectInvalid((data) => delete data.external_refs.actions_checkout.commit, "external_refs.actions_checkout keys");
   expectInvalid((data) => { data.external_refs.node_image.unknown = true; }, "external_refs.node_image keys");
-  expectInvalid((data) => delete data.npm_overrides.uuid, "npm_overrides keys");
+  expectInvalid((data) => delete data.npm_overrides.effect, "npm_overrides keys");
   expectInvalid((data) => { data.npm_overrides.extra = "1.0.0"; }, "npm_overrides keys");
 });
 
@@ -367,8 +360,8 @@ test("requires exact canonical versions without ranges", () => {
     "npm_overrides.glob",
   );
   expectInvalid(
-    (data) => { data.npm_overrides.uuid = "14.0"; },
-    "npm_overrides.uuid",
+    (data) => { data.npm_overrides.effect = "4.0"; },
+    "npm_overrides.effect",
   );
 });
 
@@ -626,7 +619,7 @@ for (const [label, current, replacement] of [
   ["Babel override", `| @babel/core override | ${VALID.npm_overrides["@babel/core"]} |`, "| @babel/core override | DRIFTED |"],
   ["brace-expansion override", `| brace-expansion override | ${VALID.npm_overrides["brace-expansion"]} |`, "| brace-expansion override | DRIFTED |"],
   ["glob override", `| glob override | ${VALID.npm_overrides.glob} |`, "| glob override | DRIFTED |"],
-  ["uuid override", `| uuid override | ${VALID.npm_overrides.uuid} |`, "| uuid override | DRIFTED |"],
+  ["effect override", `| effect override | ${VALID.npm_overrides.effect} |`, "| effect override | DRIFTED |"],
 ]) {
   test(`documentation validation rejects a drifted ${label} pin`, () => {
     withSurfaceFixture((root) => {
@@ -717,9 +710,9 @@ for (const [dependency, mutation] of [
   ["glob", (packageData) => { delete packageData.overrides.glob; }],
   ["glob range", (packageData) => { packageData.overrides.glob = "^14.0.2"; }],
   ["glob wrong version", (packageData) => { packageData.overrides.glob = "14.0.1"; }],
-  ["uuid", (packageData) => { delete packageData.overrides.uuid; }],
-  ["uuid range", (packageData) => { packageData.overrides.uuid = "^14.0.0"; }],
-  ["uuid wrong version", (packageData) => { packageData.overrides.uuid = "13.0.0"; }],
+  ["effect", (packageData) => { delete packageData.overrides.effect; }],
+  ["effect range", (packageData) => { packageData.overrides.effect = "^4.0.7"; }],
+  ["effect wrong version", (packageData) => { packageData.overrides.effect = "4.0.6"; }],
 ]) {
   test(`surface validation rejects absent, ranged, or wrong ${dependency} override`, () => {
     withSurfaceFixture((root) => {

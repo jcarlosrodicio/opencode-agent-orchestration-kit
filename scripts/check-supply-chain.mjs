@@ -22,7 +22,7 @@ const EXACT_KEYS = {
   commit: ["commit"],
   image: ["tag", "digest"],
   version: ["version"],
-  overrides: ["@babel/core", "brace-expansion", "glob", "seroval", "seroval-plugins", "toml", "uuid", "zod"],
+  overrides: ["@babel/core", "brace-expansion", "effect", "glob", "seroval", "seroval-plugins", "zod"],
 };
 
 const COMMIT = /^[0-9a-f]{40}$/;
@@ -106,11 +106,10 @@ export function validateSupplyChainData(data) {
     data.npm_overrides["brace-expansion"],
     "npm_overrides.brace-expansion",
   );
+  assertStableVersion(data.npm_overrides.effect, "npm_overrides.effect");
   assertStableVersion(data.npm_overrides.glob, "npm_overrides.glob");
   assertStableVersion(data.npm_overrides.seroval, "npm_overrides.seroval");
   assertStableVersion(data.npm_overrides["seroval-plugins"], "npm_overrides.seroval-plugins");
-  assertStableVersion(data.npm_overrides.toml, "npm_overrides.toml");
-  assertStableVersion(data.npm_overrides.uuid, "npm_overrides.uuid");
   assertStableVersion(data.npm_overrides.zod, "npm_overrides.zod");
   return data;
 }
@@ -502,11 +501,10 @@ function canonicalDocumentationPinBlock(data) {
 | opencode-ai | ${data.external_refs.opencode_ai.version} | exact version |
 | @babel/core override | ${data.npm_overrides["@babel/core"]} | exact version |
 | brace-expansion override | ${data.npm_overrides["brace-expansion"]} | exact version |
+| effect override | ${data.npm_overrides.effect} | exact version |
 | glob override | ${data.npm_overrides.glob} | exact version |
 | seroval override | ${data.npm_overrides.seroval} | exact version |
 | seroval-plugins override | ${data.npm_overrides["seroval-plugins"]} | exact version |
-| toml override | ${data.npm_overrides.toml} | exact version |
-| uuid override | ${data.npm_overrides.uuid} | exact version |
 | zod override | ${data.npm_overrides.zod} | exact version |
 <!-- supply-chain-pins:end -->`;
 }
@@ -534,11 +532,10 @@ function validateDocumentation(root, data, fsOps) {
       "| opencode-ai |",
       "| @babel/core override |",
       "| brace-expansion override |",
+      "| effect override |",
       "| glob override |",
       "| seroval override |",
       "| seroval-plugins override |",
-      "| toml override |",
-      "| uuid override |",
       "| zod override |",
     ].map((row) => actualBlock.indexOf(row));
     const rowsAreOrdered = rowPositions.every(
