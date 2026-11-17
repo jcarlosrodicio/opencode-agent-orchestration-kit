@@ -838,6 +838,10 @@ function checkAutonomousContract() {
   }
 }
 
+const KIT_SCRIPTS_DIR = '"${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts';
+const LOOP_STATE_COMMAND = `node ${KIT_SCRIPTS_DIR}/loop-state.mjs"`;
+const MISSION_STATUS_COMMAND = `node ${KIT_SCRIPTS_DIR}/mission-status.mjs"`;
+
 function checkLoopContract() {
   const rel = "commands/loop.md";
   if (!exists(rel)) {
@@ -864,14 +868,22 @@ function checkLoopContract() {
 
   const phase1 = text.split("## Phase 1")[1]?.split("## Phase 2")[0] || "";
   const phase2 = text.split("## Phase 2")[1]?.split("## Phase 3")[0] || "";
-  if (!phase1.includes("node scripts/loop-state.mjs inspect")) {
+  if (!phase1.includes(`${LOOP_STATE_COMMAND} inspect`)) {
     fail(`${rel}: resume preflight must use read-only loop-state inspect`);
   }
-  if (phase1.includes("node scripts/loop-state.mjs resume")) {
+  if (/loop-state\.mjs"?\s+resume/.test(phase1)) {
     fail(`${rel}: loop-state resume cannot run before approval`);
   }
-  if (!phase2.includes("node scripts/loop-state.mjs resume")) {
+  if (!phase2.includes(`${LOOP_STATE_COMMAND} resume`)) {
     fail(`${rel}: loop-state resume must run after approval`);
+  }
+  // The runtime ships in the config directory, not in the project: a
+  // project-relative call is not executable and led agents to improvise one.
+  if (/node\s+(?:\.\/)?scripts\/loop-state\.mjs/.test(text)) {
+    fail(`${rel}: loop-state must run from the config directory, not project-relative scripts/`);
+  }
+  if (!text.includes("state_runtime_missing: stop_and_report")) {
+    fail(`${rel}: missing state_runtime_missing: stop_and_report`);
   }
 
   for (const runtimeRel of [
@@ -1338,6 +1350,8 @@ function checkLeadRouterContract() {
     '"cd *": allow',
     '"which": allow',
     '"which *": allow',
+    '"node *scripts/loop-state.mjs inspect*": allow',
+    '"node *scripts/mission-status.mjs*": allow',
   ]) {
     if (!frontmatter.includes(command)) {
       fail(`agents/lead.md: missing bash allow ${command}`);
@@ -3127,6 +3141,11 @@ function checkMissionRuntimeContract() {
     if (!exists(rel)) fail(`${rel}: missing mission runtime surface`);
   }
   if (!required.every(exists)) return;
+
+  const loopStatus = read("commands/loop-status.md");
+  if (!loopStatus.includes(MISSION_STATUS_COMMAND) || /node\s+(?:\.\/)?scripts\/mission-status\.mjs/.test(loopStatus)) {
+    fail("commands/loop-status.md: mission-status must run from the config directory, not project-relative scripts/");
+  }
 
   const status = read("scripts/mission-status.mjs");
   for (const token of ["inspectLoopState", "readLoopHistory", "--json", "next_action"]) {

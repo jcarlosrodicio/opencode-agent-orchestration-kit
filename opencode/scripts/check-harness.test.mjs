@@ -550,6 +550,9 @@ test("orchestration catalog preserves approved behavior", async (t) => {
   }
 });
 
+const kitScriptsDir = '"${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts';
+const loopStateCommand = `node ${kitScriptsDir}/loop-state.mjs"`;
+
 const validLoopCommand = `---
 description: Run a bounded and verifiable engineering loop.
 agent: lead
@@ -563,16 +566,17 @@ history_path: .opencode/loops/<slug>.history.jsonl
 lock_path: .opencode/loops/<slug>.lock
 human_view_path: .opencode/loops/<slug>.md
 worktree_mode: explicit_opt_in
+state_runtime_missing: stop_and_report
 
 developer -> reviewer -> developer (state sync)
 
 ## Phase 1
 
-node scripts/loop-state.mjs inspect
+${loopStateCommand} inspect
 
 ## Phase 2
 
-node scripts/loop-state.mjs resume
+${loopStateCommand} resume
 
 ## Phase 3
 `;
@@ -1021,8 +1025,8 @@ test("harness rejects loop resume writes before approval", () => {
     writeLoopFixture(
       cwd,
       validLoopCommand.replace(
-        "node scripts/loop-state.mjs inspect",
-        "node scripts/loop-state.mjs resume",
+        `${loopStateCommand} inspect`,
+        `${loopStateCommand} resume`,
       ),
     );
 
@@ -1035,6 +1039,80 @@ test("harness rejects loop resume writes before approval", () => {
     assert.match(
       result.stderr,
       /commands\/loop\.md: loop-state resume cannot run before approval/,
+    );
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects a project-relative loop-state call", () => {
+  const cwd = makeFixture();
+  try {
+    writeLoopFixture(
+      cwd,
+      validLoopCommand.replace(`${loopStateCommand} resume`, "node scripts/loop-state.mjs resume"),
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a project-relative loop-state call");
+    assert.match(
+      result.stderr,
+      /commands\/loop\.md: loop-state must run from the config directory, not project-relative scripts\//,
+    );
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects a loop command without the fail-closed runtime rule", () => {
+  const cwd = makeFixture();
+  try {
+    writeLoopFixture(cwd, validLoopCommand.replace("state_runtime_missing: stop_and_report\n", ""));
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a loop without the fail-closed rule");
+    assert.match(result.stderr, /commands\/loop\.md: missing state_runtime_missing: stop_and_report/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects a project-relative mission-status call", () => {
+  const cwd = makeFixture();
+  try {
+    const loopStatus = fs.readFileSync(path.join(cwd, "commands/loop-status.md"), "utf8");
+    write(
+      "commands/loop-status.md",
+      loopStatus.replaceAll(`node ${kitScriptsDir}/mission-status.mjs"`, "node scripts/mission-status.mjs"),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a project-relative mission-status call");
+    assert.match(
+      result.stderr,
+      /commands\/loop-status\.md: mission-status must run from the config directory/,
+    );
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("harness rejects a lead allowlist that only matches project-relative loop-state", () => {
+  const cwd = makeFixture();
+  try {
+    const lead = fs.readFileSync(path.join(cwd, "agents/lead.md"), "utf8");
+    write(
+      "agents/lead.md",
+      lead.replace('"node *scripts/loop-state.mjs inspect*"', '"node scripts/loop-state.mjs inspect*"'),
+      cwd,
+    );
+
+    const result = runHarness(cwd);
+    assert.notEqual(result.status, 0, "checker accepted a lead allowlist that denies the kit runtime");
+    assert.match(
+      result.stderr,
+      /agents\/lead\.md: missing bash allow "node \*scripts\/loop-state\.mjs inspect\*": allow/,
     );
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });

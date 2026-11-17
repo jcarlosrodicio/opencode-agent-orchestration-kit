@@ -26,7 +26,21 @@ history_path: .opencode/loops/<slug>.history.jsonl
 lock_path: .opencode/loops/<slug>.lock
 human_view_path: .opencode/loops/<slug>.md
 worktree_mode: explicit_opt_in
+state_runtime: ${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/loop-state.mjs
+state_runtime_missing: stop_and_report
 ```
+
+## State runtime
+
+The state writer is the kit's own `loop-state.mjs`, installed in the OpenCode
+config directory, not in the project. Every `loop-state.mjs` subcommand in this
+command (`inspect`, `init`, `resume`, `record`, `repair`, `migrate`, `release`)
+runs as `node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/loop-state.mjs" <subcommand>`
+from the project root. A project-local `scripts/loop-state.mjs` is never used.
+
+If that file does not exist, stop and report the missing path. Never create,
+copy, or hand-write a state writer, and never write `.opencode/loops/` files
+directly.
 
 The three-iteration value limits one invocation. The persisted
 `planned_iteration_budget` (`planned_iterations` in canonical state) is the total budget for the mission and may not
@@ -64,7 +78,7 @@ Before any write or handoff to `developer`:
 
 1. Read `AGENTS.md`, `PROJECT_CONTEXT.md`, or `docs/ai/project-context.md` when
    present, plus git state and the minimum relevant repository documentation.
-2. For resume, run only `node scripts/loop-state.mjs inspect` and read the
+2. For resume, run only `node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/loop-state.mjs" inspect` and read the
    requested Markdown. If state is missing or corrupt, stop; do not silently
    repair or replace it. `inspect` is read-only and does not acquire the lock.
 3. Identify pre-existing local changes and mark them protected. If the loop must
@@ -93,9 +107,9 @@ writes. Approval of the original objective is not approval of the concrete
 After approval, delegate only:
 
 1. for a new loop, creation or update of `.opencode/loops/<slug>.md`, followed
-   by `node scripts/loop-state.mjs init` with git baseline, session, and a
+   by `node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/loop-state.mjs" init` with git baseline, session, and a
    unique `action_id`;
-2. for an approved resume, `node scripts/loop-state.mjs resume` with slug,
+2. for an approved resume, `node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/loop-state.mjs" resume` with slug,
    contract, session, and a new `action_id`.
 
 Do not edit those files as `lead`.
@@ -118,7 +132,7 @@ modify `.gitignore` unless explicitly requested.
 JSON is the source of truth for schema version, approved contract hash, git
 baseline, session, approval, lease, status, iteration, last completed step,
 blocking cause, and last action ID. Record every transition with
-`node scripts/loop-state.mjs record`. Repeating identical content with the same
+`node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/loop-state.mjs" record`. Repeating identical content with the same
 `action_id` is idempotent; reusing it for different content is an error.
 Transitions from the same session are serialized inside the durable lock. A
 retry succeeds only when journal, snapshot, and locks prove a complete commit;
@@ -175,7 +189,7 @@ For sensitive paths use `blocked` or `paused`; never create a silent exception.
 ## Recovery and repair
 
 - An interrupted write can leave the journal ahead of the snapshot. Run
-  `node scripts/loop-state.mjs repair` to rebuild JSON from the latest complete
+  `node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/loop-state.mjs" repair` to rebuild JSON from the latest complete
   event.
 - Repair validates continuity of slug, contract, baseline, approval, iteration,
   and lease before trusting `state_after`.

@@ -25,7 +25,8 @@ permission:
     "grep *": allow
     "rg *": allow
     "node scripts/collect-session-evidence.mjs --iteration *": allow
-    "node scripts/loop-state.mjs inspect*": allow
+    "node *scripts/loop-state.mjs inspect*": allow
+    "node *scripts/mission-status.mjs*": allow
     "node scripts/preflight-audit.mjs --iteration *": allow
     "tail *": allow
     "which": allow
