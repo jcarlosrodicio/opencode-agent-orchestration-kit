@@ -9,8 +9,8 @@ Usa esta consulta para inspeccionar un loop existente sin reanudarlo ni
 modificarlo.
 
 ```bash
-node scripts/mission-status.mjs --root /ruta/absoluta/al/repo --slug <slug>
-node scripts/mission-status.mjs --root /ruta/absoluta/al/repo --slug <slug> --json
+node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/mission-status.mjs" --root /ruta/absoluta/al/repo --slug <slug>
+node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/mission-status.mjs" --root /ruta/absoluta/al/repo --slug <slug> --json
 ```
 
 La salida proyecta el snapshot canónico y el último evento validado:

@@ -44,7 +44,9 @@ generate or modify frontmatter.
   run anything, writes included. Measured: `lead` implemented on its own with
   grep/glob/read/bash instead of delegating. It is now `"*": deny` with a
   read-only allowlist, plus the exact scripts its own commands tell it to run
-  (`loop-state.mjs inspect`, `preflight-audit.mjs`). A shell plugin that
+  (`loop-state.mjs inspect` and `mission-status.mjs`, matched by
+  `node *scripts/...` because `/loop` and `/loop-status` run them from the
+  config directory; `preflight-audit.mjs`). A shell plugin that
   rewrites commands must have its rewritten forms allowlisted too, or they fall
   through to the deny.
 - `lead` emits its routing decision as **fields, not prose**: `route`,

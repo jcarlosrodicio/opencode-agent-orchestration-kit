@@ -159,6 +159,10 @@ Criteria:
 - `scripts/loop-state.mjs` performs atomic writes, requires idempotent
   `action_id` values, rejects a different contract, prevents simultaneous
   resumes, and serializes concurrent transitions from the same session.
+- `/loop` runs the kit's `scripts/loop-state.mjs` from the OpenCode config
+  directory (`${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}`),
+  never a project-local copy. If it is missing, `/loop` stops and reports; it
+  never improvises a state writer.
 - Each iteration allows one focused `developer` change; `reviewer` has exclusive
   authority to approve or escalate.
 - `developer` synchronizes the verdict into state without mixing in
@@ -180,7 +184,7 @@ Contract: `lead` read-only projection.
 
 `/loop-status --slug <slug>` inspects the canonical snapshot and append-only
 history without acquiring a write lock or changing files. Use
-`node scripts/mission-status.mjs --root /absolute/repository --slug <slug>`
+`node "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/scripts/mission-status.mjs" --root /absolute/repository --slug <slug>`
 when an explicit repository root is needed. If state is missing, stale, or
 corrupt, report the durable error and do not repair or resume automatically.
 
