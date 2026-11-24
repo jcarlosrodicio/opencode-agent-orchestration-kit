@@ -69,6 +69,11 @@ export function parseOpenCodeModelList(stdout) {
   return grouped;
 }
 
+export function parseOpenCodeMajorVersion(stdout) {
+  const match = String(stdout).match(/(\d+)\.\d+\.\d+/);
+  return match ? Number(match[1]) : undefined;
+}
+
 export function parseOpenCodeAuthProviders(stdout) {
   if (typeof stdout !== "string") throw new Error("auth stdout must be a string");
   const providers = [];
@@ -232,9 +237,17 @@ function shellRcPath({ homeDir, shell }) {
   throw new Error("oc-switch supports zsh and bash startup files");
 }
 
+function modelEnvironment(state) {
+  return {
+    OPENCODE_MODEL: state.defaultModel,
+    OPENCODE_SMALL_MODEL: state.smallModel,
+    ...Object.fromEntries(AGENT_IDS.map((agent) => [agentEnvKey(agent), state.agents[agent]])),
+  };
+}
+
 function updateShellRc(contents, state) {
-  const managed = [SHELL_START, `export OPENCODE_MODEL=${shellQuote(state.defaultModel)}`, `export OPENCODE_SMALL_MODEL=${shellQuote(state.smallModel)}`,
-    ...AGENT_IDS.map((agent) => `export ${agentEnvKey(agent)}=${shellQuote(state.agents[agent])}`), SHELL_END].join("\n");
+  const managed = [SHELL_START,
+    ...Object.entries(modelEnvironment(state)).map(([key, value]) => `export ${key}=${shellQuote(value)}`), SHELL_END].join("\n");
   const block = new RegExp(`${SHELL_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?${SHELL_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\r?\\n?`, "g");
   return `${contents.replace(block, "").trimEnd()}\n\n${managed}\n`;
 }
@@ -280,9 +293,9 @@ function resolveBinary({ signal } = {}) {
   });
 }
 
-function runCommand(args, { signal } = {}) {
+function runCommand(args, { signal, env } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(args[0], args.slice(1), { shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(args[0], args.slice(1), { shell: false, stdio: ["ignore", "pipe", "pipe"], env });
     let stdout = "";
     const abort = () => child.kill("SIGTERM");
     signal?.addEventListener("abort", abort, { once: true });
@@ -306,17 +319,38 @@ function frame(screen, first, previousLineCount) {
 export function createOcSwitcher({ homeDir = os.homedir(), env = process.env, shell = env.SHELL, now = () => new Date().toISOString(), resolve = resolveBinary, command = runCommand } = {}) {
   const filePath = statePath({ homeDir, env });
   const read = () => readState(filePath, env, now);
-  const save = (state) => {
+  let majorVersion;
+  const openCodeMajor = async (binary, signal) => {
+    if (majorVersion === undefined) {
+      try { majorVersion = parseOpenCodeMajorVersion(await command([binary, "--version"], { signal })) ?? 1; } catch { majorVersion = 1; }
+    }
+    return majorVersion;
+  };
+  const save = async (state) => {
     const normalized = { ...state, schemaVersion: STATE_VERSION, updatedAt: now() };
     atomicWrite(filePath, `${JSON.stringify(normalized, null, 2)}\n`);
     const rcPath = shellRcPath({ homeDir, shell });
     let contents = "";
     try { contents = fs.readFileSync(rcPath, "utf8"); } catch (cause) { if (cause?.code !== "ENOENT") throw cause; }
     atomicWrite(rcPath, updateShellRc(contents, normalized));
+    const binary = await resolve();
+    // OpenCode 2 runs prompts through a background service that keeps the
+    // environment it started with, so new model variables need a restart.
+    if (await openCodeMajor(binary) >= 2) {
+      try {
+        await command([binary, "service", "restart"], { env: { ...env, ...modelEnvironment(normalized) } });
+      } catch {
+        throw Object.assign(new Error("Saved. Run `opencode service restart` to apply the new models."), { saved: true });
+      }
+    }
     return normalized;
   };
   const refresh = async ({ signal, forceRefresh = false } = {}) => {
     const binary = await resolve({ signal });
+    // OpenCode 2 removed --pure/--refresh and only lists providers with credentials.
+    if (await openCodeMajor(binary, signal) >= 2) {
+      return Object.values(parseOpenCodeModelList(await command([binary, "models"], { signal }))).flat();
+    }
     const providers = configuredProviderIds({ homeDir, env });
     try {
       const auth = await command([binary, "auth", "list"], { signal });
@@ -360,7 +394,19 @@ export async function runTerminalOcSwitcher({ input = process.stdin, output = pr
     previousLineCount = screenText.split("\n").length;
   };
   const finish = (nextResult) => { finished = true; result = nextResult; controller.abort(); };
-  const persist = async () => { state = await saveState(state); dirty = false; status = "Guardado."; };
+  let saveWarning;
+  const persist = async () => {
+    try {
+      state = await saveState(state);
+      saveWarning = undefined;
+      status = "Guardado.";
+    } catch (error) {
+      if (!error?.saved) throw error;
+      saveWarning = error.message;
+      status = error.message;
+    }
+    dirty = false;
+  };
   const startRefresh = (first = false) => {
     catalogFresh = false;
     status = "Loading models...";
@@ -401,7 +447,7 @@ export async function runTerminalOcSwitcher({ input = process.stdin, output = pr
         }
       } else if (name === "r") startRefresh();
       else if (name === "s") persist().catch(() => { status = "Save failed."; });
-      else if (name === "q") persist().then(() => finish({ status: "saved", state })).catch(() => finish({ status: "error", error: "Save failed." }));
+      else if (name === "q") persist().then(() => finish({ status: "saved", state, ...(saveWarning ? { warning: saveWarning } : {}) })).catch(() => finish({ status: "error", error: "Save failed." }));
       else if (name === "escape") selectedAgents.clear();
     } else {
       const available = filtered();
@@ -470,4 +516,5 @@ export function isDirectExecution({
 if (isDirectExecution()) {
   const result = await runInteractive();
   if (result.status === "error") { process.stderr.write(`${result.error}\n`); process.exitCode = 1; }
+  if (result.warning) process.stderr.write(`${result.warning}\n`);
 }
