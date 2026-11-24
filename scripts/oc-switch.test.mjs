@@ -139,6 +139,34 @@ test("OpenCode TUI changes the default model and persists on q", async () => {
   assert.match(output.writes.join(""), /Loading models/);
 });
 
+test("OpenCode TUI reports a failed service restart as a saved warning on q", async () => {
+  const input = createTuiInput();
+  const output = { isTTY: true, rows: 30, writes: [], write(chunk) { this.writes.push(String(chunk)); } };
+  const state = {
+    schemaVersion: 1,
+    defaultModel: "nan/model-a",
+    smallModel: "nan/model-a",
+    agents: Object.fromEntries(AGENT_IDS.map((agent) => [agent, "nan/model-a"])),
+  };
+  const running = runTerminalOcSwitcher({
+    input,
+    output,
+    initialState: state,
+    initialModels: ["nan/model-a"],
+    refreshModels: async () => ["nan/model-a"],
+    saveState: async () => {
+      throw Object.assign(new Error("Saved. Run `opencode service restart` to apply the new models."), { saved: true });
+    },
+  });
+
+  await nextTick();
+  emitKey(input, "q");
+  const result = await running;
+
+  assert.equal(result.status, "saved");
+  assert.match(result.warning, /opencode service restart/);
+});
+
 test("OpenCode TUI changes the focused agent model", async () => {
   const input = createTuiInput();
   const output = { isTTY: true, rows: 30, writes: [], write(chunk) { this.writes.push(String(chunk)); } };
@@ -224,11 +252,89 @@ test("uses the local OpenCode model cache until an explicit refresh", async () =
   await switcher.refreshModels({ forceRefresh: true });
 
   assert.deepEqual(calls, [
+    ["/opt/opencode/bin/opencode", "--version"],
     ["/opt/opencode/bin/opencode", "auth", "list"],
     ["/opt/opencode/bin/opencode", "models", "--pure"],
     ["/opt/opencode/bin/opencode", "auth", "list"],
     ["/opt/opencode/bin/opencode", "models", "--pure", "--refresh"],
   ]);
+});
+
+test("reads the OpenCode 2 catalog without the removed --pure and --refresh flags", async () => {
+  const calls = [];
+  const switcher = createOcSwitcher({
+    homeDir: "/tmp/oc-switch-test-home",
+    env: { OPENCODE_MODEL: "openai/model-a" },
+    resolve: async () => "/opt/opencode/bin/opencode",
+    command: async (args) => {
+      calls.push(args);
+      if (args[1] === "--version") return "opencode v2.4.1\n";
+      return "openai/model-a\nopencode-go/model-b\nxai/model-c\n";
+    },
+  });
+
+  assert.deepEqual(await switcher.refreshModels(), ["openai/model-a", "opencode-go/model-b", "xai/model-c"]);
+  await switcher.refreshModels({ forceRefresh: true });
+
+  assert.deepEqual(calls, [
+    ["/opt/opencode/bin/opencode", "--version"],
+    ["/opt/opencode/bin/opencode", "models"],
+    ["/opt/opencode/bin/opencode", "models"],
+  ]);
+});
+
+function saveWithVersion(version, { restartFails = false } = {}) {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "oc-switch-save-"));
+  const calls = [];
+  const switcher = createOcSwitcher({
+    homeDir,
+    env: { OPENCODE_MODEL: "openai/model-a", PATH: "/usr/bin" },
+    shell: "/bin/zsh",
+    resolve: async () => "/opt/opencode/bin/opencode",
+    command: async (args, options = {}) => {
+      calls.push({ args, env: options.env });
+      if (args[1] === "--version") return `${version}\n`;
+      if (args[1] === "service" && restartFails) throw new Error("OpenCode command unavailable");
+      return "";
+    },
+  });
+  const state = applyModelSelection(switcher.loadState(), { target: "defaultModel", modelRef: "opencode-go/model-b" });
+  return { homeDir, calls, saving: switcher.saveState(state) };
+}
+
+test("restarts the OpenCode 2 background service with the saved models", async () => {
+  const { homeDir, calls, saving } = saveWithVersion("opencode v2.4.1");
+  try {
+    await saving;
+    assert.match(fs.readFileSync(path.join(homeDir, ".zshrc"), "utf8"), /OPENCODE_MODEL='opencode-go\/model-b'/);
+    const restart = calls.find((call) => call.args[1] === "service");
+    assert.deepEqual(restart.args, ["/opt/opencode/bin/opencode", "service", "restart"]);
+    assert.equal(restart.env.OPENCODE_MODEL, "opencode-go/model-b");
+    assert.equal(restart.env.OPENCODE_LEAD_MODEL, "openai/model-a");
+    assert.equal(restart.env.PATH, "/usr/bin");
+  } finally {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("does not restart a service on OpenCode 1", async () => {
+  const { homeDir, calls, saving } = saveWithVersion("1.19.6");
+  try {
+    await saving;
+    assert.equal(calls.some((call) => call.args[1] === "service"), false);
+  } finally {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("keeps the saved models when the OpenCode 2 service restart fails", async () => {
+  const { homeDir, saving } = saveWithVersion("opencode v2.4.1", { restartFails: true });
+  try {
+    await assert.rejects(saving, (error) => error.saved === true && /opencode service restart/.test(error.message));
+    assert.match(fs.readFileSync(path.join(homeDir, ".zshrc"), "utf8"), /OPENCODE_MODEL='opencode-go\/model-b'/);
+  } finally {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
 });
 
 test("finds OpenCode directly on PATH without starting a login shell", () => {

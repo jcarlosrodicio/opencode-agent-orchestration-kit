@@ -398,8 +398,9 @@ OpenCode default model, small/title model, and per-agent overrides. It builds
 its provider list from OpenCode itself and reads the local model catalog from
 `opencode models --pure`, so it only shows providers configured in your
 OpenCode installation. Startup is cache-first; press `r` when you want an
-explicit remote catalog refresh through `--refresh`. It does not share a
-catalog with Pi.
+explicit remote catalog refresh through `--refresh`. On OpenCode 2, which
+removed both flags and already lists only providers with credentials, it reads
+`opencode models` instead. It does not share a catalog with Pi.
 
 From this checkout, run:
 
@@ -445,7 +446,12 @@ global bin directory) on `PATH` if npm is configured with a user prefix.
   `r` explicitly refreshes OpenCode's catalog.
 
 The selected values are persisted in the OpenCode model-switcher state and in
-the managed model block of `.zshrc` or `.bashrc`.
+the managed model block of `.zshrc` or `.bashrc`. On OpenCode 2, saving also
+runs `opencode service restart` with the new values, because the background
+service keeps the environment it started with; if the restart fails, the
+values stay saved and `oc-switch` asks you to run that command yourself.
+Terminals that were already open keep the old variables until you open a new
+shell.
 
 Pi has its own independent `pi-switch`; its catalog comes only from Pi's
 `pi --list-models` command.
